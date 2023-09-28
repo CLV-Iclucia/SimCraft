@@ -1,12 +1,12 @@
 //
 // Created by creeper on 23-9-1.
 //
+#include <FluidSim/common/fluid-simulator.h>
 #include <GLFW/glfw3.h>
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
 #include <iostream>
 #include <memory>
-#include <FluidSim/fluid-simulator.h>
 bool show_demo_window = true;
 bool show_another_window = false;
 ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -46,8 +46,9 @@ int main() {
   if (!initGLFW(window))
     return -1;
   ImGuiIO &io = initImGui(window);
-  fluid::FluidSimulator2D* simulator = new fluid::ApicSimulator2D;
+  fluid::FluidSimulator2D *simulator = new fluid::ApicSimulator2D;
   while (!glfwWindowShouldClose(window)) {
+    glfwPollEvents();
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();

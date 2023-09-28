@@ -6,7 +6,7 @@
 #define SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_FLUID_SIMULATOR_H_
 #include <Core/animation.h>
 #include <Core/timer.h>
-#include <FluidSim/fluid-sim.h>
+#include <FluidSim/common/fluid-sim.h>
 namespace fluid {
 
 class FluidSimulator2D : public core::Animation {
@@ -20,14 +20,19 @@ class ApicSimulator2D : public FluidSimulator2D {
 public:
   core::Timer timer;
   ~ApicSimulator2D() override = default;
-  void init() override;
-  void step(core::Frame &frame) override;
+  void init() override {
+
+  }
+  void step(core::Frame &frame) override {
+
+  }
 
 private:
   int nParticles = 0;
   struct ParticleList {
   } m_particles;
 };
+
 class ApicSimulator3D : public FluidSimulator2D {
  public:
   core::Timer timer;
