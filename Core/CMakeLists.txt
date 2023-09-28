@@ -1,0 +1,6 @@
+project(Core LANGUAGES CXX CUDA)
+file(GLOB_RECURSE srcs CONFIGURE_DEPENDS src/*.cc src/*.cpp include/*.h)
+add_library(Core STATIC ${srcs})
+target_include_directories(Core PUBLIC include)
+target_include_directories(Core PUBLIC "../external/glm")
+target_include_directories(Core PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
