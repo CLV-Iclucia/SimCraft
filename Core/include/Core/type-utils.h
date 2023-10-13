@@ -7,12 +7,12 @@
 #include <Core/core.h>
 namespace core {
 template <int a, int b> struct compile_time_gcd {
-  static constexpr int value = b ? compile_time_gcd<b, a % b>::value : a;
+  static_assert(a >= 0 && b >= 0);
+  static constexpr int value = b ? compile_time_gcd<a, b>::value : a;
 };
+
 // this enables us to use fractions in template arguments!
 template <int Numerator, int Denominator> struct Fraction {
-  static_assert(Numerator != 0 || Denominator != 1,
-                "There is only one definition of zero vector");
   static_assert(Denominator != 0, "Denominator cannot be zero");
   static_assert(compile_time_gcd<Numerator, Denominator>::value == 1,
                 "Fraction must be irreducible");
@@ -40,6 +40,15 @@ template <typename T, int Dim> struct is_compile_time_vec {
 template <int Dim>
 using Zeros = std::conditional_t<Dim == 2, compile_time_vec2<0, 1, 0, 1>,
                                  compile_time_vec3<0, 1, 0, 1, 0, 1>>;
+template <int Dim>
+using Halfs = std::conditional_t<Dim == 2, compile_time_vec2<1, 2, 1, 2>,
+                                 compile_time_vec3<1, 2, 1, 2, 1, 2>>;
+template <int Dim, int Axis>
+using Half = std::conditional_t<Dim == 2, compile_time_vec2<Axis == 0, 2,
+                                                           Axis == 1, 2>,
+                                compile_time_vec3<Axis == 0, 2, Axis == 1, 2,
+                                                  Axis == 2, 2>>;
+
 // specialize is_compile_time_vec for compile_time_vec2 and compile_time_vec3
 template <int NumeratorX, int DenominatorX, int NumeratorY, int DenominatorY>
 struct is_compile_time_vec<
