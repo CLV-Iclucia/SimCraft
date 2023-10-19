@@ -14,12 +14,16 @@ struct VertexBufferObj {
         glBindBuffer(GL_ARRAY_BUFFER, id);
     }
     template <typename T>
-    void passData(const std::vector<T>& data) {
-        glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(T), data.data(), GL_STATIC_DRAW);
+    void allocData(const std::vector<T>& data) {
+        glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(T), (void*)data.data(), GL_STATIC_DRAW);
     }
     template <typename T>
-    void passData(const T* data, int size) {
-        glBufferData(GL_ARRAY_BUFFER, size * sizeof(T), data, GL_STATIC_DRAW);
+    void allocData(const T* data, int size) {
+        glBufferData(GL_ARRAY_BUFFER, size * sizeof(T), (void*)data, GL_STATIC_DRAW);
+    }
+    template <typename T>
+    void passData(const std::vector<T>& data) {
+        glBufferSubData(GL_ARRAY_BUFFER, 0, data.size() * sizeof(T), (void*)data.data());
     }
     void bind() {
         glBindBuffer(GL_ARRAY_BUFFER, id);
@@ -39,7 +43,7 @@ struct VertexArrayObj {
     }
     // methods for attributes
 
-    void unbind() {
+    static void unbind() {
         glBindVertexArray(0);
     }
     ~VertexArrayObj() {

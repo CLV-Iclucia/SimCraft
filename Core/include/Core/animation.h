@@ -9,7 +9,7 @@ namespace core {
 class Frame final {
 public:
   Index idx = 0;
-  Real dt = 1.0 / 60.0;
+  Real dt = 1.0 / 100.0;
   Real currentTime() const { return idx * dt; }
   void onAdvance() { idx++; }
 };

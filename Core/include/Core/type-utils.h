@@ -5,16 +5,22 @@
 #ifndef SIMCRAFT_CORE_INCLUDE_CORE_TYPE_UTILS_H_
 #define SIMCRAFT_CORE_INCLUDE_CORE_TYPE_UTILS_H_
 #include <Core/core.h>
+#include <type_traits>
 namespace core {
 template <int a, int b> struct compile_time_gcd {
   static_assert(a >= 0 && b >= 0);
-  static constexpr int value = b ? compile_time_gcd<a, b>::value : a;
+  static constexpr int value = compile_time_gcd<b, a % b>::value;
+};
+
+template <int a> struct compile_time_gcd<a, 0> {
+  static_assert(a >= 0);
+  static constexpr int value = a;
 };
 
 // this enables us to use fractions in template arguments!
 template <int Numerator, int Denominator> struct Fraction {
   static_assert(Denominator != 0, "Denominator cannot be zero");
-  static_assert(compile_time_gcd<Numerator, Denominator>::value == 1,
+  static_assert(compile_time_gcd<Numerator, Denominator>::value == 1 || Numerator == 0,
                 "Fraction must be irreducible");
   static constexpr Real value = static_cast<Real>(Numerator) / Denominator;
 };

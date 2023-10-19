@@ -6,12 +6,14 @@
 #define SIMCRAFT_CORE_INCLUDE_CORE_DATA_STRUCTURES_GRIDS_H_
 #include <Core/core.h>
 #include <Core/type-utils.h>
+
 #include <algorithm>
 #include <type_traits>
 namespace core {
 using std::max;
 using std::min;
-template <typename T, int Dim, typename Offset> class TGrid {
+template <typename T, int Dim, typename Offset>
+class TGrid {
   static_assert(Dim == 2 || Dim == 3, "Grid dimension must be 2 or 3");
   static_assert(
       is_compile_time_vec<Offset, Dim>::value,
@@ -19,20 +21,23 @@ template <typename T, int Dim, typename Offset> class TGrid {
   static_assert(Offset::value < 1.0 && Offset::value >= 0.0,
                 "Offset must be in [0, 1)");
 };
-template <typename T, typename Offset> class TGrid<T, 2, Offset> {
-public:
+template <typename T, typename Offset>
+class TGrid<T, 2, Offset> {
+ public:
   using Range = std::tuple<Vec2i, Vec2i>;
-  static Vec2f offset() { return {Offset::x, Offset::y}; }
+  static Vector<T, 2> offset() {
+    return Vector<T, 2>(static_cast<T>(Offset::x), static_cast<T>(Offset::y));
+  }
   TGrid() = default;
-  explicit TGrid(const Vec2i &size) : m_size(size) {}
-  explicit TGrid(const Vec2i &size, const Vec2f &grid_spacing)
-      : m_size(size), m_grid_spacing(grid_spacing) {}
-  explicit TGrid(const Vec2i &size, const Vec2f &grid_spacing,
+  explicit TGrid(const Vec2i &size) : m_size(size), m_data(size.x * size.y) {}
+  explicit TGrid(const Vec2i &size, const Vector<T, 2> &grid_spacing)
+      : m_size(size), m_grid_spacing(grid_spacing), m_data(size.x * size.y) {}
+  explicit TGrid(const Vec2i &size, const Vector<T, 2> &grid_spacing,
                  const vector<T> &data)
       : m_size(size), m_grid_spacing(grid_spacing), m_data(data) {}
-  explicit TGrid(const Vec2i &size, const Vec2f &grid_spacing, vector<T> &&data)
+  explicit TGrid(const Vec2i &size, const Vector<T, 2> &grid_spacing, vector<T> &&data)
       : m_size(size), m_grid_spacing(grid_spacing), m_data(std::move(data)) {}
-  void init(const Vec2i &size, const Vec2f &grid_spacing,
+  void init(const Vec2i &size, const Vector<T, 2> &grid_spacing,
             const vector<T> &data) {
     m_size = size;
     m_grid_spacing = grid_spacing;
@@ -41,24 +46,44 @@ public:
   const Vec2i &size() const { return m_size; }
   int width() const { return m_size.x; }
   int height() const { return m_size.y; }
-  T operator()(int i, int j) const { return m_data[i * m_size.y + j]; }
-  T &operator()(int i, int j) { return m_data[i * m_size.y + j]; }
-  T at(int i, int j) const { return m_data[i * m_size.y + j]; }
-  T &at(int i, int j) { return m_data[i * m_size.y + j]; }
+  T operator()(int i, int j) const {
+    assert(i >= 0 && i < m_size.x && j >= 0 && j < m_size.y);
+    return m_data[i * m_size.y + j];
+  }
+  T &operator()(int i, int j) {
+    assert(i >= 0 && i < m_size.x && j >= 0 && j < m_size.y);
+    return m_data[i * m_size.y + j];
+  }
+  T at(int i, int j) const {
+    assert(i >= 0 && i < m_size.x && j >= 0 && j < m_size.y);
+    return m_data[i * m_size.y + j];
+  }
+  T &at(int i, int j) {
+    assert(i >= 0 && i < m_size.x && j >= 0 && j < m_size.y);
+    return m_data[i * m_size.y + j];
+  }
   T at(const Vec2i &index) const {
+    assert(index.x >= 0 && index.x < m_size.x && index.y >= 0 &&
+           index.y < m_size.y);
     return m_data[index.x * m_size.y + index.y];
   }
-  T &at(const Vec2i &index) { return m_data[index.x * m_size.y + index.y]; }
-  const Vec2f &gridSpacing() const { return m_grid_spacing; }
-  Vec2i nearest(const Vec2f& coord) const {
-    // get nearest point for coord
-    return Vec2i((coord - offset()) / m_grid_spacing + Vec2f(0.5));
+  T &at(const Vec2i &index) {
+    assert(index.x >= 0 && index.x < m_size.x && index.y >= 0 &&
+           index.y < m_size.y);
+    return m_data[index.x * m_size.y + index.y];
   }
-  Vec2i coordToIndex(const Vec2f &coord) const {
+  const Vector<T, 2> &gridSpacing() const { return m_grid_spacing; }
+  Vec2i nearest(const Vector<T, 2> &coord) const {
+    // get nearest point for coord
+    return Vec2i((coord - offset() * m_grid_spacing) / m_grid_spacing + Vector<T, 2>(0.5));
+  }
+  Vec2i coordToIndex(const Vector<T, 2> &coord) const {
     return Vec2i((coord - offset() * m_grid_spacing) / m_grid_spacing);
   }
-  Vec2f indexToCoord(const Vec2i &index) const {
-    return (Vec2f(index) + offset()) * m_grid_spacing;
+  Vector<T, 2> indexToCoord(const Vec2i &index) const {
+    assert(index.x >= 0 && index.x < m_size.x && index.y >= 0 &&
+           index.y < m_size.y);
+    return (Vector<T, 2>(index) + offset()) * m_grid_spacing;
   }
   void resize(const Vec2i &size) {
     m_size = size;
@@ -69,30 +94,30 @@ public:
     std::swap(m_grid_spacing, other.m_grid_spacing);
     std::swap(m_data, other.m_data);
   }
-  template <typename Func> void forEach(Func &&func) const {
+  template <typename Func>
+  void forEach(Func &&func) const {
     for (int i = 0; i < m_size.x; i++)
-      for (int j = 0; j < m_size.y; j++)
-        func(i, j);
+      for (int j = 0; j < m_size.y; j++) func(i, j);
   }
-  template <typename Func> void forEach(Func &&func) {
+  template <typename Func>
+  void forEach(Func &&func) {
     for (int i = 0; i < m_size.x; i++)
-      for (int j = 0; j < m_size.y; j++)
-        func(Vec2i(i, j));
+      for (int j = 0; j < m_size.y; j++) func(Vec2i(i, j));
   }
   // for inside
-  template <typename Func> void forInside(Func &&func) const {
+  template <typename Func>
+  void forInside(Func &&func) const {
     for (int i = 1; i < m_size.x - 1; i++)
-      for (int j = 1; j < m_size.y - 1; j++)
-        func(i, j);
+      for (int j = 1; j < m_size.y - 1; j++) func(i, j);
   }
-  template <typename Func> void forInside(Func &&func) {
+  template <typename Func>
+  void forInside(Func &&func) {
     for (int i = 1; i < m_size.x - 1; i++)
-      for (int j = 1; j < m_size.y - 1; j++)
-        func(Vec2i(i, j));
+      for (int j = 1; j < m_size.y - 1; j++) func(Vec2i(i, j));
   }
   // TODO: For now this only suits zero offsets
   template <typename Func>
-  void forNeighbours(const Vec2f &p, Real r, Func &&func) {
+  void forNeighbours(const Vector<T, 2> &p, Real r, Func &&func) {
     int lower_bound_x =
         max(static_cast<int>(std::ceil(p.x / m_grid_spacing.x - r)), 0);
     int upper_bound_x =
@@ -102,8 +127,7 @@ public:
     int upper_bound_y =
         min(static_cast<int>(p.y / m_grid_spacing.y + r), m_size.y - 1);
     for (int i = lower_bound_x; i <= upper_bound_x; i++)
-      for (int j = lower_bound_y; j <= upper_bound_y; j++)
-        func(i, j);
+      for (int j = lower_bound_y; j <= upper_bound_y; j++) func(i, j);
   }
   template <typename Func>
   void forNeighbours(const Vec2i &p, Real r, Func &&func) {
@@ -116,8 +140,7 @@ public:
     int upper_bound_y =
         min(static_cast<int>(p.y / m_grid_spacing.y + r), m_size.y - 1);
     for (int i = lower_bound_x; i <= upper_bound_x; i++)
-      for (int j = lower_bound_y; j <= upper_bound_y; j++)
-        func(Vec2i(i, j));
+      for (int j = lower_bound_y; j <= upper_bound_y; j++) func(Vec2i(i, j));
   }
   template <typename Func>
   void forGridNeighbours(const Vec2i &p, Real r, Func &&func) {
@@ -127,8 +150,7 @@ public:
     int upper_bound_y = min(p.y + static_cast<int>(std::ceil(r)), m_size.y - 1);
 
     for (int i = lower_bound_x; i <= upper_bound_x; i++)
-      for (int j = lower_bound_y; j <= upper_bound_y; j++)
-        func(Vec2i(i, j));
+      for (int j = lower_bound_y; j <= upper_bound_y; j++) func(Vec2i(i, j));
   }
   Range computeIntersectionNeighbourhoods(const Vec2i &p1, const Vec2i &p2,
                                           Real r) {
@@ -152,19 +174,28 @@ public:
                            Vec2i(upper_bound_x, upper_bound_y));
   }
   void clear() { m_data.clear(); }
+  void fill(T value) {
+    std::fill(m_data.begin(), m_data.end(), value);
+  }
+  T* data() { return m_data.data(); }
+  const T* data() const { return m_data.data(); }
   virtual ~TGrid() = default;
 
-protected:
+ protected:
   Vec2i m_size{0, 0};
-  Vec2f m_grid_spacing{1.0, 1.0};
+  Vector<T, 2> m_grid_spacing{1.0, 1.0};
   // in major XY, m_data[i, j] stores the value at ((i, j) + offset) * spacing
   vector<T> m_data;
 };
 
-template <typename T, typename Offset> class TGrid<T, 3, Offset> {
-public:
+template <typename T, typename Offset>
+class TGrid<T, 3, Offset> {
+ public:
   using Range = std::tuple<Vec3i, Vec3i>;
-  static Vec3f offset() { return {Offset::x, Offset::y, Offset::z}; }
+  static Vector<T, 3> offset() {
+    return Vector<T, 3>(static_cast<T>(Offset::x), static_cast<T>(Offset::y),
+            static_cast<T>(Offset::z));
+  }
   TGrid() = default;
   explicit TGrid(const Vec3i &size) : m_size(size) {}
   explicit TGrid(const Vec3i &size, const Vec3f &grid_spacing)
@@ -215,31 +246,31 @@ public:
     std::swap(m_grid_spacing, other.m_grid_spacing);
     std::swap(m_data, other.m_data);
   }
-  template <typename Func> void forEach(Func &&func) const {
+  template <typename Func>
+  void forEach(Func &&func) const {
     for (int i = 0; i < m_size.x; i++)
       for (int j = 0; j < m_size.y; j++)
-        for (int k = 0; k < m_size.z; k++)
-          func(i, j, k);
+        for (int k = 0; k < m_size.z; k++) func(i, j, k);
   }
   // another for of forEach which supports argument as Vec3i
-  template <typename Func> void forEach(Func &&func) {
+  template <typename Func>
+  void forEach(Func &&func) {
     for (int i = 0; i < m_size.x; i++)
       for (int j = 0; j < m_size.y; j++)
-        for (int k = 0; k < m_size.z; k++)
-          func(Vec3i(i, j, k));
+        for (int k = 0; k < m_size.z; k++) func(Vec3i(i, j, k));
   }
-  template <typename Func> void forInside(Func &&func) const {
+  template <typename Func>
+  void forInside(Func &&func) const {
     for (int i = 1; i < m_size.x - 1; i++)
       for (int j = 1; j < m_size.y - 1; j++)
-        for (int k = 1; k < m_size.z - 1; k++)
-          func(i, j, k);
+        for (int k = 1; k < m_size.z - 1; k++) func(i, j, k);
   }
   // another for of forEach which supports argument as Vec3i
-  template <typename Func> void forInside(Func &&func) {
+  template <typename Func>
+  void forInside(Func &&func) {
     for (int i = 1; i < m_size.x - 1; i++)
       for (int j = 1; j < m_size.y - 1; j++)
-        for (int k = 1; k < m_size.z - 1; k++)
-          func(Vec3i(i, j, k));
+        for (int k = 1; k < m_size.z - 1; k++) func(Vec3i(i, j, k));
   }
   // perform func on all neighbours of p within radius of grid spacing r
   template <typename Func>
@@ -258,8 +289,7 @@ public:
         min(static_cast<int>(p.z / m_grid_spacing.z + r), m_size.z - 1);
     for (int i = lower_bound_x; i <= upper_bound_x; i++)
       for (int j = lower_bound_y; j <= upper_bound_y; j++)
-        for (int k = lower_bound_z; k <= upper_bound_z; k++)
-          func(i, j, k);
+        for (int k = lower_bound_z; k <= upper_bound_z; k++) func(i, j, k);
   }
   // another method to perform func on all neighbours of p within grid spacing r
   // the only difference is that func accepts a Vec3i instead of three ints
@@ -328,18 +358,21 @@ public:
     return std::make_tuple(Vec3i(lower_bound_x, lower_bound_y, lower_bound_z),
                            Vec3i(upper_bound_x, upper_bound_y, upper_bound_z));
   }
-  // add a method to clear the grid
   void clear() { m_data.clear(); }
+  void fill(T value) {
+    std::fill(m_data.begin(), m_data.end(), value);
+  }
   virtual ~TGrid() = default;
 
-protected:
+ protected:
   Vec3i m_size{0, 0, 0};
   Vec3f m_grid_spacing{1.0, 1.0, 1.0};
   // in major XYZ, m_data[i, j, k] stores the value at (i, j, k) * spacing +
   // offset
   vector<T> m_data;
 };
-template <typename T, int Dim> using Grid = TGrid<T, Dim, Zeros<Dim>>;
+template <typename T, int Dim>
+using Grid = TGrid<T, Dim, Zeros<Dim>>;
 template <typename T, int Dim>
 using CellCentredGrid = TGrid<T, Dim, Halfs<Dim>>;
 template <typename T, int Dim, int Axis>
@@ -350,8 +383,9 @@ using FaceCentreOffset = std::conditional_t<
     compile_time_vec2<Axis != 0, 2, Axis != 1, 2>>;
 template <typename T, int Dim, int Axis>
 using FaceCentredGrid = TGrid<T, Dim, FaceCentreOffset<Dim, Axis>>;
-template <int Dim> using ScalarGrid = Grid<Real, Dim>;
+template <int Dim>
+using ScalarGrid = Grid<Real, Dim>;
 template <int VectorDim, int Dim>
 using VectorGrid = Grid<Vector<Real, Dim>, Dim>;
-} // namespace core
-#endif // SIMCRAFT_CORE_INCLUDE_CORE_DATA_STRUCTURES_GRIDS_H_
+}  // namespace core
+#endif  // SIMCRAFT_CORE_INCLUDE_CORE_DATA_STRUCTURES_GRIDS_H_

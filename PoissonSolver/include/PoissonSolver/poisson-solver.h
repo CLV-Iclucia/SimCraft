@@ -1,6 +1,8 @@
 #ifndef POISSONSOLVER_H_
 #define POISSONSOLVER_H_
 
+// the design of this solver is that it does not store any internal state
+// so that it is naturally thread-safe
 namespace poisson {
 enum struct Device {
     CPU,
@@ -26,20 +28,20 @@ struct PoissonSolverOption {
     Device input_device = Device::CPU;
     Device solving_device = Device::CPU;
     Device output_device = Device::CPU;
-    float* input_vars;
-    float* input_rhs;
-    float* residual = nullptr; // if nullptr, auxilary memory will be allocated
-    float* output_vars = nullptr; // if nullptr, input will be overwritten
-    float tolerance = 1e-6;
+    double* input_vars;
+    double* input_rhs;
+    double* residual = nullptr; // if nullptr, auxilary memory will be allocated
+    double* output_vars = nullptr; // if nullptr, input will be overwritten
+    double tolerance = 1e-6;
     Method method = Method::CG;
 };
 
 struct MultigridOption;
-
+struct CgSolverOption;
 
 void poissonSolve(const PoissonSolverOption& option);
 void multigridSolve(const PoissonSolverOption& option, const MultigridOption& mg_option);
-void mgpcgSolve(const PoissonSolverOption& option, const MultigridOption& mg_option);
+void mgpcgSolve(const PoissonSolverOption& option, const MultigridOption& mg_option, const CgSolverOption& cg_option);
 }
 
 #endif

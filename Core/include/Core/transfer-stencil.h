@@ -14,7 +14,7 @@ struct CubicKernel {
     if (abs_x < 1.0) {
       return 0.5 * core::cubic(abs_x) - core::sqr(abs_x) + 2.0 / 3.0;
     } else if (abs_x < 2.0) {
-      return -1.0 / 6.0 * core::cubic(2.0 - abs_x);
+      return 1.0 / 6.0 * core::cubic(2.0 - abs_x);
     } else {
       return 0.0;
     }
