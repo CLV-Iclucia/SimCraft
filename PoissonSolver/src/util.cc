@@ -51,6 +51,7 @@ void rbGaussSeidel(double *u, double *f, int n, int m, int color) {
 }
 
 // perf history: using block size of 4, 1.5 faster than the trivial loop
+// perf history: only blocking y, even slower?
 void applyLaplacian(double *output, double *input, int n, int m) {
   int B = 4;
   int nB = n / B;
@@ -69,6 +70,7 @@ void applyLaplacian(double *output, double *input, int n, int m) {
       }
     }
   }
+
 }
 
 double computeNullSpace(double *r, int n, int m) {

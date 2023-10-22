@@ -197,19 +197,19 @@ void ApicSimulator2D::advect(const core::Frame &frame) {
     p += vel(i) * static_cast<Real>(frame.dt);
     if (p.x < 0.0) {
       p.x = 0.0;
-      vel(i).x = -vel(i).x;
+      vel(i).x = 0.0;
     }
     if (p.x > 1.0) {
       p.x = 1.0;
-      vel(i).x = -vel(i).x;
+      vel(i).x = 0.0;
     }
     if (p.y < 0.0) {
       p.y = 0.0;
-      vel(i).y = -vel(i).y;
+      vel(i).y = 0.0;
     }
     if (p.y > 1.0) {
       p.y = 1.0;
-      vel(i).y = -vel(i).y;
+      vel(i).y = 0.0;
     }
   }
 }
