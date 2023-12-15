@@ -7,7 +7,7 @@
 
 #include <Core/core.h>
 #include <Core/properties.h>
-#include <Core/data-structures/grids.h>
+#include <Spatify/grids.h>
 namespace fluid {
 using Index = int;
 using core::Real;
@@ -19,8 +19,15 @@ using core::Vec2f;
 using core::Vec3f;
 using core::Vec2d;
 using core::Vec3d;
-using core::Grid;
-using core::CellCentredGrid;
-using core::FaceCentredGrid;
+using core::Vector;
+using core::Matrix;
+using spatify::Grid;
+using spatify::CellCentredGrid;
+using spatify::FaceCentredGrid;
+enum class Marker {
+  Fluid,
+  Solid,
+  Air,
+};
 };
 #endif // SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_CORE_H_
