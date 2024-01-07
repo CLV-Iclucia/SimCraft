@@ -9,88 +9,20 @@
 #include <Core/rand-gen.h>
 #include <Spatify/grids.h>
 #include <Spatify/arrays.h>
-#include <FluidSim/common/sdf.h>
-#include <FluidSim/common/fluid-sim.h>
-#include <FluidSim/common/advect-solver.h>
-#include <FluidSim/common/project-solver.h>
+#include <FluidSim/fluid-sim.h>
+#include <FluidSim/cpu/sdf.h>
+#include <FluidSim/cpu/advect-solver.h>
+#include <FluidSim/cpu/project-solver.h>
 #include <memory>
 
-enum class AdvectionOption {
-};
-
 namespace fluid {
-class ProjectionSolver2D;
-class HybridAdvectionSolver2D;
 
-class HybridFluidSimulator2D : public core::Animation {
-  public:
-    core::Timer timer;
-    ~HybridFluidSimulator2D() override = default;
-    void init(int n, const Vec2d& size, const Vec2i& resolution);
-    void initSolver(const Vec2i& resolution);
-    void step(core::Frame& frame) override;
-    [[nodiscard]] const std::vector<Vec2d>& positions() const {
-      return m_particles.positions;
-    }
-    std::vector<Vec2d>& positions() { return m_particles.positions; }
-
-  private:
-    int nParticles;
-    struct ParticleList {
-      std::vector<Vec2d> positions;
-      std::vector<Vec2d> velocities;
-    } m_particles;
-    [[nodiscard]] const Vec2d& pos(int i) const {
-      return m_particles.positions[i];
-    }
-    [[nodiscard]] const Vec2d& vel(int i) const {
-      return m_particles.velocities[i];
-    }
-    Vec2d& pos(int i) { return m_particles.positions[i]; }
-    Vec2d& vel(int i) { return m_particles.velocities[i]; }
-    Real density = 1e3;
-    template <typename Func>
-    void forActiveCells(Func&& func) {
-      for (const auto& idx : active_cells) {
-        int x = idx.x, y = idx.y;
-        func(x, y);
-      }
-    }
-    template <typename Func>
-    void forActiveCells(Func&& func) const {
-      for (const auto& idx : active_cells) {
-        int x = idx.x, y = idx.y;
-        func(x, y);
-      }
-    }
-    Real pressure(int x, int y) {
-      return markers(x, y) == Marker::Fluid ? p_grid(x, y) : 0.0;
-    }
-    void clear();
-    void applyForce(Real dt);
-    Real CFL();
-    void substep(Real dt);
-    void markCell();
-    // when do we use unique_ptr: for those grids that needs to be swapped with buffers
-    // and for polymorphic solvers
-    std::unique_ptr<FaceCentredGrid<Real, Real, 2, 0>> u_grid, u_buf_grid;
-    std::unique_ptr<FaceCentredGrid<Real, Real, 2, 1>> v_grid, v_buf_grid;
-    CellCentredGrid<Real, Real, 2> p_grid;
-    CellCentredGrid<Real, Real, 2> collider_sdf;
-    spatify::Array2D<Real> Adiag, Aneighbour[4], rhs;
-    std::unique_ptr<ProjectionSolver2D> projector;
-    std::unique_ptr<HybridAdvectionSolver2D> advector;
-    std::vector<Vec2i> active_cells;
-    spatify::GhostArray2D<Marker, 1> markers;
-};
-
-class HybridFluidSimulator3D : public core::Animation {
+class HybridFluidSimulator3D final : public core::Animation {
   public:
     core::Timer timer;
     ~HybridFluidSimulator3D() override = default;
-    HybridFluidSimulator3D(int n, const Vec3d& size, const Vec3i& resolution,
-                           Real density)
-      : nParticles(n), density(density), pg(resolution),
+    HybridFluidSimulator3D(int n, const Vec3d& size, const Vec3i& resolution)
+      : nParticles(n), pg(resolution),
         colliderSdf(resolution, size), markers(resolution) {
       m_particles.positions.resize(n);
       // compute grid spacing
@@ -108,7 +40,6 @@ class HybridFluidSimulator3D : public core::Animation {
           resolution + Vec3i(0, 1, 0), Vec3d(gridSpacing));
       wbuf = std::make_unique<FaceCentredGrid<Real, Real, 3, 2>>(
           resolution + Vec3i(0, 0, 1), Vec3d(gridSpacing));
-      // init u/v/wValid and u/v/wValidBuf
       uValid = std::make_unique<Array3D<char>>(resolution + Vec3i(1, 0, 0));
       vValid = std::make_unique<Array3D<char>>(resolution + Vec3i(0, 1, 0));
       wValid = std::make_unique<Array3D<char>>(resolution + Vec3i(0, 0, 1));
@@ -146,9 +77,9 @@ class HybridFluidSimulator3D : public core::Animation {
     std::vector<Vec3d>& positions() { return m_particles.positions; }
 
   private:
-    int nParticles;
+    int nParticles{};
     struct ParticleList {
-      std::vector<Vec3d> positions;
+      std::vector<Vec3d> positions{};
     } m_particles;
     template <typename GridType>
     void extrapolate(std::unique_ptr<GridType>& g,
@@ -191,7 +122,6 @@ class HybridFluidSimulator3D : public core::Animation {
         std::swap(valid, validBuf);
       }
     }
-    Real density = 1e3;
     Real pressure(int x, int y, int z) {
       return markers(x, y, z) == Marker::Fluid ? pg(x, y, z) : 0.0;
     }
@@ -213,7 +143,7 @@ class HybridFluidSimulator3D : public core::Animation {
     std::unique_ptr<SDF<3>> fluidSurface{}, fluidSurfaceBuf{};
     ProjectionSolver3D* projector{};
     HybridAdvectionSolver3D* advector{};
-    spatify::GhostArray3D<Marker, 1> markers;
+    GhostArray3D<Marker, 1> markers;
 };
 } // namespace fluid
 #endif  // SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_FLUID_SIMULATOR_H_

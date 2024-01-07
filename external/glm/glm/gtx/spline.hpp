@@ -40,7 +40,7 @@
 
 // Dependency:
 #include "../glm.hpp"
-#include "../gtx/optimum_pow.hpp"
+#include "optimum_pow.hpp"
 
 #if(defined(GLM_MESSAGES) && !defined(glm_ext))
 #	pragma message("GLM: GLM_GTX_spline extension included")

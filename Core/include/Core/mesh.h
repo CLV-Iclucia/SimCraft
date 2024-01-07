@@ -4,13 +4,16 @@
 
 #ifndef SIMCRAFT_CORE_INCLUDE_CORE_SURFACE_H_
 #define SIMCRAFT_CORE_INCLUDE_CORE_SURFACE_H_
+#include <Core/core.h>
+#include <string>
 namespace core {
-class Surface2D {
-
+struct Mesh {
+  int triangleCount;
+  std::vector<Vec3d> vertices;
+  std::vector<Vec3d> normals;
+  std::vector<uint> indices;
 };
 
-class Surface3D {
-
-};
+bool myLoadObj(const std::string& path, Mesh* mesh);
 }
 #endif // SIMCRAFT_CORE_INCLUDE_CORE_DATA_STRUCTURES_SDF_H_

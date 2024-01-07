@@ -41,7 +41,7 @@
 
 // Dependency:
 #include "../glm.hpp"
-#include "../gtx/fast_square_root.hpp"
+#include "fast_square_root.hpp"
 
 #if(defined(GLM_MESSAGES) && !defined(glm_ext))
 #	pragma message("GLM: GLM_GTX_normalize_dot extension included")

@@ -4,7 +4,7 @@
 
 #ifndef JEOCRAFT_IMPLICITSURFACE_INCLUDE_IMPLICITSURFACE_SDF_H_
 #define JEOCRAFT_IMPLICITSURFACE_INCLUDE_IMPLICITSURFACE_SDF_H_
-#include <FluidSim/common/fluid-sim.h>
+#include <FluidSim/fluid-sim.h>
 #include <Spatify/grids.h>
 #include <Spatify/arrays.h>
 #include <Spatify/ns-util.h>
@@ -20,6 +20,17 @@ struct SDF : NonCopyable {
   SDF(const Vector<int, Dim>& resolution, const Vector<Real, Dim>& size,
       const Vector<Real, Dim>& origin = Vector<Real, Dim>(0.0))
     : grid(resolution, size, origin) {
+    Real h = static_cast<Real>(size.x) / resolution.x;
+    for (int i = -1; i <= resolution.x; i++)
+      for (int j = -1; j <= resolution.y; j++)
+        for (int k = -1; k <= resolution.z; k++) {
+          if (int cnt = (i < 0 || i == resolution.x) + (
+                          j < 0 || j == resolution.y)
+                        + (k < 0 || k == resolution.z))
+            grid(i, j, k) = -h / std::sqrt(cnt);
+          else {
+          }
+        }
   }
   void init(const Vector<int, Dim>& resolution, const Vector<Real, Dim>& size,
             const Vector<Real, Dim>& origin = Vector<Real, Dim>(0.0)) {
@@ -28,9 +39,8 @@ struct SDF : NonCopyable {
   void clear() {
     grid.clear();
   }
-  Real eval(const Vector<Real, Dim>& p) const {
+  [[nodiscard]] Real eval(const Vector<Real, Dim>& p) const {
     if constexpr (Dim == 2) {
-      // use bilerp
     } else if constexpr (Dim == 3) {
       Vec3i idx = grid.coordToCellIndex(p);
       // use trilerp to get the value
@@ -48,7 +58,7 @@ struct SDF : NonCopyable {
              (1 - tx) * (1 - ty) * (1 - tz) * grid(x + 1, y + 1, z + 1);
     }
   }
-  Vector<Real, Dim> gradient(const Vector<int, Dim>& idx) const {
+  [[nodiscard]] Vector<Real, Dim> gradient(const Vector<int, Dim>& idx) const {
     if constexpr (Dim == 2) {
     } else if constexpr (Dim == 3) {
       int xn = idx.x < width() - 1 ? idx.x + 1 : idx.x;
@@ -72,7 +82,7 @@ struct SDF : NonCopyable {
       return Vec3d(gx / dx, gy / dy, gz / dz);
     }
   }
-  Vector<Real, Dim> grad(const Vector<Real, Dim>& p) const {
+  [[nodiscard]] Vector<Real, Dim> grad(const Vector<Real, Dim>& p) const {
     if constexpr (Dim == 2) {
       // use bilerp
     } else if constexpr (Dim == 3) {
@@ -110,7 +120,8 @@ struct SDF : NonCopyable {
     static_assert(Dim == 3);
     return grid.depth();
   }
-  std::vector<Vector<Real, Dim>> positionSamples() const {
+  // for Rendering
+  [[nodiscard]] std::vector<Vector<Real, Dim>> positionSamples() const {
     std::vector<Vector<Real, Dim>> position;
     if constexpr (Dim == 2) {
       for (int i = 0; i < grid.width(); i++)
@@ -130,16 +141,20 @@ struct SDF : NonCopyable {
   const Vector<Real, Dim>& origin() const {
     return grid.origin();
   }
-  CellCentredGrid<Real, Real, Dim> grid;
+  Real& operator()(int i, int j, int k) {
+    return grid(i, j, k);
+  }
+  Real operator()(int i, int j, int k) const {
+    return grid(i, j, k);
+  }
+  PaddedCellCentredGrid<Real, Real, Dim, 1> grid;
 };
 
 template <typename T, int Dim>
 struct ParticleSystemReconstructor : NonCopyable {
   static_assert(Dim == 2 || Dim == 3, "Dim must be 2 or 3");
-  virtual void reconstruct(int n, const Vector<T, Dim>* particles, Real radius,
-                           SDF<3>* sdf) = 0;
-  virtual SDF<Dim>& sdf() = 0;
-  virtual const SDF<Dim>& sdf() const = 0;
+  virtual void reconstruct(std::span<Vector<T, Dim>> particles, Real radius,
+                           SDF<3>& sdf) = 0;
   virtual ~ParticleSystemReconstructor() = default;
 };
 
@@ -148,26 +163,27 @@ class NaiveReconstructor : ParticleSystemReconstructor<T, Dim> {
 };
 
 template <typename T>
-class NaiveReconstructor<T, 3> : public ParticleSystemReconstructor<T, 3> {
+class NaiveReconstructor<
+      T, 3> final : public ParticleSystemReconstructor<T, 3> {
   public:
-    NaiveReconstructor() {
+    NaiveReconstructor(int n, int w, int h, int d, const Vector<T, 3>& size)
+      : ns(n, w, h, d, size) {
     }
-    void reconstruct(int n, const Vector<T, 3>* particles, Real radius,
-                     SDF<3>* sdf) {
-      ns.resetGrid(sdf->width(), sdf->height(), sdf->depth(),
-                   sdf->grid.gridSpacing());
-      ns.update(n, particles);
-      sdf->grid.fill(1e9);
-      sdf->grid.parallelForEach([&](int i, int j, int k) {
-        Vector<T, 3> p = sdf->grid.indexToCoord(i, j, k);
+    void reconstruct(std::span<Vector<T, 3>> particles, Real radius,
+                     SDF<3>& sdf) override {
+      ns.resetGrid(sdf.width(), sdf.height(), sdf.depth(),
+                   sdf.grid.gridSpacing());
+      ns.update(particles);
+      sdf.grid.fill(1e9);
+      sdf.grid.parallelForEach([&](int i, int j, int k) {
+        Vector<T, 3> p = sdf.grid.indexToCoord(i, j, k);
         ns.forNeighbours(p, 2 * radius, [&](int idx) {
           Real dis = glm::distance(p, particles[i]);
           if (dis < radius) {
-            if (sdf->grid(i, j, k) > 0.0 || sdf->grid(i, j, k) < dis -
-                radius)
-              sdf->grid(i, j, k) = dis - radius;
+            if (sdf(i, j, k) > 0.0 || sdf(i, j, k) < dis - radius)
+              sdf(i, j, k) = dis - radius;
           } else
-            sdf->grid(i, j, k) = std::min(sdf->grid(i, j, k), dis - radius);
+            sdf(i, j, k) = std::min(sdf(i, j, k), dis - radius);
         });
       });
     }

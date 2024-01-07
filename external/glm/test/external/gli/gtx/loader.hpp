@@ -11,9 +11,9 @@
 #define GLI_GTX_LOADER_INCLUDED
 
 #include "../gli.hpp"
-#include "../gtx/loader_dds9.hpp"
-#include "../gtx/loader_dds10.hpp"
-#include "../gtx/loader_tga.hpp"
+#include "loader_dds9.hpp"
+#include "loader_dds10.hpp"
+#include "loader_tga.hpp"
 
 namespace gli{
 namespace gtx{

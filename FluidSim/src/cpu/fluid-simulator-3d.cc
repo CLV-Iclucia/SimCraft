@@ -3,16 +3,16 @@
 //
 #include <Core/animation.h>
 #include <Core/rand-gen.h>
-#include <FluidSim/common/fluid-simulator.h>
-#include <FluidSim/common/advect-solver.h>
-#include <FluidSim/common/project-solver.h>
-#include <FluidSim/common/util.h>
+#include <FluidSim/cpu/fluid-simulator.h>
+#include <FluidSim/cpu/advect-solver.h>
+#include <FluidSim/cpu/project-solver.h>
+#include <FluidSim/cpu/util.h>
 #include <cassert>
 
 namespace fluid {
 void HybridFluidSimulator3D::applyForce(Real dt) const {
-  vg->forInside([this, dt](const Vec3i& idx) {
-    vg->at(idx) -= 9.8 * dt;
+  vg->forEach([this, dt](int i, int j, int k) {
+    vg->at(i, j, k) -= 9.8 * dt;
   });
 }
 
@@ -75,7 +75,7 @@ void HybridFluidSimulator3D::smoothFluidSurface(int iters) {
 
 void HybridFluidSimulator3D::applyCollider() const {
   ug->parallelForEach([&](int i, int j, int k) {
-    Vec3d pos{ug->indexToCoord(Vec3i(i, j, k))};
+    Vec3d pos{ug->indexToCoord(i, j, k)};
     if (colliderSdf.eval(pos) < 0.0) {
       // calc the normal, and project out the x component
       Vec3d normal{normalize(colliderSdf.grad(pos))};
@@ -83,14 +83,14 @@ void HybridFluidSimulator3D::applyCollider() const {
     }
   });
   vg->parallelForEach([&](int i, int j, int k) {
-    Vec3d pos = vg->indexToCoord(Vec3i(i, j, k));
+    Vec3d pos = vg->indexToCoord(i, j, k);
     if (colliderSdf.eval(pos) < 0.0) {
       Vec3d normal{normalize(colliderSdf.grad(pos))};
       vg->at(i, j, k) -= vg->at(i, j, k) * normal.y;
     }
   });
   wg->parallelForEach([&](int i, int j, int k) {
-    Vec3d pos{wg->indexToCoord(Vec3i(i, j, k))};
+    Vec3d pos{wg->indexToCoord(i, j, k)};
     if (colliderSdf.eval(pos) < 0.0) {
       Vec3d normal{normalize(colliderSdf.grad(pos))};
       wg->at(i, j, k) -= wg->at(i, j, k) * normal.z;
@@ -100,27 +100,26 @@ void HybridFluidSimulator3D::applyCollider() const {
 
 void HybridFluidSimulator3D::substep(Real dt) {
   clear();
-  advector->advect(std::span(positions()), ug.get(), vg.get(), wg.get(),
-                   colliderSdf, dt);
+  advector->advect(std::span(positions()), *ug, *vg, *wg, colliderSdf, dt);
   fluidSurfaceReconstructor->reconstruct(
-      nParticles, m_particles.positions.data(),
-      1.2 * ug->gridSpacing().x / std::sqrt(2.0), fluidSurface.get());
+      m_particles.positions, 1.2 * ug->gridSpacing().x / std::sqrt(2.0),
+      *fluidSurface);
   smoothFluidSurface(5);
-  advector->solveP2G(std::span(positions()), ug.get(), vg.get(), wg.get(),
-                     colliderSdf, uValid.get(), vValid.get(), wValid.get(), dt);
+  markCell();
+  advector->solveP2G(std::span(positions()), *ug, *vg, *wg,
+                     colliderSdf, *uValid, *vValid, *wValid, dt);
   extrapolate(ug, ubuf, uValid, uValidBuf, 10);
   extrapolate(vg, vbuf, vValid, vValidBuf, 10);
   extrapolate(wg, wbuf, wValid, wValidBuf, 10);
   applyForce(dt);
-  projector->buildSystem(markers, ug.get(), vg.get(), wg.get(),
-                         fluidSurface.get(), colliderSdf, density, dt);
-  Real residual{projector->solvePressure(pg)};
-  if (residual > 1e-4)
+  projector->buildSystem(markers, *ug, *vg, *wg, *fluidSurface, colliderSdf,
+                         dt);
+  if (Real residual{projector->solvePressure(markers, pg)}; residual > 1e-4)
     std::cerr << "Warning: projection residual is " << residual << std::endl;
-  projector->project(markers, ug.get(), vg.get(), wg.get(), fluidSurface.get(),
-                     colliderSdf, density, dt);
+  projector->project(markers, *ug, *vg, *wg, pg, *fluidSurface, colliderSdf,
+                     dt);
   applyCollider();
-  advector->solveG2P(std::span(positions()), ug.get(), vg.get(), wg.get(),
+  advector->solveG2P(std::span(positions()), *ug, *vg, *wg,
                      colliderSdf, dt);
 }
 

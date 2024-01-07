@@ -24,6 +24,7 @@ using core::Matrix;
 using spatify::Grid;
 using spatify::CellCentredGrid;
 using spatify::FaceCentredGrid;
+using spatify::PaddedCellCentredGrid;
 enum class Marker {
   Fluid,
   Solid,

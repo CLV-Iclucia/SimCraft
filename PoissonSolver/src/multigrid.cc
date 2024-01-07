@@ -8,10 +8,17 @@
 
 namespace poisson {
 
-void relax(double* u, double* f, int n, int m, const MultigridOption& option) {
-  for (int i = 0; i < option.smooth_iter; i++) {
-    rbGaussSeidel(u, f, n, m, 0);
-    rbGaussSeidel(u, f, n, m, 1);
+void relax(double* u, double* f, int n, int m, const MultigridOption& option, int dir) {
+  if (dir == 0) {
+    for (int iter = 0; iter < option.smooth_iter; iter++) {
+      rbGaussSeidel(u, f, n, m, 0);
+      rbGaussSeidel(u, f, n, m, 1);
+    }
+  } else {
+    for (int iter = 0; iter < option.smooth_iter; iter++) {
+      rbGaussSeidelReverse(u, f, n, m, 1);
+      rbGaussSeidelReverse(u, f, n, m, 0);
+    }
   }
 }
 
@@ -113,7 +120,7 @@ void multigrid(double* u, double* f, int n, int m, const MultigridOption& mg_opt
   double* r = mg_option.residual;
   for (int level = 0; level < max_level; level++) {
     zeroFill(u, n, m);
-    relax(u, f, n, m, mg_option);
+    relax(u, f, n, m, mg_option, 0);
     computeResidual(u, f, level == 0 ? r : f, n, m);
     printf("%f\n", normLinf(level == 0 ? r : f, n, m));
     double* nf = level == 0 ? aux_rhs : f + n * m;
@@ -133,7 +140,7 @@ void multigrid(double* u, double* f, int n, int m, const MultigridOption& mg_opt
     m <<= 1;
     u = nu;
     f = nf;
-    relax(u, f, n, m, mg_option);
+    relax(u, f, n, m, mg_option, 1);
   }
   computeResidual(u, input_rhs, r, n, m);
   std::printf("multigrid: residual = %f\n", normLinf(r, n, m));

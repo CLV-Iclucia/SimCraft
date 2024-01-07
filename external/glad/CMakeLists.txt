@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 project(GLAD)
-set(GLAD_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
-set(GLAD_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
+set(GLAD_INCLUDE_DIR include)
+set(GLAD_SOURCE_DIR src)
 add_library(GLAD STATIC ${GLAD_SOURCE_DIR}/glad.c ${GLAD_INCLUDE_DIR}/glad/glad.h ${GLAD_INCLUDE_DIR}/KHR/khrplatform.h)
 target_include_directories(GLAD PUBLIC ${GLAD_INCLUDE_DIR})

@@ -17,6 +17,8 @@ constexpr Real PI_180 =
 constexpr Real PI_180_INV =
     57.29577951308232087679815481410517033240547246656432154916;
 
+using glm::normalize;
+using glm::dot;
 template <typename T> inline T cubic(T x) { return x * x * x; }
 
 template <typename T> inline T sqr(T x) { return x * x; }

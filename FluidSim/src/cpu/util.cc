@@ -1,7 +1,7 @@
 #include <Core/transfer-stencil.h>
 #include <Core/mesh.h>
-#include <FluidSim/common/util.h>
-#include <FluidSim/common/sdf.h>
+#include <FluidSim/cpu/util.h>
+#include <FluidSim/cpu/sdf.h>
 #include <iostream>
 
 namespace fluid {
@@ -38,41 +38,41 @@ Vec2d sampleVelocity(const Vec2d& p,
 }
 
 Vec3d sampleVelocity(const Vec3d& p,
-                     const FaceCentredGrid<Real, Real, 3, 0>* ug,
-                     const FaceCentredGrid<Real, Real, 3, 1>* vg,
-                     const FaceCentredGrid<Real, Real, 3, 2>* wg) {
-  Vec3i u_idx = ug->nearest(p);
-  Vec3i v_idx = vg->nearest(p);
-  Vec3i w_idx = wg->nearest(p);
-  Real h = ug->gridSpacing().x;
+                     const FaceCentredGrid<Real, Real, 3, 0>& ug,
+                     const FaceCentredGrid<Real, Real, 3, 1>& vg,
+                     const FaceCentredGrid<Real, Real, 3, 2>& wg) {
+  Vec3i u_idx = ug.nearest(p);
+  Vec3i v_idx = vg.nearest(p);
+  Vec3i w_idx = wg.nearest(p);
+  Real h = ug.gridSpacing().x;
   Real u = 0.0, v = 0.0, w = 0.0;
   Real w_u = 0.0, w_v = 0.0, w_w = 0.0;
   for (int i = -1; i <= 1; i++) {
     for (int j = -1; j <= 1; j++) {
       for (int k = -1; k <= 1; k++) {
-        if (u_idx.x + i >= 0 && u_idx.x + i < ug->width() &&
-            u_idx.y + j >= 0 && u_idx.y + j < ug->height() &&
-            u_idx.z + k >= 0 && u_idx.z + j < ug->depth()) {
-          Real un = ug->at(u_idx + Vec3i(i, j, k));
-          Vec3d pn = ug->indexToCoord(u_idx + Vec3i(i, j, k));
+        if (u_idx.x + i >= 0 && u_idx.x + i < ug.width() &&
+            u_idx.y + j >= 0 && u_idx.y + j < ug.height() &&
+            u_idx.z + k >= 0 && u_idx.z + j < ug.depth()) {
+          Real un = ug(u_idx + Vec3i(i, j, k));
+          Vec3d pn = ug.indexToCoord(u_idx + Vec3i(i, j, k));
           Real uw = CubicKernel::weight<Real, 3>(h, p - pn);
           u += un * uw;
           w_u += uw;
         }
-        if (v_idx.x + i >= 0 && v_idx.x + i < vg->width() &&
-            v_idx.y + j >= 0 && v_idx.y + j < vg->height() &&
-            v_idx.z + k >= 0 && v_idx.z + j < vg->depth()) {
-          Real vn = vg->at(v_idx + Vec3i(i, j, k));
-          Vec3d pn = vg->indexToCoord(v_idx + Vec3i(i, j, k));
+        if (v_idx.x + i >= 0 && v_idx.x + i < vg.width() &&
+            v_idx.y + j >= 0 && v_idx.y + j < vg.height() &&
+            v_idx.z + k >= 0 && v_idx.z + j < vg.depth()) {
+          Real vn = vg(v_idx + Vec3i(i, j, k));
+          Vec3d pn = vg.indexToCoord(v_idx + Vec3i(i, j, k));
           Real vw = CubicKernel::weight<Real, 3>(h, p - pn);
           v += vn * vw;
           w_v += vw;
         }
-        if (w_idx.x + i >= 0 && w_idx.x + i < wg->width() &&
-            w_idx.y + j >= 0 && w_idx.y + j < wg->height() &&
-            w_idx.z + k >= 0 && w_idx.z + j < wg->depth()) {
-          Real wn = wg->at(w_idx + Vec3i(i, j, k));
-          Vec3d pn = wg->indexToCoord(w_idx + Vec3i(i, j, k));
+        if (w_idx.x + i >= 0 && w_idx.x + i < wg.width() &&
+            w_idx.y + j >= 0 && w_idx.y + j < wg.height() &&
+            w_idx.z + k >= 0 && w_idx.z + j < wg.depth()) {
+          Real wn = wg.at(w_idx + Vec3i(i, j, k));
+          Vec3d pn = wg.indexToCoord(w_idx + Vec3i(i, j, k));
           Real ww = CubicKernel::weight<Real, 3>(h, p - pn);
           w += wn * ww;
           w_u += ww;

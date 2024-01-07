@@ -6,7 +6,7 @@
 #define SIMCRAFT_CORE_INCLUDE_CORE_TYPE_UTILS_H_
 #include <Core/core.h>
 #include <type_traits>
-namespace core {
+namespace spatify {
 template <int a, int b> struct compile_time_gcd {
   static_assert(a >= 0 && b >= 0);
   static constexpr int value = compile_time_gcd<b, a % b>::value;

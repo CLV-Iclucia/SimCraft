@@ -11,7 +11,7 @@
 #define GLI_GTX_GL_TEXTURE2D_INCLUDED
 
 #include "../gli.hpp"
-#include "../gtx/loader.hpp"
+#include "loader.hpp"
 
 #ifndef GL_VERSION_1_1
 #error "ERROR: OpenGL must be included before GLI_GTX_gl_texture2d"

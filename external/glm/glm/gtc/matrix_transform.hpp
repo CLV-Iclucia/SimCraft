@@ -115,7 +115,7 @@ namespace glm
 		detail::tmat4x4<T> const & m,
 		detail::tvec3<T> const & v);
 
-	/// Creates a matrix for an orthographic parallel viewing volume.
+	/// Creates a matrix for an orthographic parallel.h viewing volume.
 	/// 
 	/// @param left 
 	/// @param right 

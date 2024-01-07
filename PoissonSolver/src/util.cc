@@ -1,5 +1,7 @@
+#include <PoissonSolver/util.h>
 #include <algorithm>
 #include <cstring>
+
 namespace poisson {
 void zeroFill(double *u, int n, int m) {
   memset(u, 0, sizeof(double) * n * m);
@@ -24,30 +26,39 @@ double dot(double *u, double *v, int n, int m) {
   return static_cast<double>(res);
 }
 
-void rbGaussSeidel(double *u, double *f, int n, int m, int color) {
-  for (int i = 0; i < n; i++) {
-    for (int j = color ^ (i & 1); j < m; j += 2) {
-      int cnt = 0;
-      double v = 0;
-      if (i > 0) {
-        v += u[(i - 1) * m + j];
-        cnt++;
-      }
-      if (i < n - 1) {
-        v += u[(i + 1) * m + j];
-        cnt++;
-      }
-      if (j > 0) {
-        v += u[i * m + j - 1];
-        cnt++;
-      }
-      if (j < m - 1) {
-        v += u[i * m + j + 1];
-        cnt++;
-      }
-      u[i * m + j] = (f[i * m + j] + v) / cnt;
-    }
+void rbGaussSeidel(double *u, const double *f, int n, int m, int color) {
+  // in the order that i and j increases
+  for (int i = 0; i < n; i++)
+    for (int j = (i & 1) ^ color; j < m; j += 2)
+      gaussSeidel(u, f, n, m, i, j);
+}
+
+void rbGaussSeidelReverse(double *u, const double *f, int n, int m, int color) {
+  for (int i = n - 1; i >= 0; i--)
+    for (int j = m - 1 - (((m - 1 + i) & 1) ^ color); j >= 0; j -= 2)
+      gaussSeidel(u, f, n, m, i, j);
+}
+
+void gaussSeidel(double *u, const double *f, int n, int m, int i, int j) {
+  int cnt = 0;
+  double v = 0;
+  if (i > 0) {
+    v += u[(i - 1) * m + j];
+    cnt++;
   }
+  if (i < n - 1) {
+    v += u[(i + 1) * m + j];
+    cnt++;
+  }
+  if (j > 0) {
+    v += u[i * m + j - 1];
+    cnt++;
+  }
+  if (j < m - 1) {
+    v += u[i * m + j + 1];
+    cnt++;
+  }
+  u[i * m + j] = (f[i * m + j] + v) / cnt;
 }
 
 // perf history: using block size of 4, 1.5 faster than the trivial loop

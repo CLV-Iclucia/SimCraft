@@ -1,20 +1,12 @@
 # SimCraft
 
-SimCraft is my personal physics simulation playground.
-It will become a collection of algorithms of physics simulation in computer graphics.
+SimCraft is my personal physics based simulation playground, where I implement and test various simulation stuffs
 
-There is nothing special here yet, so I suggest that you should come back months later.
+## Now it includes
 
-## Dependencies
+The following projects are under construction
 
-Up till now I have used the following external libraries:
-
-- glad for OpenGL loading
-
-- glfw for window management
-
-- glm for basic 3D math
-
-- Eigen for sparse linear algebra
-
-- TBB for CPU parallel execution
+- Fluid simulation playground
+- Hair simulation based on discrete elastic rods
+- Material point methods playground
+- Poisson equation solver playground
