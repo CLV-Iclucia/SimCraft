@@ -25,10 +25,5 @@ using spatify::Grid;
 using spatify::CellCentredGrid;
 using spatify::FaceCentredGrid;
 using spatify::PaddedCellCentredGrid;
-enum class Marker {
-  Fluid,
-  Solid,
-  Air,
-};
 };
 #endif // SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_CORE_H_

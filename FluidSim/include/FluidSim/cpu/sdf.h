@@ -135,6 +135,25 @@ struct SDF : NonCopyable {
     }
     return position;
   }
+  [[nodiscard]] std::vector<Vector<Real, 3>> fieldSamples() const {
+    std::vector<Vector<Real, 3>> field;
+    if constexpr (Dim == 2) {
+      for (int i = 0; i < grid.width(); i++)
+        for (int j = 0; j < grid.height(); j++)
+          field.emplace_back(grid(i, j), grid(i, j), grid(i, j));
+    } else if constexpr (Dim == 3) {
+      for (int i = 0; i < grid.width(); i++)
+        for (int j = 0; j < grid.height(); j++)
+          for (int k = 0; k < grid.depth(); k++) {
+            Real val = grid(i, j, k);
+            field.emplace_back(val, val, val);
+          }
+    }
+    return field;
+  }
+  int sampleCount() const {
+    return grid.width() * grid.height() * grid.depth();
+  }
   const Vector<Real, Dim>& spacing() const {
     return grid.gridSpacing();
   }

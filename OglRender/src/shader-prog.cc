@@ -12,6 +12,7 @@ void ShaderProg::initUniformHandles() {
     int size;
     glGetActiveUniform(id, i, 256, &length, &size, &type, name);
     uniform_handles[name] = glGetUniformLocation(id, name);
+    std::cout << "Uniform variable " << name << " detected" << std::endl;
   }
 }
 void ShaderProg::initAttributeHandles() {

@@ -88,6 +88,8 @@ struct ShaderProg {
       glDeleteShader(geometry);
     glGetProgramiv(id, GL_ACTIVE_UNIFORMS, &uniform_count);
     glGetProgramiv(id, GL_ACTIVE_ATTRIBUTES, &attribute_count);
+    initAttributeHandles();
+    initUniformHandles();
   }
   std::unordered_map<std::string, GLuint> uniform_handles;
   std::unordered_map<std::string, GLuint> attribute_handles;

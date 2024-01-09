@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <string>
 namespace opengl {
+#define offsetof(s, m) ((size_t)&(((s*)0)->m))
 struct ShaderProg;
 
 struct NonCopyable {
@@ -110,8 +111,11 @@ struct OpenGLContext : NonCopyable {
     glVertexAttribPointer(attributes[name], size, type, normalized, stride, pointer);
     glEnableVertexAttribArray(attributes[name]);
   }
+  VertexBufferObj& VBO(const std::string& name) {
+    return vbo[attributes[name]];
+  }
   int attribute(const std::string &name) {
-    return attributes[name];
+    return static_cast<int>(attributes[name]);
   }
   void loadAttributesFromShader(const ShaderProg &shader) {
     for (const auto &attr : shader.attribute_handles)

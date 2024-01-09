@@ -134,16 +134,20 @@ class TargetCamera : public PerspectiveCamera {
     }
 
     void processKeyBoard(GLFWwindow* window, float deltaTime) override {
-      float cameraSpeed = 2 * PI *  movementSpeed * deltaTime;
+      float cameraSpeed = 2 * PI * movementSpeed * deltaTime;
 
-      if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+      if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
         yaw -= cameraSpeed;
-      if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+      }
+      if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
         yaw += cameraSpeed;
-      if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+      }
+      if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
         pitch += cameraSpeed;
-      if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+      }
+      if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
         pitch -= cameraSpeed;
+      }
 
       if (pitch > 89.0f)
         pitch = 89.0f;
@@ -170,6 +174,7 @@ class TargetCamera : public PerspectiveCamera {
     glm::vec3 getPosition() const {
       return position;
     }
+
   private:
     void updateCameraVectors() {
       position.x = targetPosition.x + distance * cos(glm::radians(yaw)) * cos(

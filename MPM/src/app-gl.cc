@@ -9,7 +9,7 @@
 #include <Core/range-for.h>
 bool show_demo_window = true;
 bool show_another_window = false;
-ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+ImVec4 kClearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 bool initGLFW(GLFWwindow*& window) {
   if (!glfwInit()) {
     std::cerr << "Failed to initialize GLFW" << std::endl;
@@ -71,7 +71,7 @@ int main() {
                          1.0f);
       ImGui::ColorEdit3(
           "clear color",
-          (float *)&clear_color);
+          (float *)&kClearColor);
       if (ImGui::Button("Button"))
         counter++;
       ImGui::SameLine();
@@ -95,8 +95,8 @@ int main() {
     int display_w, display_h;
     glfwGetFramebufferSize(window, &display_w, &display_h);
     glViewport(0, 0, display_w, display_h);
-    glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w,
-                 clear_color.z * clear_color.w, clear_color.w);
+    glClearColor(kClearColor.x * kClearColor.w, kClearColor.y * kClearColor.w,
+                 kClearColor.z * kClearColor.w, kClearColor.w);
     glClear(GL_COLOR_BUFFER_BIT);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     glfwSwapBuffers(window);

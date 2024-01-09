@@ -22,22 +22,21 @@ class ProjectionSolver3D {
     ProjectionSolver3D(int w, int h, int d)
       : width(w), height(h), depth(d) {
     }
-    virtual void buildSystem(const GhostArray3D<Marker, 1>& markers,
-                             const FaceCentredGrid<Real, Real, 3, 0>& ug,
-                             const FaceCentredGrid<Real, Real, 3, 1>& vg,
-                             const FaceCentredGrid<Real, Real, 3, 2>& wg,
-                             const SDF<3>& fluid_sdf,
-                             const SDF<3>& collider_sdf,
-                             Real dt) = 0;
-    virtual Real solvePressure(const GhostArray3D<Marker, 1>& markers,
+    virtual void buildSystem(
+        const FaceCentredGrid<Real, Real, 3, 0>& ug,
+        const FaceCentredGrid<Real, Real, 3, 1>& vg,
+        const FaceCentredGrid<Real, Real, 3, 2>& wg,
+        const SDF<3>& fluid_sdf,
+        const SDF<3>& collider_sdf,
+        Real dt) = 0;
+    virtual Real solvePressure(const SDF<3>& fluidSdf,
                                Array3D<Real>& pg) = 0;
-    virtual void project(const GhostArray3D<Marker, 1>& markers,
-                         FaceCentredGrid<Real, Real, 3, 0>& ug,
+    virtual void project(FaceCentredGrid<Real, Real, 3, 0>& ug,
                          FaceCentredGrid<Real, Real, 3, 1>& vg,
                          FaceCentredGrid<Real, Real, 3, 2>& wg,
                          const Array3D<Real>& pg,
-                         const SDF<3>& fluid_sdf,
-                         const SDF<3>& collider_sdf,
+                         const SDF<3>& fluidSdf,
+                         const SDF<3>& colliderSdf,
                          Real dt) = 0;
 
     virtual ~ProjectionSolver3D() = default;
@@ -51,10 +50,11 @@ class CompressedSolver3D {
     CompressedSolver3D(int m, int h, int d)
       : r(m, h, d) {
     }
-    virtual Real solve(const GhostArray3D<Marker, 1>& markers,
-                       const Array3D<Real>& Adiag,
+    virtual Real solve(const Array3D<Real>& Adiag,
                        const std::array<Array3D<Real>, 6>& Aneighbour,
-                       const Array3D<Real>& rhs, Array3D<Real>& pg) = 0;
+                       const Array3D<Real>& rhs,
+                       const Array3D<uint8_t>& active,
+                       Array3D<Real>& pg) = 0;
     virtual ~CompressedSolver3D() = default;
 
   protected:
@@ -63,23 +63,25 @@ class CompressedSolver3D {
 
 class Preconditioner3D {
   public:
-    virtual void precond(const GhostArray3D<Marker, 1>& markers,
-                         const Array3D<Real>& Adiag,
-                         const std::array<Array3D<Real>, 6>& Aneighbour,
-                         const Array3D<Real>& r, Array3D<Real>& z) = 0;
+    virtual void precond(
+        const Array3D<Real>& Adiag,
+        const std::array<Array3D<Real>, 6>& Aneighbour,
+        const Array3D<Real>& r, const Array3D<uint8_t>& active,
+        Array3D<Real>& z) = 0;
     virtual ~Preconditioner3D() = default;
 };
 
-class ModifiedIncompleteCholesky3D : public Preconditioner3D {
+class ModifiedIncompleteCholesky3D final : public Preconditioner3D {
   public:
     ModifiedIncompleteCholesky3D(int w, int h, int d, Real tuning = 0.97,
                                  Real safety = 0.25)
       : E(w, h, d), q(w, h, d), tau(tuning), sigma(safety) {
     }
-    void precond(const GhostArray3D<Marker, 1>& markers,
-                 const Array3D<Real>& Adiag,
-                 const std::array<Array3D<Real>, 6>& Aneighbour,
-                 const Array3D<Real>& r, Array3D<Real>& z) override;
+    void precond(
+        const Array3D<Real>& Adiag,
+        const std::array<Array3D<Real>, 6>& Aneighbour,
+        const Array3D<Real>& r, const Array3D<uint8_t>& active,
+        Array3D<Real>& z) override;
 
   protected:
     Array3D<Real> E;
@@ -93,10 +95,11 @@ class CgSolver3D final : public CompressedSolver3D {
       : CompressedSolver3D(w, h, d), z(w, h, d),
         s(w, h, d) {
     }
-    Real solve(const GhostArray3D<Marker, 1>& markers,
-               const Array3D<Real>& Adiag,
+    Real solve(const Array3D<Real>& Adiag,
                const std::array<Array3D<Real>, 6>& Aneighbour,
-               const Array3D<Real>& rhs, Array3D<Real>& pg) override;
+               const Array3D<Real>& rhs,
+               const Array3D<uint8_t>& active,
+               Array3D<Real>& pg) override;
     void setPreconditioner(Preconditioner3D* precond) {
       this->preconditioner = precond;
     }
@@ -118,26 +121,24 @@ class FvmSolver3D final : public ProjectionSolver3D {
         Aneighbour{Array3D<Real>(w, h, d), Array3D<Real>(w, h, d),
                    Array3D<Real>(w, h, d), Array3D<Real>(w, h, d),
                    Array3D<Real>(w, h, d), Array3D<Real>(w, h, d),},
-        active_cells(w * h * d) {
+        active(w, h, d) {
     }
-    void buildSystem(const GhostArray3D<Marker, 1>& markers,
-                     const FaceCentredGrid<Real, Real, 3, 0>& ug,
-                     const FaceCentredGrid<Real, Real, 3, 1>& vg,
-                     const FaceCentredGrid<Real, Real, 3, 2>& wg,
-                     const SDF<3>& fluid_sdf,
-                     const SDF<3>& collider_sdf,
-                     Real dt) override;
-    Real solvePressure(const GhostArray3D<Marker, 1>& markers,
-                       Array3D<Real>& pg) override {
-      return solver->solve(markers, Adiag, Aneighbour, rhs, pg);
+    void buildSystem(
+        const FaceCentredGrid<Real, Real, 3, 0>& ug,
+        const FaceCentredGrid<Real, Real, 3, 1>& vg,
+        const FaceCentredGrid<Real, Real, 3, 2>& wg,
+        const SDF<3>& fluidSdf,
+        const SDF<3>& colliderSdf,
+        Real dt) override;
+    Real solvePressure(const SDF<3>& fluidSdf, Array3D<Real>& pg) override {
+      return solver->solve(Adiag, Aneighbour, rhs, active, pg);
     }
-    void project(const GhostArray3D<Marker, 1>& markers,
-                 FaceCentredGrid<Real, Real, 3, 0>& ug,
+    void project(FaceCentredGrid<Real, Real, 3, 0>& ug,
                  FaceCentredGrid<Real, Real, 3, 1>& vg,
                  FaceCentredGrid<Real, Real, 3, 2>& wg,
                  const Array3D<Real>& pg,
-                 const SDF<3>& fluid_sdf,
-                 const SDF<3>& collider_sdf,
+                 const SDF<3>& fluidSdf,
+                 const SDF<3>& colliderSdf,
                  Real dt) override;
     void setCompressedSolver(CompressedSolver3D* solver) {
       this->solver = solver;
@@ -145,10 +146,11 @@ class FvmSolver3D final : public ProjectionSolver3D {
     ~FvmSolver3D() override = default;
 
   protected:
+    void checkSystemSymmetry() const;
     Array3D<Real> Adiag, rhs, uWeights, vWeights, wWeights;
     std::array<Array3D<Real>, 6> Aneighbour;
     CompressedSolver3D* solver{};
-    std::vector<Vec3i> active_cells;
+    Array3D<uint8_t> active;
 };
 }
 #endif //SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_COMMON_PROJECT_SOLVER_H_

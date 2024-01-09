@@ -13,7 +13,7 @@
 #include <iostream>
 #include <memory>
 using namespace opengl;
-ImVec4 clear_color = ImVec4(0.0f, 1.0f, 1.0f, 1.00f);
+ImVec4 kClearColor = ImVec4(1.0f, 1.0f, 1.0f, 1.00f);
 bool initGLFW(GLFWwindow*& window) {
   if (!glfwInit()) {
     std::cerr << "Failed to initialize GLFW" << std::endl;
@@ -47,13 +47,13 @@ ImGuiIO& initImGui(GLFWwindow* window) {
 }
 
 struct Options {
-  int nParticles = 0;
+  int nParticles = 8192;
   core::Vec3d size = core::Vec3d(1.0);
   core::Vec3i resolution = core::Vec3i(64);
   std::string colliderPath = std::format("{}/spot.obj", SIMCRAFT_ASSETS_DIR);
 } opt;
 
-void processWindowInput(GLFWwindow* window, FpsCamera& camera) {
+void processWindowInput(GLFWwindow* window, TargetCamera& camera) {
   static float lastFrame = 0.f;
   float currentFrame = glfwGetTime();
   float deltaTime = currentFrame - lastFrame;
@@ -80,16 +80,123 @@ Options parseOptions(int argc, char** argv) {
   return opt;
 }
 
+void relocateMesh(core::Mesh& mesh, const core::Vec3d& size) {
+  core::Real max_coord = -1e9, min_coord = 1e9;
+  for (const auto& v : mesh.vertices) {
+    max_coord = std::max(max_coord, std::max(std::max(v.x, v.y), v.z));
+    min_coord = std::min(min_coord, std::min(std::min(v.x, v.y), v.z));
+  }
+  core::Real scene_scale = std::min(std::min(size.x, size.y), size.z);
+  core::Real scale = scene_scale / (max_coord - min_coord);
+  for (auto& v : mesh.vertices) {
+    v = (v - core::Vec3d(min_coord)) * scale;
+    v *= 0.5;
+    assert(
+        v.x >= 0.0 && v.x <= scene_scale && v.y >= 0.0 && v.y <= scene_scale &&
+        v.z >= 0.0 && v.z <= scene_scale);
+  }
+}
+
+std::tuple<std::unique_ptr<OpenGLContext>, std::unique_ptr<ShaderProg>>
+initSdfRender(const fluid::SDF<3>& sdf) {
+  auto shader = std::make_unique<ShaderProg>(
+      std::format("{}/perspective-sdf.vs", FLUIDSIM_SHADER_DIR).c_str(),
+      std::format("{}/sdf.fs", FLUIDSIM_SHADER_DIR).c_str());
+  auto ctx = std::make_unique<OpenGLContext>();
+  ctx->vao.bind();
+  ctx->newAttribute("aPos", sdf.positionSamples(), 3, 3 * sizeof(double),
+                    GL_DOUBLE);
+  ctx->newAttribute("aColor", sdf.fieldSamples(), 3, 3 * sizeof(double),
+                    GL_DOUBLE);
+  return {std::move(ctx), std::move(shader)};
+}
+
+std::tuple<std::unique_ptr<OpenGLContext>, std::unique_ptr<ShaderProg>>
+initFluidRender(const std::vector<core::Vec3d>& particles) {
+  auto shader = std::make_unique<ShaderProg>(
+      std::format("{}/perspective.vs", FLUIDSIM_SHADER_DIR).c_str(),
+      std::format("{}/point.fs", FLUIDSIM_SHADER_DIR).c_str());
+  auto ctx = std::make_unique<OpenGLContext>();
+  ctx->vao.bind();
+  ctx->newAttribute("aPos", particles, 3, 3 * sizeof(double), GL_DOUBLE);
+  return {std::move(ctx), std::move(shader)};
+}
+
+std::tuple<std::unique_ptr<OpenGLContext>, std::unique_ptr<ShaderProg>>
+initColliderRender(const core::Mesh& mesh) {
+  auto shader = std::make_unique<ShaderProg>(
+      std::format("{}/perspective-mesh.vs", FLUIDSIM_SHADER_DIR).c_str(),
+      std::format("{}/collider.fs", FLUIDSIM_SHADER_DIR).c_str());
+  auto ctx = std::make_unique<OpenGLContext>();
+  ctx->vao.bind();
+  ctx->newAttribute("aPos", mesh.vertices, 3, 3 * sizeof(double),
+                    GL_DOUBLE);
+  ctx->ebo.bind();
+  ctx->ebo.passData(mesh.indices);
+  return {std::move(ctx), std::move(shader)};
+}
+
+void drawFluid(OpenGLContext* fluidCtx, ShaderProg* fluidShader,
+               TargetCamera& camera, const std::vector<core::Vec3d>& positions,
+               int display_w, int display_h) {
+  core::Mat4f model;
+  model[0][0] = model[1][1] = model[2][2] = model[3][3] = 1.f;
+  glEnable(GL_DEPTH_TEST);
+  fluidCtx->vao.bind();
+  fluidCtx->VBO("aPos").bind();
+  fluidCtx->VBO("aPos").passData(positions);
+  fluidShader->use();
+  glEnable(GL_PROGRAM_POINT_SIZE);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  fluidShader->setMat4f("view", camera.getViewMatrix());
+  fluidShader->setMat4f("model", model);
+  fluidShader->setMat4f(
+      "proj", camera.getProjectionMatrix(display_w, display_h));
+  glDrawArrays(GL_POINTS, 0, positions.size());
+}
+void drawCollider(OpenGLContext* colliderCtx, ShaderProg* colliderShader,
+                  TargetCamera& camera, const core::Mesh& colliderMesh,
+                  int display_w, int display_h) {
+  core::Mat4f model;
+  model[0][0] = model[1][1] = model[2][2] = model[3][3] = 1.f;
+  colliderCtx->vao.bind();
+  colliderShader->use();
+  colliderShader->setMat4f("view", camera.getViewMatrix());
+  colliderShader->setMat4f("model", model);
+  colliderShader->setMat4f(
+      "proj", camera.getProjectionMatrix(display_w, display_h));
+  glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+  OpenGLContext::draw(GL_TRIANGLES, colliderMesh.indices.size());
+  glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+}
+
+void drawSDF(OpenGLContext* sdfCtx, ShaderProg* sdfShader,
+             TargetCamera& camera, const fluid::SDF<3>& sdf, int display_w,
+             int display_h) {
+  core::Mat4f model;
+  model[0][0] = model[1][1] = model[2][2] = model[3][3] = 1.f;
+  glEnable(GL_DEPTH_TEST);
+  sdfCtx->vao.bind();
+  sdfShader->use();
+  glEnable(GL_PROGRAM_POINT_SIZE);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  sdfShader->setMat4f("view", camera.getViewMatrix());
+  sdfShader->setMat4f("model", model);
+  sdfShader->setMat4f(
+      "proj", camera.getProjectionMatrix(display_w, display_h));
+  glDrawArrays(GL_POINTS, 0, sdf.sampleCount());
+}
+
 int main(int argc, char** argv) {
   auto [nParticles, size, resolution, colliderPath] = parseOptions(argc, argv);
   GLFWwindow* window;
   if (!initGLFW(window)) return -1;
   ImGuiIO& io = initImGui(window);
 
-  std::unique_ptr<fluid::HybridFluidSimulator3D> simulator =
-      std::make_unique<fluid::HybridFluidSimulator3D>(
-          nParticles, size, resolution);
-
+  auto simulator = std::make_unique<fluid::HybridFluidSimulator3D>(
+      nParticles, size, resolution);
   core::Mesh colliderMesh;
 
   if (!myLoadObj(colliderPath, &colliderMesh)) {
@@ -97,7 +204,8 @@ int main(int argc, char** argv) {
     return -1;
   }
 
-  simulator->buildCollider(colliderMesh);
+  relocateMesh(colliderMesh, size);
+  // simulator->buildCollider(colliderMesh);
   std::unique_ptr<fluid::HybridAdvectionSolver3D> advector = std::make_unique<
     fluid::PicAdvector3D>(nParticles, resolution.x, resolution.y,
                           resolution.z);
@@ -112,39 +220,26 @@ int main(int argc, char** argv) {
       reconstructor = std::make_unique<fluid::NaiveReconstructor<
         core::Real, 3>>(nParticles, resolution.x, resolution.y, resolution.z,
                         size);
-
   micpcg->setPreconditioner(preconder.get());
   projector->setCompressedSolver(micpcg.get());
   simulator->setAdvector(advector.get());
   simulator->setProjector(projector.get());
   simulator->setReconstructor(reconstructor.get());
-
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
     std::cerr << "Failed to initialize GLAD" << std::endl;
     return -1;
   }
-  ShaderProg fluidShader(
-      std::format("{}/perspective.vs", FLUIDSIM_SHADER_DIR).c_str(),
-      std::format("{}/point.fs", FLUIDSIM_SHADER_DIR).c_str());
-  fluidShader.initAttributeHandles();
-  fluidShader.initUniformHandles();
-  ShaderProg colliderShader(
-      std::format("{}/perspective.vs", FLUIDSIM_SHADER_DIR).c_str(),
-      std::format("{}/normal.fs", FLUIDSIM_SHADER_DIR).c_str());
-  colliderShader.initAttributeHandles();
-  colliderShader.initUniformHandles();
+  simulator->reconstruct();
+  auto [fluidCtx, fluidShader] = initFluidRender(simulator->positions());
+  auto [sdfCtx, sdfShader] = initSdfRender(simulator->exportFluidSurface());
+  auto [colliderCtx, colliderShader] = initColliderRender(colliderMesh);
 
-  OpenGLContext fluidCtx, colliderCtx;
-  fluidCtx.vao.bind();
-  fluidCtx.newAttribute("aPos", simulator->positions(), 3, 3 * sizeof(double),
-                        GL_DOUBLE);
-  colliderCtx.vao.bind();
   core::Frame frame;
-  FpsCamera camera;
-  core::Mat4f model;
-  model[0][0] = model[1][1] = model[2][2] = model[3][3] = 1.f;
+  TargetCamera camera(core::Vec3f(size.x, size.y, size.z) * 0.5f, 90.f);
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
+    processWindowInput(window, camera);
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame(); {
@@ -158,27 +253,15 @@ int main(int argc, char** argv) {
     int display_w, display_h;
     glfwGetFramebufferSize(window, &display_w, &display_h);
     glViewport(0, 0, display_w, display_h);
-    glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w,
-                 clear_color.z * clear_color.w, clear_color.w);
+    glClearColor(kClearColor.x, kClearColor.y, kClearColor.z, kClearColor.w);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
-    simulator->step(frame);
-    fluidCtx.vao.bind();
-    fluidCtx.vbo[fluidCtx.attribute("aPos")].passData(simulator->positions());
-    fluidShader.use();
-    glEnable(GL_PROGRAM_POINT_SIZE);
-    fluidShader.setMat4f("view", camera.getViewMatrix());
-    fluidShader.setMat4f("model", model);
-    fluidShader.setMat4f(
-        "proj", camera.getProjectionMatrix(display_w, display_h));
-    glDrawArrays(GL_POINTS, 0, nParticles);
-    colliderCtx.vao.bind();
-    colliderShader.use();
-    colliderShader.setMat4f("view", camera.getViewMatrix());
-    colliderShader.setMat4f("model", model);
-    colliderShader.setMat4f(
-        "proj", camera.getProjectionMatrix(display_w, display_h));
-    opengl::OpenGLContext::draw(GL_TRIANGLES, colliderMesh.indices.size());
+    // simulator->step(frame);
+    drawFluid(fluidCtx.get(), fluidShader.get(), camera, simulator->positions(),
+    display_w, display_h);
+    drawSDF(sdfCtx.get(), sdfShader.get(), camera,
+            simulator->exportFluidSurface(), display_w, display_h);
+    drawCollider(colliderCtx.get(), colliderShader.get(), camera, colliderMesh,
+                 display_w, display_h);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     glfwSwapBuffers(window);
   }

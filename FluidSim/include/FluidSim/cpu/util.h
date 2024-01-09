@@ -20,19 +20,36 @@ template <typename T>
 inline T clamp(T x, T min, T max) {
   return x < min ? min : (x > max ? max : x);
 }
+
+template <typename T>
+inline bool approx(T x, T y) {
+  if constexpr (std::is_same_v<T, Real>)
+    return std::abs(x - y) < 1e-6;
+  else if (std::is_same_v<T, float>)
+    return std::abs(x - y) < 1e-3;
+  else return x == y;
+}
+
+inline bool notNan(Real x) {
+  return x == x;
+}
+
 using core::sqr;
 using core::normalize;
 using core::dot;
 
 Real dotProduct(const spatify::Array3D<Real>& a,
-                const spatify::Array3D<Real>& b);
-void saxpy(spatify::Array3D<Real>& a, const spatify::Array3D<Real>& b, Real x);
+                const spatify::Array3D<Real>& b,
+                const spatify::Array3D<uint8_t>& active);
+void saxpy(spatify::Array3D<Real>& a, const spatify::Array3D<Real>& b, Real x,
+           const spatify::Array3D<uint8_t>& active);
 void scaleAndAdd(spatify::Array3D<Real>& a, const spatify::Array3D<Real>& b,
-                 Real x);
+                 Real x, const spatify::Array3D<uint8_t>& active);
 
-inline Real LinfNorm(spatify::Array3D<Real>& a) {
+inline Real LinfNorm(spatify::Array3D<Real>& a, const spatify::Array3D<uint8_t>& active) {
   Real maxv = 0;
   a.forEach([&](int i, int j, int k) {
+    if (!active(i, j, k)) return;
     maxv = std::max(maxv, std::abs(a(i, j, k)));
   });
   return maxv;

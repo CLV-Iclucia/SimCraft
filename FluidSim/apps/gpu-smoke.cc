@@ -12,7 +12,7 @@
 
 #include "..\include\FluidSim\gpu\smoke-simulator.cuh"
 using namespace opengl;
-ImVec4 clear_color = ImVec4(0.0f, 1.0f, 1.0f, 1.00f);
+ImVec4 kClearColor = ImVec4(0.0f, 1.0f, 1.0f, 1.00f);
 bool initGLFW(GLFWwindow*& window) {
   if (!glfwInit()) {
     std::cerr << "Failed to initialize GLFW" << std::endl;
@@ -115,7 +115,7 @@ int main(int argc, char** argv) {
   fluidShader.initAttributeHandles();
   fluidShader.initUniformHandles();
   ShaderProg colliderShader(FLUIDSIM_SHADER_DIR"/perspective-mesh.vs",
-                            FLUIDSIM_SHADER_DIR"/normal.fs");
+                            FLUIDSIM_SHADER_DIR"/collider.fs");
   colliderShader.initAttributeHandles();
   colliderShader.initUniformHandles();
 
@@ -146,8 +146,8 @@ int main(int argc, char** argv) {
     int display_w, display_h;
     glfwGetFramebufferSize(window, &display_w, &display_h);
     glViewport(0, 0, display_w, display_h);
-    glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w,
-                 clear_color.z * clear_color.w, clear_color.w);
+    glClearColor(kClearColor.x * kClearColor.w, kClearColor.y * kClearColor.w,
+                 kClearColor.z * kClearColor.w, kClearColor.w);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 

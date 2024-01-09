@@ -16,16 +16,6 @@ void HybridFluidSimulator3D::applyForce(Real dt) const {
   });
 }
 
-void HybridFluidSimulator3D::markCell() {
-  markers.fill(Marker::Air, Marker::Solid);
-  markers.forEach([&](int i, int j, int k) {
-    if (fluidSurface->grid(i, j, k) < 0.0)
-      markers(i, j, k) = Marker::Fluid;
-    else if (colliderSdf.grid(i, j, k) < 0.0)
-      markers(i, j, k) = Marker::Solid;
-  });
-}
-
 void HybridFluidSimulator3D::clear() {
   ug->fill(0);
   ubuf->fill(0);
@@ -76,23 +66,23 @@ void HybridFluidSimulator3D::smoothFluidSurface(int iters) {
 void HybridFluidSimulator3D::applyCollider() const {
   ug->parallelForEach([&](int i, int j, int k) {
     Vec3d pos{ug->indexToCoord(i, j, k)};
-    if (colliderSdf.eval(pos) < 0.0) {
+    if (colliderSdf->eval(pos) < 0.0) {
       // calc the normal, and project out the x component
-      Vec3d normal{normalize(colliderSdf.grad(pos))};
+      Vec3d normal{normalize(colliderSdf->grad(pos))};
       ug->at(i, j, k) -= ug->at(i, j, k) * normal.x;
     }
   });
   vg->parallelForEach([&](int i, int j, int k) {
     Vec3d pos = vg->indexToCoord(i, j, k);
-    if (colliderSdf.eval(pos) < 0.0) {
-      Vec3d normal{normalize(colliderSdf.grad(pos))};
+    if (colliderSdf->eval(pos) < 0.0) {
+      Vec3d normal{normalize(colliderSdf->grad(pos))};
       vg->at(i, j, k) -= vg->at(i, j, k) * normal.y;
     }
   });
   wg->parallelForEach([&](int i, int j, int k) {
     Vec3d pos{wg->indexToCoord(i, j, k)};
-    if (colliderSdf.eval(pos) < 0.0) {
-      Vec3d normal{normalize(colliderSdf.grad(pos))};
+    if (colliderSdf->eval(pos) < 0.0) {
+      Vec3d normal{normalize(colliderSdf->grad(pos))};
       wg->at(i, j, k) -= wg->at(i, j, k) * normal.z;
     }
   });
@@ -100,53 +90,77 @@ void HybridFluidSimulator3D::applyCollider() const {
 
 void HybridFluidSimulator3D::substep(Real dt) {
   clear();
-  advector->advect(std::span(positions()), *ug, *vg, *wg, colliderSdf, dt);
+  std::cout << "Solving advection... ";
+  advector->advect(std::span(positions()), *ug, *vg, *wg, *colliderSdf, dt);
+  std::cout << "Done." << std::endl;
+  std::cout << "Reconstructing surface... ";
   fluidSurfaceReconstructor->reconstruct(
       m_particles.positions, 1.2 * ug->gridSpacing().x / std::sqrt(2.0),
       *fluidSurface);
+  std::cout << "Done." << std::endl;
+  std::cout << "Smoothing surface... ";
   smoothFluidSurface(5);
-  markCell();
+  std::cout << "Done." << std::endl;
+  std::cout << "Solving P2G... ";
   advector->solveP2G(std::span(positions()), *ug, *vg, *wg,
-                     colliderSdf, *uValid, *vValid, *wValid, dt);
+                     *colliderSdf, *uValid, *vValid, *wValid, dt);
+  std::cout << "Done." << std::endl;
+  std::cout << "Extrapolating velocities... ";
   extrapolate(ug, ubuf, uValid, uValidBuf, 10);
   extrapolate(vg, vbuf, vValid, vValidBuf, 10);
   extrapolate(wg, wbuf, wValid, wValidBuf, 10);
+  std::cout << "Done." << std::endl;
   applyForce(dt);
-  projector->buildSystem(markers, *ug, *vg, *wg, *fluidSurface, colliderSdf,
-                         dt);
-  if (Real residual{projector->solvePressure(markers, pg)}; residual > 1e-4)
+  std::cout << "Building linear system... ";
+  projector->buildSystem(*ug, *vg, *wg, *fluidSurface, *colliderSdf, dt);
+  std::cout << "Done." << std::endl;
+  std::cout << "Solving linear system... ";
+  if (Real residual{projector->solvePressure(*fluidSurface, pg)};
+    residual > 1e-4)
     std::cerr << "Warning: projection residual is " << residual << std::endl;
-  projector->project(markers, *ug, *vg, *wg, pg, *fluidSurface, colliderSdf,
-                     dt);
+  std::cout << "Done." << std::endl;
+  std::cout << "Doing projection and applying collider... ";
+  projector->project(*ug, *vg, *wg, pg, *fluidSurface, *colliderSdf, dt);
   applyCollider();
+  std::cout << "Done." << std::endl;
+  std::cout << "Solving G2P... ";
   advector->solveG2P(std::span(positions()), *ug, *vg, *wg,
-                     colliderSdf, dt);
+                     *colliderSdf, dt);
+  std::cout << "Done" << std::endl;
 }
 
 Real HybridFluidSimulator3D::CFL() const {
-  Real cfl{0.0};
   Real h{ug->gridSpacing().x};
-  Real min_speed{1e-6};
+  Real cfl{h / 1e-6};
   ug->forEach([&cfl, h, this](int x, int y, int z) {
+    assert(notNan(ug->at(x, y ,z)));
     if (ug->at(x, y, z) != 0.0)
       cfl = std::max(cfl, h / abs(ug->at(x, y, z)));
   });
   vg->forEach([&cfl, h, this](int x, int y, int z) {
+    assert(notNan(vg->at(x, y, z)));
     if (vg->at(x, y, z) != 0.0)
       cfl = std::max(cfl, h / abs(vg->at(x, y, z)));
   });
   wg->forEach([&cfl, h, this](int x, int y, int z) {
+    assert(notNan(wg->at(x, y, z)));
     if (wg->at(x, y, z) != 0.0)
       cfl = std::max(cfl, h / abs(wg->at(x, y, z)));
   });
-  return std::min(cfl, h / min_speed);
+  return cfl;
 }
 
 void HybridFluidSimulator3D::step(core::Frame& frame) {
   Real t = 0;
+  std::cout << std::format("********* Frame {} *********", frame.idx) <<
+      std::endl;
+  int substep_cnt = 0;
   while (t < frame.dt) {
     Real cfl = CFL();
     Real dt = std::min(cfl, frame.dt - t);
+    substep_cnt++;
+    std::cout << std::format("<<<<< Substep {}, dt = {} >>>>>", substep_cnt, dt)
+        << std::endl;
     substep(dt);
     t += dt;
   }

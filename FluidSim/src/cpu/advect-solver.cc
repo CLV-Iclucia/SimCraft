@@ -71,8 +71,11 @@ void PicAdvector3D::solveP2G(const std::span<Vec3d> pos,
     }
     int i = &p - pos.data();
     vel(i).x = w_u > 0.0 ? u / w_u : 0.0;
+    assert(notNan(vel(i).x));
     vel(i).y = w_v > 0.0 ? v / w_v : 0.0;
+    assert(notNan(vel(i).y));
     vel(i).z = w_w > 0.0 ? w / w_w : 0.0;
+    assert(notNan(vel(i).z));
   }
 }
 
