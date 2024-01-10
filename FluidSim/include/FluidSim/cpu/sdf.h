@@ -42,7 +42,7 @@ struct SDF : NonCopyable {
   [[nodiscard]] Real eval(const Vector<Real, Dim>& p) const {
     if constexpr (Dim == 2) {
     } else if constexpr (Dim == 3) {
-      Vec3i idx = grid.coordToCellIndex(p);
+      Vec3i idx = grid.coordToSampledCellIndex(p);
       // use trilerp to get the value
       int x = idx.x, y = idx.y, z = idx.z;
       Real tx = (p.x - grid.indexToCoord(x, 0, 0).x) / grid.gridSpacing().x;
@@ -86,7 +86,7 @@ struct SDF : NonCopyable {
     if constexpr (Dim == 2) {
       // use bilerp
     } else if constexpr (Dim == 3) {
-      Vec3i idx = grid.coordToCellIndex(p);
+      Vec3i idx = grid.coordToSampledCellIndex(p);
       // use trilerp to get the value
       int x = idx.x, y = idx.y, z = idx.z;
       Real tx = (p.x - grid.indexToCoord(x, 0, 0).x) / grid.gridSpacing().x;
@@ -173,7 +173,7 @@ template <typename T, int Dim>
 struct ParticleSystemReconstructor : NonCopyable {
   static_assert(Dim == 2 || Dim == 3, "Dim must be 2 or 3");
   virtual void reconstruct(std::span<Vector<T, Dim>> particles, Real radius,
-                           SDF<3>& sdf) = 0;
+                           SDF<3>& sdf, spatify::Array3D<char>& sdfValid) = 0;
   virtual ~ParticleSystemReconstructor() = default;
 };
 
@@ -189,20 +189,19 @@ class NaiveReconstructor<
       : ns(n, w, h, d, size) {
     }
     void reconstruct(std::span<Vector<T, 3>> particles, Real radius,
-                     SDF<3>& sdf) override {
+                     SDF<3>& sdf, spatify::Array3D<char>& sdfValid) override {
       ns.resetGrid(sdf.width(), sdf.height(), sdf.depth(),
                    sdf.grid.gridSpacing());
       ns.update(particles);
       sdf.grid.fill(1e9);
-      sdf.grid.parallelForEach([&](int i, int j, int k) {
+      sdfValid.fill(false);
+      sdf.grid.forEach([&](int i, int j, int k) {
         Vector<T, 3> p = sdf.grid.indexToCoord(i, j, k);
-        ns.forNeighbours(p, 2 * radius, [&](int idx) {
-          Real dis = glm::distance(p, particles[i]);
-          if (dis < radius) {
-            if (sdf(i, j, k) > 0.0 || sdf(i, j, k) < dis - radius)
-              sdf(i, j, k) = dis - radius;
-          } else
-            sdf(i, j, k) = std::min(sdf(i, j, k), dis - radius);
+        ns.forNeighbours(p, particles, 2 * radius, [&](int idx) {
+          Real dis = glm::distance(p, particles[idx]);
+          assert(dis < 2 * radius);
+          sdf(i, j, k) = std::min(sdf(i, j, k), dis - radius);
+          sdfValid(i, j, k) = true;
         });
       });
     }

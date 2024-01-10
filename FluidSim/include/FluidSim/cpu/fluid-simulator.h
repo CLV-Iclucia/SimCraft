@@ -23,27 +23,27 @@ class HybridFluidSimulator3D final : public core::Animation {
     HybridFluidSimulator3D(int n, const Vec3d& size, const Vec3i& resolution)
       : nParticles(n), pg(resolution) {
       m_particles.positions.resize(n);
-      // compute grid spacing
-      Vec3d gridSpacing = size / Vec3d(resolution);
       // initialize grids
-      ug = std::make_unique<FaceCentredGrid<Real, Real, 3, 0>>(
-          resolution + Vec3i(1, 0, 0), Vec3d(gridSpacing));
-      vg = std::make_unique<FaceCentredGrid<Real, Real, 3, 1>>(
-          resolution + Vec3i(0, 1, 0), Vec3d(gridSpacing));
-      wg = std::make_unique<FaceCentredGrid<Real, Real, 3, 2>>(
-          resolution + Vec3i(0, 0, 1), Vec3d(gridSpacing));
+      ug = std::make_unique<FaceCentredGrid<
+        Real, Real, 3, 0>>(resolution, size);
+      vg = std::make_unique<FaceCentredGrid<
+        Real, Real, 3, 1>>(resolution, size);
+      wg = std::make_unique<FaceCentredGrid<
+        Real, Real, 3, 2>>(resolution, size);
       ubuf = std::make_unique<FaceCentredGrid<Real, Real, 3, 0>>(
-          resolution + Vec3i(1, 0, 0), Vec3d(gridSpacing));
+          resolution, size);
       vbuf = std::make_unique<FaceCentredGrid<Real, Real, 3, 1>>(
-          resolution + Vec3i(0, 1, 0), Vec3d(gridSpacing));
+          resolution, size);
       wbuf = std::make_unique<FaceCentredGrid<Real, Real, 3, 2>>(
-          resolution + Vec3i(0, 0, 1), Vec3d(gridSpacing));
+          resolution, size);
       uValid = std::make_unique<Array3D<char>>(resolution + Vec3i(1, 0, 0));
       vValid = std::make_unique<Array3D<char>>(resolution + Vec3i(0, 1, 0));
       wValid = std::make_unique<Array3D<char>>(resolution + Vec3i(0, 0, 1));
       uValidBuf = std::make_unique<Array3D<char>>(resolution + Vec3i(1, 0, 0));
       vValidBuf = std::make_unique<Array3D<char>>(resolution + Vec3i(0, 1, 0));
       wValidBuf = std::make_unique<Array3D<char>>(resolution + Vec3i(0, 0, 1));
+      sdfValid = std::make_unique<Array3D<char>>(resolution);
+      sdfValidBuf = std::make_unique<Array3D<char>>(resolution);
       fluidSurface = std::make_unique<SDF<3>>(resolution, size);
       fluidSurfaceBuf = std::make_unique<SDF<3>>(resolution, size);
       colliderSdf = std::make_unique<SDF<3>>(resolution, size);
@@ -51,6 +51,9 @@ class HybridFluidSimulator3D final : public core::Animation {
         p = core::randomVec<Real, 3>() * 0.25 + Vec3d(0.25, 0.75, 0.25);
         p *= size;
       }
+      assert(
+          ug->gridSpacing() == vg->gridSpacing() && vg->gridSpacing() == wg->
+          gridSpacing());
     }
     void buildCollider(const core::Mesh& colliderMesh) const {
       std::cout << "Building collider SDF..." << std::endl;
@@ -69,9 +72,9 @@ class HybridFluidSimulator3D final : public core::Animation {
       projector = projectionSolver;
     }
     void reconstruct() {
-      fluidSurfaceReconstructor->reconstruct(m_particles.positions,
-                                             1.2 * ug->gridSpacing().x /
-                                             std::sqrt(2.0), *fluidSurface);
+      fluidSurfaceReconstructor->reconstruct(
+          m_particles.positions, 1.2 * ug->gridSpacing().x / std::sqrt(2.0),
+          *fluidSurface, *sdfValid);
     }
     void setReconstructor(ParticleSystemReconstructor<Real, 3>* reconstructor) {
       fluidSurfaceReconstructor = reconstructor;
@@ -82,6 +85,9 @@ class HybridFluidSimulator3D final : public core::Animation {
     }
     [[nodiscard]] const SDF<3>& exportFluidSurface() const {
       return *fluidSurface;
+    }
+    [[nodiscard]] const SDF<3>& exportColliderSurface() const {
+      return *colliderSdf;
     }
     std::vector<Vec3d>& positions() { return m_particles.positions; }
 
@@ -96,9 +102,10 @@ class HybridFluidSimulator3D final : public core::Animation {
                      std::unique_ptr<Array3D<char>>& valid,
                      std::unique_ptr<Array3D<char>>& validBuf, int iters) {
       for (int i = 0; i < iters; i++) {
+        validBuf->fill(false);
         g->forEach([&](int i, int j, int k) {
           if (valid->at(i, j, k)) {
-            validBuf->at(i, j, k) = 0;
+            validBuf->at(i, j, k) = true;
             return;
           }
           Real sum{0.0};
@@ -129,10 +136,10 @@ class HybridFluidSimulator3D final : public core::Animation {
           }
           if (count > 0) {
             gbuf->at(i, j, k) = sum / count;
-            validBuf->at(i, j, k) = 1;
+            validBuf->at(i, j, k) = true;
           } else {
             gbuf->at(i, j, k) = 0.0;
-            validBuf->at(i, j, k) = 0;
+            validBuf->at(i, j, k) = false;
           }
         });
         std::swap(g, gbuf);
@@ -149,7 +156,7 @@ class HybridFluidSimulator3D final : public core::Animation {
     std::unique_ptr<FaceCentredGrid<Real, Real, 3, 1>> vg, vbuf;
     std::unique_ptr<FaceCentredGrid<Real, Real, 3, 2>> wg, wbuf;
     std::unique_ptr<Array3D<char>> uValid, vValid, wValid, uValidBuf, vValidBuf,
-        wValidBuf;
+        wValidBuf, sdfValid, sdfValidBuf;
     Array3D<Real> pg;
     ParticleSystemReconstructor<Real, 3>* fluidSurfaceReconstructor{};
     std::unique_ptr<SDF<3>> fluidSurface{}, fluidSurfaceBuf{}, colliderSdf{};

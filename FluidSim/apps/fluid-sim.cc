@@ -205,7 +205,7 @@ int main(int argc, char** argv) {
   }
 
   relocateMesh(colliderMesh, size);
-  // simulator->buildCollider(colliderMesh);
+  simulator->buildCollider(colliderMesh);
   std::unique_ptr<fluid::HybridAdvectionSolver3D> advector = std::make_unique<
     fluid::PicAdvector3D>(nParticles, resolution.x, resolution.y,
                           resolution.z);
@@ -231,7 +231,7 @@ int main(int argc, char** argv) {
   }
   simulator->reconstruct();
   auto [fluidCtx, fluidShader] = initFluidRender(simulator->positions());
-  auto [sdfCtx, sdfShader] = initSdfRender(simulator->exportFluidSurface());
+  // auto [sdfCtx, sdfShader] = initSdfRender(simulator->exportFluidSurface());
   auto [colliderCtx, colliderShader] = initColliderRender(colliderMesh);
 
   core::Frame frame;
@@ -255,11 +255,11 @@ int main(int argc, char** argv) {
     glViewport(0, 0, display_w, display_h);
     glClearColor(kClearColor.x, kClearColor.y, kClearColor.z, kClearColor.w);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    // simulator->step(frame);
+    simulator->step(frame);
     drawFluid(fluidCtx.get(), fluidShader.get(), camera, simulator->positions(),
     display_w, display_h);
-    drawSDF(sdfCtx.get(), sdfShader.get(), camera,
-            simulator->exportFluidSurface(), display_w, display_h);
+    // drawSDF(sdfCtx.get(), sdfShader.get(), camera,
+            // simulator->exportFluidSurface(), display_w, display_h);
     drawCollider(colliderCtx.get(), colliderShader.get(), camera, colliderMesh,
                  display_w, display_h);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

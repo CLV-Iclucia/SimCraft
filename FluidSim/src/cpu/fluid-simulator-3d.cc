@@ -96,9 +96,10 @@ void HybridFluidSimulator3D::substep(Real dt) {
   std::cout << "Reconstructing surface... ";
   fluidSurfaceReconstructor->reconstruct(
       m_particles.positions, 1.2 * ug->gridSpacing().x / std::sqrt(2.0),
-      *fluidSurface);
+      *fluidSurface, *sdfValid);
   std::cout << "Done." << std::endl;
   std::cout << "Smoothing surface... ";
+  extrapolate(fluidSurface, fluidSurfaceBuf, sdfValid, sdfValidBuf, 10);
   smoothFluidSurface(5);
   std::cout << "Done." << std::endl;
   std::cout << "Solving P2G... ";
