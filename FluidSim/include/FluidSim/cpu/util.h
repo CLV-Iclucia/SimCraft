@@ -8,6 +8,8 @@
 #include <Spatify/arrays.h>
 
 namespace fluid {
+using spatify::FaceCentredGrid;
+using spatify::Array3D;
 Vec2d sampleVelocity(const Vec2d& p,
                      const FaceCentredGrid<Real, Real, 2, 0>& u_grid,
                      const FaceCentredGrid<Real, Real, 2, 1>& v_grid);

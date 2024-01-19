@@ -383,16 +383,21 @@ Real dotProduct(const spatify::Array3D<Real>& a,
   Real sum = 0.0;
   a.forEach([&](int i, int j, int k) {
     if (!active(i, j, k)) return;
+    assert(!std::isnan(a(i, j, k)));
+    assert(!std::isnan(b(i, j, k)));
     sum += a(i, j, k) * b(i, j, k);
   });
+  assert(!std::isnan(sum));
   return sum;
 }
 
 void saxpy(spatify::Array3D<Real>& a, const spatify::Array3D<Real>& b, Real x,
            const spatify::Array3D<uint8_t>& active) {
+  assert(!std::isnan(x));
   a.forEach([&](int i, int j, int k) {
     if (!active(i, j, k)) return;
     a(i, j, k) += x * b(i, j, k);
+    assert(!std::isnan(a(i, j, k)));
   });
 }
 
@@ -400,7 +405,8 @@ void scaleAndAdd(spatify::Array3D<Real>& c, const spatify::Array3D<Real>& a,
                  Real x, const spatify::Array3D<uint8_t>& active) {
   c.forEach([&](int i, int j, int k) {
     if (!active(i, j, k)) return;
-    c(i, j, k) = a(i, j, k) + c(i, j, k);
+    c(i, j, k) = a(i, j, k) + x * c(i, j, k);
+    assert(!std::isnan(c(i, j, k)));
   });
 }
 } // namespace fluid

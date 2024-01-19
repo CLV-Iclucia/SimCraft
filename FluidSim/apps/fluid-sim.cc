@@ -230,6 +230,11 @@ int main(int argc, char** argv) {
     return -1;
   }
   simulator->reconstruct();
+  simulator->smoothFluidSurface(5);
+  simulator->extrapolateFluidSdf(10);
+
+  // initial config: for all the sample points atmost one of the two sdf is negative
+  // check this, if not true then it means the sdf is not properly initialized
   auto [fluidCtx, fluidShader] = initFluidRender(simulator->positions());
   // auto [sdfCtx, sdfShader] = initSdfRender(simulator->exportFluidSurface());
   auto [colliderCtx, colliderShader] = initColliderRender(colliderMesh);
@@ -257,9 +262,9 @@ int main(int argc, char** argv) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     simulator->step(frame);
     drawFluid(fluidCtx.get(), fluidShader.get(), camera, simulator->positions(),
-    display_w, display_h);
+              display_w, display_h);
     // drawSDF(sdfCtx.get(), sdfShader.get(), camera,
-            // simulator->exportFluidSurface(), display_w, display_h);
+    //         simulator->exportFluidSurface(), display_w, display_h);
     drawCollider(colliderCtx.get(), colliderShader.get(), camera, colliderMesh,
                  display_w, display_h);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

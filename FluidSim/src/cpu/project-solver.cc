@@ -39,11 +39,15 @@ void applyCompressedMatrix(const Array3D<Real>& Adiag,
     if (k < x.depth() - 1 && active(i, j, k + 1))
       t += Aneighbour[Front](i, j, k) * x(i, j, k + 1);
     b(i, j, k) = t;
+    assert(!std::isnan(t));
   });
 }
 
 void FvmSolver3D::checkSystemSymmetry() const {
   Adiag.forEach([&](int i, int j, int k) {
+    if (i == 0 || j == 0 || k == 0 || i == Adiag.width() - 1 || j == Adiag.
+        height() - 1 || k == Adiag.depth() - 1)
+      return;
     if (!active(i, j, k) || Adiag(i, j, k) == 0.0) return;
     if (i > 0 && active(i - 1, j, k))
       assert(approx(Aneighbour[Left](i, j, k), Aneighbour[Right](i - 1, j, k)));
@@ -73,8 +77,11 @@ void FvmSolver3D::buildSystem(const FaceCentredGrid<Real, Real, 3, 0>& ug,
   Aneighbour[Down].fill(0);
   Aneighbour[Front].fill(0);
   Aneighbour[Back].fill(0);
+  uWeights.fill(0);
+  vWeights.fill(0);
+  wWeights.fill(0);
   uWeights.parallelForEach([&](int i, int j, int k) {
-    if (i == 0) return ;
+    if (i == 0) return;
     if (fluidSdf(i - 1, j, k) > 0.0 && fluidSdf(i, j, k) > 0.0)
       return;
     Vec3d p = ug.indexToCoord(i, j, k);
@@ -88,7 +95,7 @@ void FvmSolver3D::buildSystem(const FaceCentredGrid<Real, Real, 3, 0>& ug,
     assert(notNan(uWeights(i, j, k)));
   });
   vWeights.parallelForEach([&](int i, int j, int k) {
-    if (j == 0) return ;
+    if (j == 0) return;
     if (fluidSdf(i, j - 1, k) > 0.0 && fluidSdf(i, j, k) > 0.0)
       return;
     Vec3d p = vg.indexToCoord(i, j, k);
@@ -102,7 +109,7 @@ void FvmSolver3D::buildSystem(const FaceCentredGrid<Real, Real, 3, 0>& ug,
     assert(notNan(vWeights(i, j, k)));
   });
   wWeights.parallelForEach([&](int i, int j, int k) {
-    if (k == 0) return ;
+    if (k == 0) return;
     if (fluidSdf(i, j, k - 1) > 0.0 && fluidSdf(i, j, k) > 0.0)
       return;
     Vec3d p = wg.indexToCoord(i, j, k);
@@ -116,8 +123,18 @@ void FvmSolver3D::buildSystem(const FaceCentredGrid<Real, Real, 3, 0>& ug,
     assert(notNan(wWeights(i, j, k)));
   });
 
-  Adiag.parallelForEach([&](int i, int j, int k) {
-    if (fluidSdf(i, j, k) < 0.0) {
+  Adiag.forEach([&](int i, int j, int k) {
+    if (i == 0 || j == 0 || k == 0 || i == Adiag.width() - 1 || j == Adiag.
+        height() - 1 || k == Adiag.depth()
+        - 1) {
+      active(i, j, k) = false;
+      return;
+    }
+    if (uWeights(i, j, k) == 0.0 && uWeights(i + 1, j, k) == 0.0 &&
+        vWeights(i, j, k) == 0.0 && vWeights(i, j + 1, k) == 0.0 &&
+        wWeights(i, j, k) == 0.0 && wWeights(i, j, k + 1) == 0.0)
+      return;
+    if (fluidSdf(i, j, k) > 0.0) {
       active(i, j, k) = false;
       return;
     }
@@ -160,7 +177,6 @@ void FvmSolver3D::buildSystem(const FaceCentredGrid<Real, Real, 3, 0>& ug,
       Aneighbour[Down](i, j, k) -= vWeights(i, j, k) * factor;
     }
     rhs(i, j, k) += vWeights(i, j, k) * vg(i, j, k);
-
     // up
     if (fluidSdf(i, j + 1, k) > 0.0) {
       Real theta = std::max(
@@ -171,7 +187,6 @@ void FvmSolver3D::buildSystem(const FaceCentredGrid<Real, Real, 3, 0>& ug,
       Aneighbour[Up](i, j, k) -= vWeights(i, j + 1, k) * factor;
     }
     rhs(i, j, k) -= vWeights(i, j + 1, k) * vg(i, j + 1, k);
-
     // back
     if (fluidSdf(i, j, k - 1) > 0.0) {
       Real theta = std::max(
@@ -237,9 +252,6 @@ void ModifiedIncompleteCholesky3D::precond(
             / sqr(E(i, j, k - 1));
     }
     if (e < sigma * Adiag(i, j, k)) e = Adiag(i, j, k);
-    if (e <= 0.0) {
-      std::cout << i << " " << j << " " << k << std::endl;
-    }
     assert(e > 0.0);
     E(i, j, k) = 1.0 / std::sqrt(e);
   });
@@ -283,16 +295,20 @@ Real CgSolver3D::solve(const Array3D<Real>& Adiag,
                        Array3D<Real>& pg) {
   pg.fill(0);
   r.copyFrom(rhs);
+  Real residual = LinfNorm(r, active);
+  if (residual < tolerance)
+    return residual;
   if (preconditioner)
     preconditioner->precond(Adiag, Aneighbour, rhs, active, z);
   else
     z.copyFrom(r);
   s.copyFrom(z);
   Real sigma = dotProduct(z, r, active);
-  Real residual{};
   for (int i = 0; i < max_iterations; i++) {
     applyCompressedMatrix(Adiag, Aneighbour, s, active, z);
-    Real alpha = sigma / dotProduct(s, z, active);
+    Real sdotz = dotProduct(s, z, active);
+    assert(sdotz != 0);
+    Real alpha = sigma / sdotz;
     saxpy(pg, s, alpha, active);
     saxpy(r, z, -alpha, active);
     residual = LinfNorm(r, active);
@@ -300,6 +316,7 @@ Real CgSolver3D::solve(const Array3D<Real>& Adiag,
     if (preconditioner)
       preconditioner->precond(Adiag, Aneighbour, r, active, z);
     Real sigma_new = dotProduct(z, r, active);
+    assert(sigma != 0);
     Real beta = sigma_new / sigma;
     scaleAndAdd(s, z, beta, active);
     sigma = sigma_new;

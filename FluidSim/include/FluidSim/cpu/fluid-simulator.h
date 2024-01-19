@@ -13,9 +13,15 @@
 #include <FluidSim/cpu/sdf.h>
 #include <FluidSim/cpu/advect-solver.h>
 #include <FluidSim/cpu/project-solver.h>
+#include <Spatify/grids.h>
 #include <memory>
-
 namespace fluid {
+
+using spatify::Grid;
+using spatify::CellCentredGrid;
+using spatify::FaceCentredGrid;
+using spatify::PaddedCellCentredGrid;
+
 class HybridFluidSimulator3D final : public core::Animation {
   public:
     core::Timer timer;
@@ -75,6 +81,51 @@ class HybridFluidSimulator3D final : public core::Animation {
       fluidSurfaceReconstructor->reconstruct(
           m_particles.positions, 1.2 * ug->gridSpacing().x / std::sqrt(2.0),
           *fluidSurface, *sdfValid);
+    }
+    void smoothFluidSurface(int iters);
+    void extrapolateFluidSdf(int iters) {
+      for (int i = 0; i < iters; i++) {
+        sdfValidBuf->fill(false);
+        fluidSurface->grid.forEach([&](int i, int j, int k) {
+          if (sdfValid->at(i, j, k)) {
+            sdfValidBuf->at(i, j, k) = true;
+            return;
+          }
+          Real sum{0.0};
+          int count{0};
+          if (i > 0 && sdfValid->at(i - 1, j, k)) {
+            sum += fluidSurface->grid(i - 1, j, k);
+            count++;
+          }
+          if (i < fluidSurface->width() - 1 && sdfValid->at(i + 1, j, k)) {
+            sum += fluidSurface->grid(i + 1, j, k);
+            count++;
+          }
+          if (j > 0 && sdfValid->at(i, j - 1, k)) {
+            sum += fluidSurface->grid(i, j - 1, k);
+            count++;
+          }
+          if (j < fluidSurface->height() - 1 && sdfValid->at(i, j + 1, k)) {
+            sum += fluidSurface->grid(i, j + 1, k);
+            count++;
+          }
+          if (k > 0 && sdfValid->at(i, j, k - 1)) {
+            sum += fluidSurface->grid(i, j, k - 1);
+            count++;
+          }
+          if (k < fluidSurface->depth() - 1 && sdfValid->at(i, j, k + 1)) {
+            sum += fluidSurface->grid(i, j, k + 1);
+            count++;
+          }
+          if (count > 0) {
+            fluidSurfaceBuf->grid(i, j, k) = sum / count;
+            sdfValidBuf->at(i, j, k) = true;
+          } else
+            sdfValidBuf->at(i, j, k) = false;
+        });
+        std::swap(fluidSurface, fluidSurfaceBuf);
+        std::swap(sdfValid, sdfValidBuf);
+      }
     }
     void setReconstructor(ParticleSystemReconstructor<Real, 3>* reconstructor) {
       fluidSurfaceReconstructor = reconstructor;
@@ -151,7 +202,6 @@ class HybridFluidSimulator3D final : public core::Animation {
     void applyCollider() const;
     [[nodiscard]] Real CFL() const;
     void substep(Real dt);
-    void smoothFluidSurface(int iters);
     std::unique_ptr<FaceCentredGrid<Real, Real, 3, 0>> ug, ubuf;
     std::unique_ptr<FaceCentredGrid<Real, Real, 3, 1>> vg, vbuf;
     std::unique_ptr<FaceCentredGrid<Real, Real, 3, 2>> wg, wbuf;

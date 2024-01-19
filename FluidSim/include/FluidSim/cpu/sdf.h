@@ -8,6 +8,7 @@
 #include <Spatify/grids.h>
 #include <Spatify/arrays.h>
 #include <Spatify/ns-util.h>
+#include <FluidSim/cpu/util.h>
 
 namespace core {
 struct Mesh;
@@ -43,19 +44,22 @@ struct SDF : NonCopyable {
     if constexpr (Dim == 2) {
     } else if constexpr (Dim == 3) {
       Vec3i idx = grid.coordToSampledCellIndex(p);
-      // use trilerp to get the value
       int x = idx.x, y = idx.y, z = idx.z;
-      Real tx = (p.x - grid.indexToCoord(x, 0, 0).x) / grid.gridSpacing().x;
-      Real ty = (p.y - grid.indexToCoord(0, y, 0).y) / grid.gridSpacing().y;
-      Real tz = (p.z - grid.indexToCoord(0, 0, z).z) / grid.gridSpacing().z;
-      return tx * ty * tz * grid(x, y, z) +
-             tx * ty * (1 - tz) * grid(x, y, z + 1) +
-             tx * (1 - ty) * tz * grid(x, y + 1, z) +
-             tx * (1 - ty) * (1 - tz) * grid(x, y + 1, z + 1) +
-             (1 - tx) * ty * tz * grid(x + 1, y, z) +
-             (1 - tx) * ty * (1 - tz) * grid(x + 1, y, z + 1) +
-             (1 - tx) * (1 - ty) * tz * grid(x + 1, y + 1, z) +
-             (1 - tx) * (1 - ty) * (1 - tz) * grid(x + 1, y + 1, z + 1);
+      Vec3d pos = grid.indexToCoord(x, y, z);
+      Real tx = (p.x - pos.x) / grid.gridSpacing().x;
+      Real ty = (p.y - pos.y) / grid.gridSpacing().y;
+      Real tz = (p.z - pos.z) / grid.gridSpacing().z;
+      assert(tx >= 0.0 && tx <= 1.0 && ty >= 0.0 && ty <= 1.0 && tz >= 0.0 &&
+          tz <= 1.0);
+      Real ret = tx * ty * tz * grid(x, y, z) +
+                 tx * ty * (1 - tz) * grid(x, y, z + 1) +
+                 tx * (1 - ty) * tz * grid(x, y + 1, z) +
+                 tx * (1 - ty) * (1 - tz) * grid(x, y + 1, z + 1) +
+                 (1 - tx) * ty * tz * grid(x + 1, y, z) +
+                 (1 - tx) * ty * (1 - tz) * grid(x + 1, y, z + 1) +
+                 (1 - tx) * (1 - ty) * tz * grid(x + 1, y + 1, z) +
+                 (1 - tx) * (1 - ty) * (1 - tz) * grid(x + 1, y + 1, z + 1);
+      return ret;
     }
   }
   [[nodiscard]] Vector<Real, Dim> gradient(const Vector<int, Dim>& idx) const {
@@ -197,9 +201,9 @@ class NaiveReconstructor<
       sdfValid.fill(false);
       sdf.grid.forEach([&](int i, int j, int k) {
         Vector<T, 3> p = sdf.grid.indexToCoord(i, j, k);
-        ns.forNeighbours(p, particles, 2 * radius, [&](int idx) {
+        ns.forNeighbours(p, particles, 4 * radius, [&](int idx) {
           Real dis = glm::distance(p, particles[idx]);
-          assert(dis < 2 * radius);
+          assert(dis < 4 * radius);
           sdf(i, j, k) = std::min(sdf(i, j, k), dis - radius);
           sdfValid(i, j, k) = true;
         });

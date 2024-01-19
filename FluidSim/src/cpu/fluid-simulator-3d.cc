@@ -28,7 +28,7 @@ void HybridFluidSimulator3D::clear() {
 
 void HybridFluidSimulator3D::smoothFluidSurface(int iters) {
   for (int i = 0; i < iters; i++) {
-    fluidSurfaceBuf->grid.parallelForEach([&](int i, int j, int k) {
+    fluidSurfaceBuf->grid.forEach([&](int i, int j, int k) {
       Real sum = 0;
       int count = 0;
       if (i > 0) {
@@ -56,7 +56,7 @@ void HybridFluidSimulator3D::smoothFluidSurface(int iters) {
         count++;
       }
       fluidSurfaceBuf->grid(i, j, k) = sum / count;
-      if (fluidSurface->grid(i, j, k) > fluidSurfaceBuf->grid(i, j, k))
+      if (fluidSurface->grid(i, j, k) < fluidSurfaceBuf->grid(i, j, k))
         fluidSurfaceBuf->grid(i, j, k) = fluidSurface->grid(i, j, k);
     });
     std::swap(fluidSurface, fluidSurfaceBuf);
@@ -99,7 +99,7 @@ void HybridFluidSimulator3D::substep(Real dt) {
       *fluidSurface, *sdfValid);
   std::cout << "Done." << std::endl;
   std::cout << "Smoothing surface... ";
-  extrapolate(fluidSurface, fluidSurfaceBuf, sdfValid, sdfValidBuf, 10);
+  extrapolateFluidSdf(10);
   smoothFluidSurface(5);
   std::cout << "Done." << std::endl;
   std::cout << "Solving P2G... ";

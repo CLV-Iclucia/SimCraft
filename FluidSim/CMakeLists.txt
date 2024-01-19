@@ -3,12 +3,13 @@ project(Fluid LANGUAGES CXX CUDA)
 file(GLOB_RECURSE cpu_srcs CONFIGURE_DEPENDS src/cpu/*.cc src/cpu/*.cpp)
 file(GLOB_RECURSE cpu_headers CONFIGURE_DEPENDS include/FluidSim/cpu/*.h)
 
-file(GLOB_RECURSE gpu_srcs CONFIGURE_DEPENDS src/gpu/*.cc src/gpu/*.cpp src/gpu/*.cu)
+file(GLOB_RECURSE gpu_srcs CONFIGURE_DEPENDS src/gpu/*.cc src/gpu/*.cpp src/gpu/*.cu src/gpu/*.cc)
 file(GLOB_RECURSE gpu_headers CONFIGURE_DEPENDS include/FluidSim/gpu/*.h include/FluidSim/gpu/*.cuh)
 
 file(GLOB common_headers CONFIGURE_DEPENDS include/FluidSim/*.h)
 
-add_library(CpuFluid STATIC ${cpu_srcs} ${cpu_headers} ${common_headers})
+add_library(CpuFluid STATIC ${cpu_srcs} ${cpu_headers} ${common_headers}
+        include/FluidSim/gpu/kernels.cuh)
 add_library(GpuFluid STATIC ${gpu_srcs} ${gpu_headers} ${common_headers})
 
 target_include_directories(CpuFluid PUBLIC include)
@@ -28,8 +29,7 @@ target_include_directories(fluid-sim PUBLIC ${GLAD_INCLUDE_DIR})
 target_link_libraries(fluid-sim PUBLIC ogl-render
         imgui imgui_impl_glfw imgui_impl_opengl3 CpuFluid glfw3)
 
-add_executable(gpu-smoke apps/gpu-smoke.cc)
+add_executable(gpu-smoke apps/gpu-smoke.cu)
 target_include_directories(gpu-smoke PUBLIC ${EXTERNAL_PATH}/imgui)
 target_include_directories(gpu-smoke PUBLIC ${GLAD_INCLUDE_DIR})
-target_link_libraries(gpu-smoke PUBLIC ogl-render
-        imgui imgui_impl_glfw imgui_impl_opengl3 GpuFluid glfw3)
+target_link_libraries(gpu-smoke PUBLIC ogl-render GpuFluid glfw3)
