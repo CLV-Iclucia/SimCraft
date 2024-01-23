@@ -9,8 +9,6 @@
 #include <iostream>
 #include <memory>
 #include <FluidSim/gpu/smoke-simulator.cuh>
-#include <cuda_runtime.h>
-#include <cuda_gl_interop.h>
 using namespace opengl;
 ImVec4 kClearColor = ImVec4(0.0f, 1.0f, 1.0f, 1.00f);
 bool initGLFW(GLFWwindow*& window) {
@@ -34,10 +32,12 @@ bool initGLFW(GLFWwindow*& window) {
 
 struct Options {
   int resolution = 64;
-  int exportFrame = 60;
+  int exportFrame = -1;
   core::Vec3f density = core::Vec3f(1.f, 0.0f, 1.f);
   core::Vec3f albedo = core::Vec3f(0.5f, 0.0f, 0.5f);
-  std::string outputFile = "smoke.vol";
+  std::string densityOutputFile = "density.vol";
+  std::string albedoOutputFile = "albedo.vol";
+  std::string outputDir = ".";
 } opt;
 
 void processWindowInput(GLFWwindow* window, FpsCamera& camera) {
@@ -52,12 +52,11 @@ Options parseOptions(int argc, char** argv) {
   Options opt;
   for (int i = 1; i < argc; i++) {
     if (std::string(argv[i]) == "-r") {
-      opt.resolution = std::stoi(argv[i]);
+      opt.resolution = std::stoi(argv[++i]);
     } else if (std::string(argv[i]) == "-e") {
-      opt.exportFrame = std::stoi(argv[i]);
+      opt.exportFrame = std::atoi(argv[++i]);
     } else if (std::string(argv[i]) == "-o") {
-      opt.outputFile = argv[i];
-    } else if (std::string(argv[i]) == "-a") {
+      opt.outputDir = std::string(argv[++i]);
     } else {
       std::cerr << "Unknown option: " << argv[i] << std::endl;
       return opt;
@@ -76,16 +75,26 @@ std::vector<float> screen{
     -1.f, -1.f,
 };
 
-void exportVolume(const std::vector<float>& data, const Options& opt) {
-  std::ofstream outFile(opt.outputFile);
-
+void exportVolume(const std::vector<float>& density,
+                  const Options& opt) {
+  std::string densityFile = opt.outputDir + "/" + opt.densityOutputFile;
+  std::string albedoFile = opt.outputDir + "/" + opt.albedoOutputFile;
+  std::ofstream outFile(densityFile);
   outFile << opt.resolution << " " << opt.resolution << " " << opt.resolution <<
       std::endl;
-  outFile << opt.albedo.x << " " << opt.albedo.y << " " << opt.albedo.z <<
+  for (int i = 0; i < opt.resolution * opt.resolution * opt.resolution; i++) {
+    outFile << density[i] * opt.density.x << " " << density[i] * opt.density.y
+        << " "
+        << density[i] * opt.density.z << std::endl;
+  }
+  outFile << std::endl;
+  outFile.close();
+  outFile.open(albedoFile);
+  outFile << opt.resolution << " " << opt.resolution << " " << opt.resolution <<
       std::endl;
   for (int i = 0; i < opt.resolution * opt.resolution * opt.resolution; i++) {
-    outFile << data[i] * opt.density.x << " " << data[i] * opt.density.y << " "
-        << data[i] * opt.density.z << std::endl;
+    outFile << opt.albedo.x << " " << opt.albedo.y << " " << opt.albedo.z <<
+        std::endl;
   }
   outFile << std::endl;
   outFile.close();
@@ -124,10 +133,13 @@ int main(int argc, char** argv) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     simulator->step(frame);
     simulator->rho->copyTo(buffer.data());
-    if (frame.idx == opt.exportFrame) {
+    if (frame.idx == opt.exportFrame || glfwGetKey(window, GLFW_KEY_P) ==
+        GLFW_PRESS) {
+      std::vector<float> albedo(opt.resolution * opt.resolution *
+                                opt.resolution);
       exportVolume(buffer, opt);
-      std::cout << "exporting, is this what you want?" << std::endl;
-      getchar();
+      std::cout << "exporting frame " << frame.idx << " to directory " << opt.outputDir << std::endl;
+      return 0;
     }
     glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, opt.resolution, opt.resolution,
                     opt.resolution, GL_RED,

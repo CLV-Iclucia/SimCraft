@@ -3,7 +3,7 @@ in vec2 screenPos;
 
 uniform sampler3D smokeTex;
 const vec3 cameraPos = vec3(-0.5, 0.5, 0.5); // looks to the positive x-axis
-const float nearPlane = 0.5;
+const float nearPlane = 0.4f;
 const float stepSize = 0.04f;
 
 struct Ray {
@@ -38,5 +38,5 @@ void main() {
         if (!insideBox(pos))
             break;
     }
-    gl_FragColor = vec4(color, 0.f, color, 1.0);
+    gl_FragColor = vec4(color, color, color, 1.0);
 }

@@ -31,8 +31,8 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
   std::vector<std::unique_ptr<CudaSurface<float>>> err2;
   std::vector<uint> sizes;
   float alpha = 1.f;
-  float beta = 2.5f;
-  float epsilon = 1.f;
+  float beta = 1.f;
+  float epsilon = 1.5f;
   float ambientTemperature = 0.f;
   explicit GpuSmokeSimulator(unsigned int _n, unsigned int _n0 = 16)
     : n(_n)
@@ -57,6 +57,9 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
     FillKernel<<<dim3(nblocks, nblocks, nblocks),
         dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
             rho->surfAccessor(), 0.f, n);
+    FillKernel<<<dim3(nblocks, nblocks, nblocks),
+        dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
+            T->surfAccessor(), 0.f, n);
   }
 
   void advection(float dt) {
@@ -74,7 +77,7 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
     ResampleKernel<<<dim3(nblocks, nblocks, nblocks),
         dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
             loc->surfAccessor(), vel->texAccessor(), velBuf->surfAccessor(),
-            make_float4(0.f, 2.5f, 0.f, 0.f), n);
+            make_float4(0.f, 0.0f, 0.f, 0.f), n);
     checkCUDAErrorWithLine("Resample vel failed!");
     ResampleKernel<float><<<dim3(nblocks, nblocks, nblocks),
         dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
@@ -132,7 +135,7 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
     SubgradientKernel<<<dim3(nblocks, nblocks, nblocks),
         dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
             p->surfAccessor(), vel->surfAccessor(),
-            make_float4(0.f, 2.5f, 0.f, 0.f), n);
+            make_float4(0.f, 0.0f, 0.f, 0.f), n);
     checkCUDAErrorWithLine("Subgradient failed!");
   }
   void smooth(float dt) {
@@ -145,12 +148,11 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
       checkCUDAErrorWithLine("Smooth failed!");
       std::swap(rho, rhoBuf);
     }
-
   }
   void substep(float dt) {
     advection(dt);
     cool(dt);
-    smooth(dt);
+    // smooth(dt);
     applyForce(dt);
     projection(dt);
   }
@@ -165,7 +167,6 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
     // std::cout << "Substep " << i << std::endl;
     substep(frame.dt);
     frame.onAdvance();
-    std::cout << "Frame " << frame.idx << " done!" << std::endl;
   }
 };
 }

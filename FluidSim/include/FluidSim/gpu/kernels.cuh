@@ -21,12 +21,10 @@ inline void checkCUDAError(const char* msg, int line = -1) {
 #define checkCUDAErrorWithLine(msg) checkCUDAError(msg, __LINE__)
 
 namespace fluid {
-
 __device__ __forceinline__ bool withinSource(float x, float y, float z,
-    int n) {
+                                             int n) {
   float centre = static_cast<float>(n) * 0.5f;
-  return y < 16.f && (x - centre) * (x - centre) + (z - centre) * (z - centre)
-         < 16.f;
+  return abs(x - centre) < 8.f && abs(z - centre) < 8.f && y < 16.f;
 }
 
 __device__ __forceinline__ float3 makeCellCenter(int x, int y, int z) {
@@ -34,7 +32,8 @@ __device__ __forceinline__ float3 makeCellCenter(int x, int y, int z) {
                      static_cast<float>(z) + 0.5f);
 }
 __global__ void AdvectKernel(CudaTextureAccessor<float4> texVel,
-                             CudaSurfaceAccessor<float4> surf_loc, uint n, float dt);
+                             CudaSurfaceAccessor<float4> surf_loc, uint n,
+                             float dt);
 
 template <typename T>
 __global__ void FillKernel(CudaSurfaceAccessor<T> surf, T val, uint n) {
@@ -58,7 +57,9 @@ __global__ void ResampleKernel(CudaSurfaceAccessor<float4> surf_loc,
     return;
   float4 loc = surf_loc.read(x, y, z);
   assert(loc.x == loc.x && loc.y == loc.y && loc.z == loc.z && loc.w == loc.w);
-  auto val = withinSource(loc.x, loc.y, loc.z, n) ? src_val : tex.sample(loc.x, loc.y, loc.z);
+  auto val = withinSource(loc.x, loc.y, loc.z, n)
+               ? src_val
+               : tex.sample(loc.x, loc.y, loc.z);
   tex_nxt.write(val, x, y, z);
 }
 

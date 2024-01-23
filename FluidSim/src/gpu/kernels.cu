@@ -4,7 +4,8 @@
 
 namespace fluid {
 __global__ void AdvectKernel(CudaTextureAccessor<float4> texVel,
-                             CudaSurfaceAccessor<float4> surf_loc, uint n, float dt) {
+                             CudaSurfaceAccessor<float4> surf_loc, uint n,
+                             float dt) {
   int x = threadIdx.x + blockDim.x * blockIdx.x;
   int y = threadIdx.y + blockDim.y * blockIdx.y;
   int z = threadIdx.z + blockDim.z * blockIdx.z;
@@ -22,7 +23,8 @@ __global__ void AdvectKernel(CudaTextureAccessor<float4> texVel,
   assert(vel2.x == vel2.x && vel2.y == vel2.y && vel2.z == vel2.z);
   float3 vel3 = sample(texVel, loc - 0.75f * vel2 * dt);
   assert(vel3.x == vel3.x && vel3.y == vel3.y && vel3.z == vel3.z);
-  loc -= (2.f / 9.f) * vel1 * dt + (1.f / 3.f) * vel2 * dt + (4.f / 9.f) * vel3 * dt;
+  loc -= (2.f / 9.f) * vel1 * dt + (1.f / 3.f) * vel2 * dt + (4.f / 9.f) * vel3
+      * dt;
   assert(loc.x == loc.x && loc.y == loc.y && loc.z == loc.z);
   surf_loc.write(make_float4(loc.x, loc.y, loc.z, 0.f), x, y, z);
 }
@@ -39,8 +41,8 @@ __global__ void DivergenceKernel(CudaSurfaceAccessor<float4> surf_vel,
   float vxp = surf_vel.read<cudaBoundaryModeZero>(x - 1, y, z).x;
   float vyn = surf_vel.read<cudaBoundaryModeZero>(x, y + 1, z).y;
   float vyp = surf_vel.read<cudaBoundaryModeZero>(x, y - 1, z).y;
-  float vzn = surf_vel.read<cudaBoundaryModeZero>(x, y, z + 1).y;
-  float vzp = surf_vel.read<cudaBoundaryModeZero>(x, y, z - 1).y;
+  float vzn = surf_vel.read<cudaBoundaryModeZero>(x, y, z + 1).z;
+  float vzp = surf_vel.read<cudaBoundaryModeZero>(x, y, z - 1).z;
   float div = (vxn - vxp + vyn - vyp + vzn - vzp) * 0.5f;
   surf_div.write(div, x, y, z);
 }
@@ -138,7 +140,8 @@ __global__ void AccumulateForceKernel(CudaSurfaceAccessor<float4> surf_force,
   float rho = surf_rho.read(x, y, z);
   assert(rho == rho);
   float3 loc = makeCellCenter(x, y, z);
-  float buoyancy = -alpha * rho * loc.y / n + beta * (T - ambientTemperature) * loc.y / n;
+  float buoyancy = -alpha * rho * loc.y / n + beta * (T - ambientTemperature) *
+                   loc.y / n;
   assert(buoyancy == buoyancy);
   float nwnx = norm(surf_vort.read<cudaBoundaryModeZero>(x + 1, y, z));
   float nwpx = norm(surf_vort.read<cudaBoundaryModeZero>(x - 1, y, z));
@@ -154,7 +157,9 @@ __global__ void AccumulateForceKernel(CudaSurfaceAccessor<float4> surf_force,
   assert(eta.x == eta.x && eta.y == eta.y && eta.z == eta.z);
   float3 confine = epsilon * cross(eta, make_float3(vort.x, vort.y, vort.z));
   float neta = norm(eta);
-  confine = neta == 0.f ? make_float3(0.f, 0.f, 0.f) : confine / neta;
+  confine = neta == 0.f || withinSource(x, y, z, n)
+              ? make_float3(0.f, 0.f, 0.f)
+              : confine / neta;
   assert(
       confine.x == confine.x && confine.y == confine.y && confine.z == confine.
       z);
@@ -186,12 +191,18 @@ __global__ void CoolingKernel(CudaSurfaceAccessor<float> surf_T,
   int z = threadIdx.z + blockDim.z * blockIdx.z;
   if (x >= n || y >= n || z >= n)
     return;
-  float T = surf_T.read(x, y, z);
   float rho = surf_rho.read(x, y, z);
-  float coolingRate = (T - ambientTemperature);
+  float T = surf_T.read(x, y, z);
+  float txp = surf_T.read<cudaBoundaryModeClamp>(x + 1, y, z);
+  float txn = surf_T.read<cudaBoundaryModeClamp>(x - 1, y, z);
+  float typ = surf_T.read<cudaBoundaryModeClamp>(x, y + 1, z);
+  float tyn = surf_T.read<cudaBoundaryModeClamp>(x, y - 1, z);
+  float tzp = surf_T.read<cudaBoundaryModeClamp>(x, y, z + 1);
+  float tzn = surf_T.read<cudaBoundaryModeClamp>(x, y, z - 1);
+  float avg = (txp + txn + typ + tyn + tzp + tzn) / 6.f;
   float decayingRate = rho;
-  surf_T_nxt.write(T - coolingRate * dt, x, y, z);
-  surf_rho_nxt.write(rho - 0.1f * decayingRate * dt, x, y, z);
+  surf_T_nxt.write((T - (T - avg) * dt) * exp(-0.01f), x, y, z);
+  surf_rho_nxt.write(rho - decayingRate * 0.075f * dt, x, y, z);
 }
 __global__ void SmoothingKernel(CudaSurfaceAccessor<float> surf_rho,
                                 CudaSurfaceAccessor<float> surf_rho_nxt,
@@ -208,7 +219,6 @@ __global__ void SmoothingKernel(CudaSurfaceAccessor<float> surf_rho,
   float rzp = surf_rho.read<cudaBoundaryModeClamp>(x, y, z + 1);
   float rzn = surf_rho.read<cudaBoundaryModeClamp>(x, y, z - 1);
   float rel = surf_rho.read(x, y, z);
-  assert(vel.x == vel.x && vel.y == vel.y && vel.z == vel.z);
   float result = (rxp + rxn + ryp + ryn + rzp + rzn + 6.f * rel) / 12.f;
   surf_rho_nxt.write(result, x, y, z);
 }
