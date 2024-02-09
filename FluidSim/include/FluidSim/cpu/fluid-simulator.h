@@ -15,8 +15,8 @@
 #include <FluidSim/cpu/project-solver.h>
 #include <Spatify/grids.h>
 #include <memory>
-namespace fluid {
 
+namespace fluid {
 using spatify::Grid;
 using spatify::CellCentredGrid;
 using spatify::FaceCentredGrid;
@@ -27,7 +27,9 @@ class HybridFluidSimulator3D final : public core::Animation {
     core::Timer timer;
     ~HybridFluidSimulator3D() override = default;
     HybridFluidSimulator3D(int n, const Vec3d& size, const Vec3i& resolution)
-      : nParticles(n), pg(resolution) {
+      : nParticles(n), uw(resolution + Vec3i(1, 0, 0)),
+        vw(resolution + Vec3i(0, 1, 0)), ww(resolution + Vec3i(0, 0, 1)),
+        pg(resolution) {
       m_particles.positions.resize(n);
       // initialize grids
       ug = std::make_unique<FaceCentredGrid<
@@ -54,7 +56,7 @@ class HybridFluidSimulator3D final : public core::Animation {
       fluidSurfaceBuf = std::make_unique<SDF<3>>(resolution, size);
       colliderSdf = std::make_unique<SDF<3>>(resolution, size);
       for (auto& p : m_particles.positions) {
-        p = core::randomVec<Real, 3>() * 0.25 + Vec3d(0.25, 0.75, 0.25);
+        p = core::randomVec<Real, 3>() * Vec3d(1.0, 0.25, 1.0) + Vec3d(0.0, 0.5, 0.0);
         p *= size;
       }
       assert(
@@ -154,7 +156,7 @@ class HybridFluidSimulator3D final : public core::Animation {
                      std::unique_ptr<Array3D<char>>& validBuf, int iters) {
       for (int i = 0; i < iters; i++) {
         validBuf->fill(false);
-        g->forEach([&](int i, int j, int k) {
+        g->parallelForEach([&](int i, int j, int k) {
           if (valid->at(i, j, k)) {
             validBuf->at(i, j, k) = true;
             return;
@@ -200,6 +202,7 @@ class HybridFluidSimulator3D final : public core::Animation {
     void clear();
     void applyForce(Real dt) const;
     void applyCollider() const;
+    void applyDirichletBoundary() const;
     [[nodiscard]] Real CFL() const;
     void substep(Real dt);
     std::unique_ptr<FaceCentredGrid<Real, Real, 3, 0>> ug, ubuf;
@@ -207,6 +210,7 @@ class HybridFluidSimulator3D final : public core::Animation {
     std::unique_ptr<FaceCentredGrid<Real, Real, 3, 2>> wg, wbuf;
     std::unique_ptr<Array3D<char>> uValid, vValid, wValid, uValidBuf, vValidBuf,
         wValidBuf, sdfValid, sdfValidBuf;
+    Array3D<Real> uw, vw, ww;
     Array3D<Real> pg;
     ParticleSystemReconstructor<Real, 3>* fluidSurfaceReconstructor{};
     std::unique_ptr<SDF<3>> fluidSurface{}, fluidSurfaceBuf{}, colliderSdf{};

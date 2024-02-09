@@ -12,22 +12,32 @@
 namespace fluid {
 void HybridFluidSimulator3D::applyForce(Real dt) const {
   vg->forEach([this, dt](int i, int j, int k) {
-    vg->at(i, j, k) -= 9.8 * dt;
+    if (vValid->at(i, j, k) && j > 0 && j < vg->height() - 1)
+      vg->at(i, j, k) -= 9.8 * dt;
   });
 }
 
 void HybridFluidSimulator3D::clear() {
-  ug->fill(0);
-  ubuf->fill(0);
+  uValid->fill(0);
+  vValid->fill(0);
+  wValid->fill(0);
+  uValidBuf->fill(0);
+  vValidBuf->fill(0);
+  wValidBuf->fill(0);
   vg->fill(0);
-  vbuf->fill(0);
+  ug->fill(0);
   wg->fill(0);
+  ubuf->fill(0);
+  vbuf->fill(0);
   wbuf->fill(0);
+  uw.fill(0);
+  vw.fill(0);
+  ww.fill(0);
   pg.fill(0);
 }
 
 void HybridFluidSimulator3D::smoothFluidSurface(int iters) {
-  for (int i = 0; i < iters; i++) {
+  for (int iter = 0; iter < iters; iter++) {
     fluidSurfaceBuf->grid.forEach([&](int i, int j, int k) {
       Real sum = 0;
       int count = 0;
@@ -65,6 +75,10 @@ void HybridFluidSimulator3D::smoothFluidSurface(int iters) {
 
 void HybridFluidSimulator3D::applyCollider() const {
   ug->parallelForEach([&](int i, int j, int k) {
+    if (i == 0 || i == ug->width() - 1) {
+      ug->at(i, j, k) = 0.0;
+      return;
+    }
     Vec3d pos{ug->indexToCoord(i, j, k)};
     if (colliderSdf->eval(pos) < 0.0) {
       // calc the normal, and project out the x component
@@ -73,6 +87,10 @@ void HybridFluidSimulator3D::applyCollider() const {
     }
   });
   vg->parallelForEach([&](int i, int j, int k) {
+    if (j == 0 || j == vg->height() - 1) {
+      vg->at(i, j, k) = 0.0;
+      return;
+    }
     Vec3d pos = vg->indexToCoord(i, j, k);
     if (colliderSdf->eval(pos) < 0.0) {
       Vec3d normal{normalize(colliderSdf->grad(pos))};
@@ -80,12 +98,43 @@ void HybridFluidSimulator3D::applyCollider() const {
     }
   });
   wg->parallelForEach([&](int i, int j, int k) {
+    if (k == 0 || k == wg->depth() - 1) {
+      wg->at(i, j, k) = 0.0;
+      return;
+    }
     Vec3d pos{wg->indexToCoord(i, j, k)};
     if (colliderSdf->eval(pos) < 0.0) {
       Vec3d normal{normalize(colliderSdf->grad(pos))};
       wg->at(i, j, k) -= wg->at(i, j, k) * normal.z;
     }
   });
+}
+
+void HybridFluidSimulator3D::applyDirichletBoundary() const {
+  for (int j = 0; j < ug->height(); j++) {
+    for (int k = 0; k < ug->depth(); k++) {
+      ug->at(0, j, k) = 0.0;
+      uValid->at(0, j, k) = 1;
+      ug->at(ug->width() - 1, j, k) = 0.0;
+      uValid->at(ug->width() - 1, j, k) = 1;
+    }
+  }
+  for (int i = 0; i < vg->width(); i++) {
+    for (int k = 0; k < vg->depth(); k++) {
+      vg->at(i, 0, k) = 0.0;
+      vValid->at(i, 0, k) = 1;
+      vg->at(i, vg->height() - 1, k) = 0.0;
+      vValid->at(i, vg->height() - 1, k) = 1;
+    }
+  }
+  for (int i = 0; i < wg->width(); i++) {
+    for (int j = 0; j < wg->height(); j++) {
+      wg->at(i, j, 0) = 0.0;
+      wValid->at(i, j, 0) = 1;
+      wg->at(i, j, wg->depth() - 1) = 0.0;
+      wValid->at(i, j, wg->depth() - 1) = 1;
+    }
+  }
 }
 
 void HybridFluidSimulator3D::substep(Real dt) {
@@ -104,7 +153,8 @@ void HybridFluidSimulator3D::substep(Real dt) {
   std::cout << "Done." << std::endl;
   std::cout << "Solving P2G... ";
   advector->solveP2G(std::span(positions()), *ug, *vg, *wg,
-                     *colliderSdf, *uValid, *vValid, *wValid, dt);
+                     *colliderSdf, uw, vw, ww, *uValid, *vValid, *wValid, dt);
+  applyDirichletBoundary();
   std::cout << "Done." << std::endl;
   std::cout << "Extrapolating velocities... ";
   extrapolate(ug, ubuf, uValid, uValidBuf, 10);
@@ -119,6 +169,7 @@ void HybridFluidSimulator3D::substep(Real dt) {
   if (Real residual{projector->solvePressure(*fluidSurface, pg)};
     residual > 1e-4)
     std::cerr << "Warning: projection residual is " << residual << std::endl;
+  else std::cout << "Projection residual is " << residual << std::endl;
   std::cout << "Done." << std::endl;
   std::cout << "Doing projection and applying collider... ";
   projector->project(*ug, *vg, *wg, pg, *fluidSurface, *colliderSdf, dt);

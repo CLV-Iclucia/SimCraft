@@ -19,42 +19,51 @@ Vec3d sampleVelocity(const Vec3d& p,
                      const FaceCentredGrid<Real, Real, 3, 2>& w_grid);
 Real fractionInside(Real lu, Real ru, Real rd, Real ld);
 template <typename T>
-inline T clamp(T x, T min, T max) {
+T clamp(T x, T min, T max) {
   return x < min ? min : (x > max ? max : x);
 }
 
 template <typename T>
-inline bool approx(T x, T y) {
+T lerp(T x, T y, Real t) {
+  return x * (1 - t) + y * t;
+}
+
+template <typename T>
+bool approx(T x, T y) {
   if constexpr (std::is_same_v<T, Real>)
-    return std::abs(x - y) < 1e-6;
+    return std::abs(x - y) < 1e-4;
   else if (std::is_same_v<T, float>)
     return std::abs(x - y) < 1e-3;
   else return x == y;
 }
 
 inline bool notNan(Real x) {
-  return x == x;
+  return !std::isnan(x);
 }
 
 using core::sqr;
 using core::normalize;
 using core::dot;
 
-Real dotProduct(const spatify::Array3D<Real>& a,
-                const spatify::Array3D<Real>& b,
-                const spatify::Array3D<uint8_t>& active);
-void saxpy(spatify::Array3D<Real>& a, const spatify::Array3D<Real>& b, Real x,
-           const spatify::Array3D<uint8_t>& active);
-void scaleAndAdd(spatify::Array3D<Real>& a, const spatify::Array3D<Real>& b,
-                 Real x, const spatify::Array3D<uint8_t>& active);
+Real dotProduct(const Array3D<Real>& a,
+                const Array3D<Real>& b,
+                const Array3D<uint8_t>& active);
+void saxpy(Array3D<Real>& a, const Array3D<Real>& b, Real x,
+           const Array3D<uint8_t>& active);
+void scaleAndAdd(Array3D<Real>& a, const Array3D<Real>& b,
+                 Real x, const Array3D<uint8_t>& active);
 
-inline Real LinfNorm(spatify::Array3D<Real>& a, const spatify::Array3D<uint8_t>& active) {
+inline Real LinfNorm(Array3D<Real>& a, const Array3D<uint8_t>& active) {
   Real maxv = 0;
   a.forEach([&](int i, int j, int k) {
     if (!active(i, j, k)) return;
     maxv = std::max(maxv, std::abs(a(i, j, k)));
   });
   return maxv;
+}
+
+inline void doNothing() {
+
 }
 }
 

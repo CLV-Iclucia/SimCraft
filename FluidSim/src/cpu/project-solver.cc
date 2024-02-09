@@ -4,11 +4,6 @@
 #include <FluidSim/cpu/util.h>
 
 namespace fluid {
-static const std::array neighbours = {
-    Vec3i(-1, 0, 0), Vec3i(1, 0, 0), Vec3i(0, -1, 0),
-    Vec3i(0, 1, 0), Vec3i(0, 0, -1), Vec3i(0, 0, 1),
-};
-
 enum Directions {
   Left,
   Right,
@@ -18,13 +13,13 @@ enum Directions {
   Back
 };
 
-void applyCompressedMatrix(const Array3D<Real>& Adiag,
-                           const std::array<Array3D<Real>, 6>&
-                           Aneighbour, const Array3D<Real>& x,
-                           const Array3D<uint8_t>& active,
-                           Array3D<Real>& b) {
+static void applyCompressedMatrix(const Array3D<Real>& Adiag,
+                                  const std::array<Array3D<Real>, 6>&
+                                  Aneighbour, const Array3D<Real>& x,
+                                  const Array3D<uint8_t>& active,
+                                  Array3D<Real>& b) {
   b.parallelForEach([&](int i, int j, int k) {
-    if (!active(i, j, k) || Adiag(i, j, k) == 0.0) return;
+    if (!active(i, j, k)) return;
     Real t = Adiag(i, j, k) * x(i, j, k);
     if (i > 0 && active(i - 1, j, k))
       t += Aneighbour[Left](i, j, k) * x(i - 1, j, k);
@@ -45,9 +40,6 @@ void applyCompressedMatrix(const Array3D<Real>& Adiag,
 
 void FvmSolver3D::checkSystemSymmetry() const {
   Adiag.forEach([&](int i, int j, int k) {
-    if (i == 0 || j == 0 || k == 0 || i == Adiag.width() - 1 || j == Adiag.
-        height() - 1 || k == Adiag.depth() - 1)
-      return;
     if (!active(i, j, k) || Adiag(i, j, k) == 0.0) return;
     if (i > 0 && active(i - 1, j, k))
       assert(approx(Aneighbour[Left](i, j, k), Aneighbour[Right](i - 1, j, k)));
@@ -80,8 +72,13 @@ void FvmSolver3D::buildSystem(const FaceCentredGrid<Real, Real, 3, 0>& ug,
   uWeights.fill(0);
   vWeights.fill(0);
   wWeights.fill(0);
+  rhs.fill(0);
+  active.fill(false);
   uWeights.parallelForEach([&](int i, int j, int k) {
-    if (i == 0) return;
+    if (i == 0 || i == uWeights.width() - 1) {
+      uWeights(i, j, k) = 0.0;
+      return;
+    }
     if (fluidSdf(i - 1, j, k) > 0.0 && fluidSdf(i, j, k) > 0.0)
       return;
     Vec3d p = ug.indexToCoord(i, j, k);
@@ -95,7 +92,10 @@ void FvmSolver3D::buildSystem(const FaceCentredGrid<Real, Real, 3, 0>& ug,
     assert(notNan(uWeights(i, j, k)));
   });
   vWeights.parallelForEach([&](int i, int j, int k) {
-    if (j == 0) return;
+    if (j == 0 || j == vWeights.height() - 1) {
+      vWeights(i, j, k) = 0.0;
+      return;
+    }
     if (fluidSdf(i, j - 1, k) > 0.0 && fluidSdf(i, j, k) > 0.0)
       return;
     Vec3d p = vg.indexToCoord(i, j, k);
@@ -109,7 +109,10 @@ void FvmSolver3D::buildSystem(const FaceCentredGrid<Real, Real, 3, 0>& ug,
     assert(notNan(vWeights(i, j, k)));
   });
   wWeights.parallelForEach([&](int i, int j, int k) {
-    if (k == 0) return;
+    if (k == 0 || k == wWeights.depth() - 1) {
+      wWeights(i, j, k) = 0.0;
+      return;
+    }
     if (fluidSdf(i, j, k - 1) > 0.0 && fluidSdf(i, j, k) > 0.0)
       return;
     Vec3d p = wg.indexToCoord(i, j, k);
@@ -123,21 +126,13 @@ void FvmSolver3D::buildSystem(const FaceCentredGrid<Real, Real, 3, 0>& ug,
     assert(notNan(wWeights(i, j, k)));
   });
 
-  Adiag.forEach([&](int i, int j, int k) {
-    if (i == 0 || j == 0 || k == 0 || i == Adiag.width() - 1 || j == Adiag.
-        height() - 1 || k == Adiag.depth()
-        - 1) {
-      active(i, j, k) = false;
-      return;
-    }
+  Adiag.parallelForEach([&](int i, int j, int k) {
     if (uWeights(i, j, k) == 0.0 && uWeights(i + 1, j, k) == 0.0 &&
         vWeights(i, j, k) == 0.0 && vWeights(i, j + 1, k) == 0.0 &&
         wWeights(i, j, k) == 0.0 && wWeights(i, j, k + 1) == 0.0)
       return;
-    if (fluidSdf(i, j, k) > 0.0) {
-      active(i, j, k) = false;
+    if (fluidSdf(i, j, k) > 0.0)
       return;
-    }
     active(i, j, k) = true;
     Real signed_dist = fluidSdf(i, j, k);
     Real factor = dt / h;
@@ -146,68 +141,88 @@ void FvmSolver3D::buildSystem(const FaceCentredGrid<Real, Real, 3, 0>& ug,
     assert(notNan(wg(i, j, k)));
 
     // left
-    if (fluidSdf(i - 1, j, k) > 0.0) {
-      Real theta = std::max(
-          signed_dist / (signed_dist - fluidSdf(i - 1, j, k)), 0.01);
-      Adiag(i, j, k) += uWeights(i, j, k) * factor / theta;
-    } else {
-      Adiag(i, j, k) += uWeights(i, j, k) * factor;
-      Aneighbour[Left](i, j, k) -= uWeights(i, j, k) * factor;
+    if (i > 0) {
+      if (fluidSdf(i - 1, j, k) > 0.0) {
+        Real theta = std::max(
+            fluidSdf(i - 1, j, k) / (fluidSdf(i - 1, j, k) - signed_dist),
+            0.01);
+        Adiag(i, j, k) += uWeights(i, j, k) * factor / theta;
+      } else {
+        Adiag(i, j, k) += uWeights(i, j, k) * factor;
+        Aneighbour[Left](i, j, k) -= uWeights(i, j, k) * factor;
+      }
+      rhs(i, j, k) += uWeights(i, j, k) * ug(i, j, k);
     }
-    rhs(i, j, k) += uWeights(i, j, k) * ug(i, j, k);
 
     // right
-    if (fluidSdf(i + 1, j, k) > 0.0) {
-      Real theta = std::max(
-          signed_dist / (signed_dist - fluidSdf(i + 1, j, k)), 0.01);
-      Adiag(i, j, k) += uWeights(i + 1, j, k) * factor / theta;
-    } else {
-      Adiag(i, j, k) += uWeights(i + 1, j, k) * factor;
-      Aneighbour[Right](i, j, k) -= uWeights(i + 1, j, k) * factor;
+    if (i < fluidSdf.width() - 1) {
+      if (fluidSdf(i + 1, j, k) > 0.0) {
+        Real theta = std::max(
+            signed_dist / (signed_dist - fluidSdf(i + 1, j, k)), 0.01);
+        Adiag(i, j, k) += uWeights(i + 1, j, k) * factor / theta;
+      } else {
+        if (i < fluidSdf.width() - 1) {
+          Adiag(i, j, k) += uWeights(i + 1, j, k) * factor;
+          Aneighbour[Right](i, j, k) -= uWeights(i + 1, j, k) * factor;
+        }
+      }
+      rhs(i, j, k) -= uWeights(i + 1, j, k) * ug(i + 1, j, k);
     }
-    rhs(i, j, k) -= uWeights(i + 1, j, k) * ug(i + 1, j, k);
 
     // down
-    if (fluidSdf(i, j - 1, k) > 0.0) {
-      Real theta = std::max(
-          signed_dist / (signed_dist - fluidSdf(i, j - 1, k)), 0.01);
-      Adiag(i, j, k) += vWeights(i, j, k) * factor / theta;
-    } else {
-      Adiag(i, j, k) += vWeights(i, j, k) * factor;
-      Aneighbour[Down](i, j, k) -= vWeights(i, j, k) * factor;
+    if (j > 0) {
+      if (fluidSdf(i, j - 1, k) > 0.0) {
+        Real theta = std::max(
+            fluidSdf(i, j - 1, k) / (fluidSdf(i, j - 1, k) - signed_dist),
+            0.01);
+        Adiag(i, j, k) += vWeights(i, j, k) * factor / theta;
+      } else {
+        Adiag(i, j, k) += vWeights(i, j, k) * factor;
+        Aneighbour[Down](i, j, k) -= vWeights(i, j, k) * factor;
+      }
+      rhs(i, j, k) += vWeights(i, j, k) * vg(i, j, k);
     }
-    rhs(i, j, k) += vWeights(i, j, k) * vg(i, j, k);
+
     // up
-    if (fluidSdf(i, j + 1, k) > 0.0) {
-      Real theta = std::max(
-          signed_dist / (signed_dist - fluidSdf(i, j + 1, k)), 0.01);
-      Adiag(i, j, k) += vWeights(i, j + 1, k) * factor / theta;
-    } else {
-      Adiag(i, j, k) += vWeights(i, j + 1, k) * factor;
-      Aneighbour[Up](i, j, k) -= vWeights(i, j + 1, k) * factor;
+    if (j < fluidSdf.width() - 1) {
+      if (fluidSdf(i, j + 1, k) > 0.0) {
+        Real theta = std::max(
+            signed_dist / (signed_dist - fluidSdf(i, j + 1, k)), 0.01);
+        Adiag(i, j, k) += vWeights(i, j + 1, k) * factor / theta;
+      } else {
+        Adiag(i, j, k) += vWeights(i, j + 1, k) * factor;
+        Aneighbour[Up](i, j, k) -= vWeights(i, j + 1, k) * factor;
+      }
+      rhs(i, j, k) -= vWeights(i, j + 1, k) * vg(i, j + 1, k);
     }
-    rhs(i, j, k) -= vWeights(i, j + 1, k) * vg(i, j + 1, k);
+
     // back
-    if (fluidSdf(i, j, k - 1) > 0.0) {
-      Real theta = std::max(
-          signed_dist / (signed_dist - fluidSdf(i, j, k - 1)), 0.01);
-      Adiag(i, j, k) += wWeights(i, j, k) * factor / theta;
-    } else {
-      Adiag(i, j, k) += wWeights(i, j, k) * factor;
-      Aneighbour[Back](i, j, k) -= wWeights(i, j, k) * factor;
+    if (k > 0) {
+      if (fluidSdf(i, j, k - 1) > 0.0) {
+        Real theta = std::max(
+            fluidSdf(i, j, k - 1) / (fluidSdf(i, j, k - 1) - signed_dist),
+            0.01);
+        Adiag(i, j, k) += wWeights(i, j, k) * factor / theta;
+      } else {
+        Adiag(i, j, k) += wWeights(i, j, k) * factor;
+        Aneighbour[Back](i, j, k) -= wWeights(i, j, k) * factor;
+      }
+      rhs(i, j, k) += wWeights(i, j, k) * wg(i, j, k);
     }
-    rhs(i, j, k) += wWeights(i, j, k) * wg(i, j, k);
 
     // front
-    if (fluidSdf(i, j, k + 1) > 0.0) {
-      Real theta = std::max(
-          signed_dist / (signed_dist - fluidSdf(i, j, k + 1)), 0.01);
-      Adiag(i, j, k) += wWeights(i, j, k + 1) * factor / theta;
-    } else {
-      Adiag(i, j, k) += wWeights(i, j, k + 1) * factor;
-      Aneighbour[Front](i, j, k) -= wWeights(i, j, k + 1) * factor;
+    if (k < fluidSdf.depth() - 1) {
+      if (fluidSdf(i, j, k + 1) > 0.0) {
+        Real theta = std::max(
+            signed_dist / (signed_dist - fluidSdf(i, j, k + 1)), 0.01);
+        Adiag(i, j, k) += wWeights(i, j, k + 1) * factor / theta;
+      } else {
+        Adiag(i, j, k) += wWeights(i, j, k + 1) * factor;
+        Aneighbour[Front](i, j, k) -= wWeights(i, j, k + 1) * factor;
+      }
+      rhs(i, j, k) -= wWeights(i, j, k + 1) * wg(i, j, k + 1);
     }
-    rhs(i, j, k) -= wWeights(i, j, k + 1) * wg(i, j, k + 1);
+    assert(Adiag(i, j, k) > 0.0);
     assert(notNan(rhs(i, j, k)));
   });
   checkSystemSymmetry();
@@ -220,11 +235,13 @@ void ModifiedIncompleteCholesky3D::precond(
     const Array3D<uint8_t>& active,
     Array3D<Real>& z) {
   // before this we have guaranteed that A is symmetric
+  E.fill(0);
   E.forEach([&](int i, int j, int k) {
     if (!active(i, j, k)) return;
     Real e = Adiag(i, j, k);
     assert(notNan(e));
-    if (i > 0 && active(i - 1, j, k)) {
+    if (e == 0.0) return;
+    if (i > 0 && active(i - 1, j, k) && Adiag(i - 1, j, k) != 0.0) {
       e -= sqr(Aneighbour[Left](i, j, k) * E(i - 1, j, k));
       if (j < E.height() - 1 && active(i - 1, j + 1, k))
         e -= tau * Aneighbour[Left](i, j, k) * Aneighbour[Left](i - 1, j + 1, k)
@@ -233,7 +250,7 @@ void ModifiedIncompleteCholesky3D::precond(
         e -= tau * Aneighbour[Left](i, j, k) * Aneighbour[Left](i - 1, j, k + 1)
             / sqr(E(i - 1, j, k));
     }
-    if (j > 0 && active(i, j - 1, k)) {
+    if (j > 0 && active(i, j - 1, k) && Adiag(i, j - 1, k) != 0.0) {
       e -= sqr(Aneighbour[Down](i, j, k) * E(i, j - 1, k));
       if (i < E.width() - 1 && active(i + 1, j - 1, k))
         e -= tau * Aneighbour[Down](i, j, k) * Aneighbour[Down](i + 1, j - 1, k)
@@ -242,7 +259,7 @@ void ModifiedIncompleteCholesky3D::precond(
         e -= tau * Aneighbour[Down](i, j, k) * Aneighbour[Down](i, j - 1, k + 1)
             / sqr(E(i, j - 1, k));
     }
-    if (k > 0 && active(i, j, k - 1)) {
+    if (k > 0 && active(i, j, k - 1) && Adiag(i, j, k - 1) != 0.0) {
       e -= sqr(Aneighbour[Back](i, j, k) * E(i, j, k - 1));
       if (i < E.width() - 1 && active(i + 1, j, k - 1))
         e -= tau * Aneighbour[Back](i, j, k) * Aneighbour[Back](i + 1, j, k - 1)
@@ -252,6 +269,7 @@ void ModifiedIncompleteCholesky3D::precond(
             / sqr(E(i, j, k - 1));
     }
     if (e < sigma * Adiag(i, j, k)) e = Adiag(i, j, k);
+    assert(notNan(e));
     assert(e > 0.0);
     E(i, j, k) = 1.0 / std::sqrt(e);
   });
@@ -296,15 +314,18 @@ Real CgSolver3D::solve(const Array3D<Real>& Adiag,
   pg.fill(0);
   r.copyFrom(rhs);
   Real residual = LinfNorm(r, active);
-  if (residual < tolerance)
+  if (residual < tolerance) {
+    std::cout << "naturally converged" << std::endl;
     return residual;
+  }
   if (preconditioner)
     preconditioner->precond(Adiag, Aneighbour, rhs, active, z);
   else
     z.copyFrom(r);
   s.copyFrom(z);
   Real sigma = dotProduct(z, r, active);
-  for (int i = 0; i < max_iterations; i++) {
+  int iter = 1;
+  for (; iter < max_iterations; iter++) {
     applyCompressedMatrix(Adiag, Aneighbour, s, active, z);
     Real sdotz = dotProduct(s, z, active);
     assert(sdotz != 0);
@@ -321,6 +342,7 @@ Real CgSolver3D::solve(const Array3D<Real>& Adiag,
     scaleAndAdd(s, z, beta, active);
     sigma = sigma_new;
   }
+  std::cout << std::format("PCG iterations: {}", iter) << std::endl;
   return residual;
 }
 
@@ -334,57 +356,76 @@ void FvmSolver3D::project(FaceCentredGrid<Real, Real, 3, 0>& ug,
   Real h = ug.gridSpacing().x;
   ug.parallelForEach([&](int i, int j, int k) {
     if (uWeights(i, j, k) <= 0.0) return;
-    Real theta{1.0};
     if (i == 0 || i == ug.width() - 1) {
       ug(i, j, k) = 0.0;
       return;
     }
-    Real sd_left = fluid_sdf.grid(i - 1, j, k);
-    Real sd_right = fluid_sdf.grid(i, j, k);
+    Real sd_left = fluid_sdf(i - 1, j, k);
+    Real sd_right = fluid_sdf(i, j, k);
     assert(notNan(pg(i, j, k)));
     if (sd_left >= 0.0 && sd_right >= 0.0) return;
     if (sd_left < 0.0 && sd_right < 0.0) {
       ug(i, j, k) -= (pg(i, j, k) - pg(i - 1, j, k)) * dt / h;
       return;
     }
-    theta = std::max(sd_left / (sd_left - sd_right), 0.01);
-    ug(i, j, k) -= pg(i - 1, j, k) * dt / h / theta;
+    Real theta = std::max(sd_left / (sd_left - sd_right), 0.01);
+    if (sd_left < 0.0)
+      ug(i, j, k) += pg(i - 1, j, k) * dt / h / theta;
+    else
+      ug(i, j, k) -= pg(i, j, k) * dt / h / (1.0 - theta);
   });
   vg.parallelForEach([&](int i, int j, int k) {
     if (vWeights(i, j, k) <= 0.0) return;
-    Real theta{1.0};
     if (j == 0 || j == vg.height() - 1) {
       vg(i, j, k) = 0.0;
       return;
     }
-    Real sd_down = fluid_sdf.grid(i - 1, j, k);
-    Real sd_up = fluid_sdf.grid(i, j, k);
+    Real sd_down = fluid_sdf(i, j - 1, k);
+    Real sd_up = fluid_sdf(i, j, k);
     assert(notNan(pg(i, j, k)));
     if (sd_down >= 0.0 && sd_up >= 0.0) return;
     if (sd_down < 0.0 && sd_up < 0.0) {
       vg(i, j, k) -= (pg(i, j, k) - pg(i, j - 1, k)) * dt / h;
       return;
     }
-    theta = std::max(sd_down / (sd_down - sd_up), 0.01);
-    vg(i, j, k) -= pg(i, j - 1, k) * dt / h / theta;
+    Real theta = std::max(sd_down / (sd_down - sd_up), 0.01);
+    if (sd_down < 0.0)
+      vg(i, j, k) += pg(i, j - 1, k) * dt / h / theta;
+    else
+      vg(i, j, k) -= pg(i, j, k) * dt / h / (1.0 - theta);
   });
   wg.parallelForEach([&](int i, int j, int k) {
     if (wWeights(i, j, k) <= 0.0) return;
-    Real theta{1.0};
     if (k == 0 || k == wg.depth() - 1) {
       wg(i, j, k) = 0.0;
       return;
     }
     assert(notNan(pg(i, j, k)));
-    Real sd_back = fluid_sdf.grid(i, j, k - 1);
-    Real sd_front = fluid_sdf.grid(i, j, k);
+    Real sd_back = fluid_sdf(i, j, k - 1);
+    Real sd_front = fluid_sdf(i, j, k);
     if (sd_back >= 0.0 && sd_front >= 0.0) return;
     if (sd_back < 0.0 && sd_front < 0.0) {
-      wg(i, j, k) -= (pg(i, j, k) - pg(i - 1, j, k)) * dt / h;
+      wg(i, j, k) -= (pg(i, j, k) - pg(i, j, k - 1)) * dt / h;
       return;
     }
-    theta = std::max(sd_back / (sd_back - sd_front), 0.01);
-    wg(i, j, k) -= pg(i, j, k - 1) * dt / h / theta;
+    Real theta = std::max(sd_back / (sd_back - sd_front), 0.01);
+    if (sd_back < 0.0)
+      wg(i, j, k) += pg(i, j, k - 1) * dt / h / theta;
+    else
+      wg(i, j, k) -= pg(i, j, k) * dt / h / (1.0 - theta);
+  });
+  // check divergence free
+  Adiag.forEach([&](int i, int j, int k) {
+    if (!active(i, j, k)) return;
+    Real div = 0.0;
+    // sum the six faces
+    div += ug(i, j, k) * uWeights(i, j, k);
+    div -= ug(i + 1, j, k) * uWeights(i + 1, j, k);
+    div += vg(i, j, k) * vWeights(i, j, k);
+    div -= vg(i, j + 1, k) * vWeights(i, j + 1, k);
+    div += wg(i, j, k) * wWeights(i, j, k);
+    div -= wg(i, j, k + 1) * wWeights(i, j, k + 1);
+    // assert(approx(div, 0.0));
   });
 }
 }

@@ -11,7 +11,7 @@ namespace fluid {
 class HybridAdvectionSolver3D {
   public:
     HybridAdvectionSolver3D(int n, Real w, Real h, Real d)
-      : n_particles(n), width(w), height(h), depth(d)  {
+      : n_particles(n), width(w), height(h), depth(d) {
     }
     virtual void solveG2P(std::span<Vec3d> pos,
                           const FaceCentredGrid<Real, Real, 3, 0>& ug,
@@ -20,13 +20,16 @@ class HybridAdvectionSolver3D {
                           const SDF<3>& collider_sdf,
                           Real dt) = 0;
     virtual void solveP2G(std::span<Vec3d> pos,
-                          const FaceCentredGrid<Real, Real, 3, 0>& ug,
-                          const FaceCentredGrid<Real, Real, 3, 1>& vg,
-                          const FaceCentredGrid<Real, Real, 3, 2>& wg,
+                          FaceCentredGrid<Real, Real, 3, 0>& ug,
+                          FaceCentredGrid<Real, Real, 3, 1>& vg,
+                          FaceCentredGrid<Real, Real, 3, 2>& wg,
                           const SDF<3>& collider_sdf,
-                          spatify::Array3D<char>& uValid,
-                          spatify::Array3D<char>& vValid,
-                          spatify::Array3D<char>& wValid,
+                          Array3D<Real>& uw,
+                          Array3D<Real>& vw,
+                          Array3D<Real>& ww,
+                          Array3D<char>& uValid,
+                          Array3D<char>& vValid,
+                          Array3D<char>& wValid,
                           Real dt) = 0;
     virtual void advect(std::span<Vec3d> pos,
                         const FaceCentredGrid<Real, Real, 3, 0>& ug,
@@ -59,13 +62,16 @@ class PicAdvector3D final : public HybridAdvectionSolver3D {
                   const SDF<3>& collider_sdf,
                   Real dt) override;
     void solveP2G(std::span<Vec3d> pos,
-                  const FaceCentredGrid<Real, Real, 3, 0>& ug,
-                  const FaceCentredGrid<Real, Real, 3, 1>& vg,
-                  const FaceCentredGrid<Real, Real, 3, 2>& wg,
+                  FaceCentredGrid<Real, Real, 3, 0>& ug,
+                  FaceCentredGrid<Real, Real, 3, 1>& vg,
+                  FaceCentredGrid<Real, Real, 3, 2>& wg,
                   const SDF<3>& collider_sdf,
-                  spatify::Array3D<char>& uValid,
-                  spatify::Array3D<char>& vValid,
-                  spatify::Array3D<char>& wValid,
+                  Array3D<Real>& uw,
+                  Array3D<Real>& vw,
+                  Array3D<Real>& ww,
+                  Array3D<char>& uValid,
+                  Array3D<char>& vValid,
+                  Array3D<char>& wValid,
                   Real dt) override;
     void advect(std::span<Vec3d> pos,
                 const FaceCentredGrid<Real, Real, 3, 0>& ug,
@@ -73,8 +79,10 @@ class PicAdvector3D final : public HybridAdvectionSolver3D {
                 const FaceCentredGrid<Real, Real, 3, 2>& wg,
                 const SDF<3>& collider_sdf,
                 Real dt) override;
+
   private:
     void handleCollision(const SDF<3>& collider_sdf, Vec3d& p, Vec3d& v) const;
+    std::unique_ptr<Array3D<Real>> uw{}, vw{}, ww{};
 };
 }
 #endif //SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_COMMON_ADVECT_SOLVER_H_

@@ -21,17 +21,6 @@ struct SDF : NonCopyable {
   SDF(const Vector<int, Dim>& resolution, const Vector<Real, Dim>& size,
       const Vector<Real, Dim>& origin = Vector<Real, Dim>(0.0))
     : grid(resolution, size, origin) {
-    Real h = static_cast<Real>(size.x) / resolution.x;
-    for (int i = -1; i <= resolution.x; i++)
-      for (int j = -1; j <= resolution.y; j++)
-        for (int k = -1; k <= resolution.z; k++) {
-          if (int cnt = (i < 0 || i == resolution.x) + (
-                          j < 0 || j == resolution.y)
-                        + (k < 0 || k == resolution.z))
-            grid(i, j, k) = -h / std::sqrt(cnt);
-          else {
-          }
-        }
   }
   void init(const Vector<int, Dim>& resolution, const Vector<Real, Dim>& size,
             const Vector<Real, Dim>& origin = Vector<Real, Dim>(0.0)) {
@@ -44,21 +33,26 @@ struct SDF : NonCopyable {
     if constexpr (Dim == 2) {
     } else if constexpr (Dim == 3) {
       Vec3i idx = grid.coordToSampledCellIndex(p);
-      int x = idx.x, y = idx.y, z = idx.z;
+      int x = clamp(idx.x, 0, grid.width() - 1);
+      int y = clamp(idx.y, 0, grid.height() - 1);
+      int z = clamp(idx.z, 0, grid.depth() - 1);
+      int xn = clamp(idx.x + 1, 0, grid.width() - 1);
+      int yn = clamp(idx.y + 1, 0, grid.height() - 1);
+      int zn = clamp(idx.z + 1, 0, grid.depth() - 1);
       Vec3d pos = grid.indexToCoord(x, y, z);
-      Real tx = (p.x - pos.x) / grid.gridSpacing().x;
-      Real ty = (p.y - pos.y) / grid.gridSpacing().y;
-      Real tz = (p.z - pos.z) / grid.gridSpacing().z;
+      Real tx = clamp((p.x - pos.x) / grid.gridSpacing().x, 0.0, 1.0);
+      Real ty = clamp((p.y - pos.y) / grid.gridSpacing().y, 0.0, 1.0);
+      Real tz = clamp((p.z - pos.z) / grid.gridSpacing().z, 0.0, 1.0);
       assert(tx >= 0.0 && tx <= 1.0 && ty >= 0.0 && ty <= 1.0 && tz >= 0.0 &&
           tz <= 1.0);
       Real ret = tx * ty * tz * grid(x, y, z) +
-                 tx * ty * (1 - tz) * grid(x, y, z + 1) +
-                 tx * (1 - ty) * tz * grid(x, y + 1, z) +
-                 tx * (1 - ty) * (1 - tz) * grid(x, y + 1, z + 1) +
-                 (1 - tx) * ty * tz * grid(x + 1, y, z) +
-                 (1 - tx) * ty * (1 - tz) * grid(x + 1, y, z + 1) +
-                 (1 - tx) * (1 - ty) * tz * grid(x + 1, y + 1, z) +
-                 (1 - tx) * (1 - ty) * (1 - tz) * grid(x + 1, y + 1, z + 1);
+                 tx * ty * (1 - tz) * grid(x, y, zn) +
+                 tx * (1 - ty) * tz * grid(x, yn, z) +
+                 tx * (1 - ty) * (1 - tz) * grid(x, yn, zn) +
+                 (1 - tx) * ty * tz * grid(xn, y, z) +
+                 (1 - tx) * ty * (1 - tz) * grid(xn, y, zn) +
+                 (1 - tx) * (1 - ty) * tz * grid(xn, yn, z) +
+                 (1 - tx) * (1 - ty) * (1 - tz) * grid(xn, yn, zn);
       return ret;
     }
   }
@@ -92,18 +86,23 @@ struct SDF : NonCopyable {
     } else if constexpr (Dim == 3) {
       Vec3i idx = grid.coordToSampledCellIndex(p);
       // use trilerp to get the value
-      int x = idx.x, y = idx.y, z = idx.z;
+      int x = clamp(idx.x, 0, grid.width() - 1);
+      int y = clamp(idx.y, 0, grid.height() - 1);
+      int z = clamp(idx.z, 0, grid.depth() - 1);
+      int xn = clamp(idx.x + 1, 0, grid.width() - 1);
+      int yn = clamp(idx.y + 1, 0, grid.height() - 1);
+      int zn = clamp(idx.z + 1, 0, grid.depth() - 1);
       Real tx = (p.x - grid.indexToCoord(x, 0, 0).x) / grid.gridSpacing().x;
       Real ty = (p.y - grid.indexToCoord(0, y, 0).y) / grid.gridSpacing().y;
       Real tz = (p.z - grid.indexToCoord(0, 0, z).z) / grid.gridSpacing().z;
       Vec3d g000 = gradient(Vec3i(x, y, z));
-      Vec3d g001 = gradient(Vec3i(x, y, z + 1));
-      Vec3d g010 = gradient(Vec3i(x, y + 1, z));
-      Vec3d g011 = gradient(Vec3i(x, y + 1, z + 1));
-      Vec3d g100 = gradient(Vec3i(x + 1, y, z));
-      Vec3d g101 = gradient(Vec3i(x + 1, y, z + 1));
-      Vec3d g110 = gradient(Vec3i(x + 1, y + 1, z));
-      Vec3d g111 = gradient(Vec3i(x + 1, y + 1, z + 1));
+      Vec3d g001 = gradient(Vec3i(x, y, zn));
+      Vec3d g010 = gradient(Vec3i(x, yn, z));
+      Vec3d g011 = gradient(Vec3i(x, yn, zn));
+      Vec3d g100 = gradient(Vec3i(xn, y, z));
+      Vec3d g101 = gradient(Vec3i(xn, y, zn));
+      Vec3d g110 = gradient(Vec3i(xn, yn, z));
+      Vec3d g111 = gradient(Vec3i(xn, yn, zn));
       return tx * ty * tz * g000 +
              tx * ty * (1 - tz) * g001 +
              tx * (1 - ty) * tz * g010 +
@@ -170,7 +169,7 @@ struct SDF : NonCopyable {
   Real operator()(int i, int j, int k) const {
     return grid(i, j, k);
   }
-  PaddedCellCentredGrid<Real, Real, Dim, 1> grid;
+  spatify::CellCentredGrid<Real, Real, Dim> grid;
 };
 
 template <typename T, int Dim>
@@ -199,7 +198,7 @@ class NaiveReconstructor<
       ns.update(particles);
       sdf.grid.fill(1e9);
       sdfValid.fill(false);
-      sdf.grid.forEach([&](int i, int j, int k) {
+      sdf.grid.parallelForEach([&](int i, int j, int k) {
         Vector<T, 3> p = sdf.grid.indexToCoord(i, j, k);
         ns.forNeighbours(p, particles, 4 * radius, [&](int idx) {
           Real dis = glm::distance(p, particles[idx]);

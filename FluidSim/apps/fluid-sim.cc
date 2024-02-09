@@ -47,7 +47,7 @@ ImGuiIO& initImGui(GLFWwindow* window) {
 }
 
 struct Options {
-  int nParticles = 8192;
+  int nParticles = 16384;
   core::Vec3d size = core::Vec3d(1.0);
   core::Vec3i resolution = core::Vec3i(64);
   std::string colliderPath = std::format("{}/spot.obj", SIMCRAFT_ASSETS_DIR);
@@ -178,6 +178,8 @@ void drawSDF(OpenGLContext* sdfCtx, ShaderProg* sdfShader,
   model[0][0] = model[1][1] = model[2][2] = model[3][3] = 1.f;
   glEnable(GL_DEPTH_TEST);
   sdfCtx->vao.bind();
+  sdfCtx->VBO("aColor").bind();
+  sdfCtx->VBO("aColor").passData(sdf.fieldSamples());
   sdfShader->use();
   glEnable(GL_PROGRAM_POINT_SIZE);
   glEnable(GL_BLEND);
@@ -209,10 +211,10 @@ int main(int argc, char** argv) {
   std::unique_ptr<fluid::HybridAdvectionSolver3D> advector = std::make_unique<
     fluid::PicAdvector3D>(nParticles, resolution.x, resolution.y,
                           resolution.z);
-  std::unique_ptr<fluid::FvmSolver3D> projector = std::make_unique<
-    fluid::FvmSolver3D>(resolution.x, resolution.y, resolution.z);
-  std::unique_ptr<fluid::CgSolver3D> micpcg = std::make_unique<
-    fluid::CgSolver3D>(resolution.x, resolution.y, resolution.z);
+  auto projector = std::make_unique<fluid::FvmSolver3D>(
+      resolution.x, resolution.y, resolution.z);
+  auto micpcg = std::make_unique<fluid::CgSolver3D>(
+      resolution.x, resolution.y, resolution.z);
   std::unique_ptr<fluid::Preconditioner3D> preconder = std::make_unique<
     fluid::ModifiedIncompleteCholesky3D>(resolution.x, resolution.y,
                                          resolution.z);
@@ -264,7 +266,7 @@ int main(int argc, char** argv) {
     drawFluid(fluidCtx.get(), fluidShader.get(), camera, simulator->positions(),
               display_w, display_h);
     // drawSDF(sdfCtx.get(), sdfShader.get(), camera,
-    //         simulator->exportFluidSurface(), display_w, display_h);
+            // simulator->exportFluidSurface(), display_w, display_h);
     drawCollider(colliderCtx.get(), colliderShader.get(), camera, colliderMesh,
                  display_w, display_h);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

@@ -19,6 +19,7 @@ constexpr Real PI_180_INV =
 
 using glm::normalize;
 using glm::dot;
+using glm::clamp;
 template <typename T> inline T cubic(T x) { return x * x * x; }
 
 template <typename T> inline T sqr(T x) { return x * x; }
@@ -82,6 +83,9 @@ inline T triCatmullRomSpline(const T &AAA, const T &BAA, const T &ABA,
       biCatmullRomSpline(AAA, BAA, ABA, BBA, Vector<T, 2>(t.x, t.y)),
       biCatmullRomSpline(AAB, BAB, ABB, BBB, Vector<T, 2>(t.x, t.y)), t.z);
 }
+
+bool quadraticSolve(Real a, Real b, Real c, Real& x1, Real& x2);
+Real cubicSolve(Real a, Real b, Real c, Real d, Real l, Real r, Real tolerance);
 
 } // namespace core
 // namespace core

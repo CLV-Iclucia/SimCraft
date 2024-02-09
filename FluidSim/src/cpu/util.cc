@@ -52,7 +52,7 @@ Vec3d sampleVelocity(const Vec3d& p,
       for (int k = -1; k <= 1; k++) {
         if (u_idx.x + i >= 0 && u_idx.x + i < ug.width() &&
             u_idx.y + j >= 0 && u_idx.y + j < ug.height() &&
-            u_idx.z + k >= 0 && u_idx.z + j < ug.depth()) {
+            u_idx.z + k >= 0 && u_idx.z + k < ug.depth()) {
           Real un = ug(u_idx + Vec3i(i, j, k));
           Vec3d pn = ug.indexToCoord(u_idx + Vec3i(i, j, k));
           Real uw = CubicKernel::weight<Real, 3>(h, p - pn);
@@ -61,7 +61,7 @@ Vec3d sampleVelocity(const Vec3d& p,
         }
         if (v_idx.x + i >= 0 && v_idx.x + i < vg.width() &&
             v_idx.y + j >= 0 && v_idx.y + j < vg.height() &&
-            v_idx.z + k >= 0 && v_idx.z + j < vg.depth()) {
+            v_idx.z + k >= 0 && v_idx.z + k < vg.depth()) {
           Real vn = vg(v_idx + Vec3i(i, j, k));
           Vec3d pn = vg.indexToCoord(v_idx + Vec3i(i, j, k));
           Real vw = CubicKernel::weight<Real, 3>(h, p - pn);
@@ -70,12 +70,12 @@ Vec3d sampleVelocity(const Vec3d& p,
         }
         if (w_idx.x + i >= 0 && w_idx.x + i < wg.width() &&
             w_idx.y + j >= 0 && w_idx.y + j < wg.height() &&
-            w_idx.z + k >= 0 && w_idx.z + j < wg.depth()) {
+            w_idx.z + k >= 0 && w_idx.z + k < wg.depth()) {
           Real wn = wg.at(w_idx + Vec3i(i, j, k));
           Vec3d pn = wg.indexToCoord(w_idx + Vec3i(i, j, k));
           Real ww = CubicKernel::weight<Real, 3>(h, p - pn);
           w += wn * ww;
-          w_u += ww;
+          w_w += ww;
         }
       }
     }
@@ -394,7 +394,7 @@ Real dotProduct(const spatify::Array3D<Real>& a,
 void saxpy(spatify::Array3D<Real>& a, const spatify::Array3D<Real>& b, Real x,
            const spatify::Array3D<uint8_t>& active) {
   assert(!std::isnan(x));
-  a.forEach([&](int i, int j, int k) {
+  a.parallelForEach([&](int i, int j, int k) {
     if (!active(i, j, k)) return;
     a(i, j, k) += x * b(i, j, k);
     assert(!std::isnan(a(i, j, k)));
@@ -403,7 +403,7 @@ void saxpy(spatify::Array3D<Real>& a, const spatify::Array3D<Real>& b, Real x,
 
 void scaleAndAdd(spatify::Array3D<Real>& c, const spatify::Array3D<Real>& a,
                  Real x, const spatify::Array3D<uint8_t>& active) {
-  c.forEach([&](int i, int j, int k) {
+  c.parallelForEach([&](int i, int j, int k) {
     if (!active(i, j, k)) return;
     c(i, j, k) = a(i, j, k) + x * c(i, j, k);
     assert(!std::isnan(c(i, j, k)));
