@@ -74,13 +74,13 @@ void StretchingForce::computeStiffness(const Hair &hair,
 void TwistingForce::computeElementForce(const Hair &hair, Index e,
                                         Vec4d &f) const {
   if (e >= 1 && e < hair.NumVertices() - 2) {
-    f << p_Et_p_e(hair, e) - p_Et_p_e(hair, e - 1),
-        -p_Et_p_m(hair, e) + p_Et_p_m(hair, e + 1);
+    f << pEt_pe(hair, e) - pEt_pe(hair, e - 1),
+        -pEt_pm(hair, e) + pEt_pm(hair, e + 1);
   } else if (e == 0) {
-    f << p_Et_p_e(hair, 0), -p_Et_p_m(hair, 0) + p_Et_p_m(hair, 1);
+    f << pEt_pe(hair, 0), -pEt_pm(hair, 0) + pEt_pm(hair, 1);
   } else if (e == hair.NumVertices() - 2) {
-    f << p_Et_p_e(hair, e) - p_Et_p_e(hair, e - 1),
-        -p_Et_p_m(hair, hair.NumVertices() - 2);
+    f << pEt_pe(hair, e) - pEt_pe(hair, e - 1),
+        -pEt_pm(hair, hair.NumVertices() - 2);
   } else {
 #ifndef NDEBUG
     std::cerr << "TwistingForce::computeElementForce: "
@@ -92,11 +92,11 @@ void TwistingForce::computeElementStiffness(const Hair &hair, Index i, Index j,
                                             Mat4d &H) const {
   H.block<3, 3>(0, 0) =
       hair.G() * hair.area() / (4 * hair.edgeLength(i)) *
-          (tensorProduct(p_m_p_e(hair, i, i), p_m_p_e(hair, i, j)) +
-           hair.m(i) * p_m_p_e_p_e(hair, i, i, j)) +
+          (tensorProduct(pmpe(hair, i, i), pmpe(hair, i, j)) +
+           hair.m(i) * p2m_pe2(hair, i, i, j)) +
       hair.G() * hair.area() / (4 * hair.edgeLength(i + 1)) *
-          (tensorProduct(p_m_p_e(hair, i + 1, i), p_m_p_e(hair, i + 1, j)) +
-           hair.m(i + 1) * p_m_p_e_p_e(hair, i + 1, i, j));
+          (tensorProduct(pmpe(hair, i + 1, i), pmpe(hair, i + 1, j)) +
+           hair.m(i + 1) * p2m_pe2(hair, i + 1, i, j));
   H.block<3, 1>(0, 3) = Vec3d::Zero();
   H.block<1, 3>(3, 0) = Vec3d::Zero();
   H(3, 3) = 0.25 * hair.G() * hair.area() * hair.radius() * hair.radius() /
@@ -116,11 +116,9 @@ void TwistingForce::computeStiffness(const Hair &hair,
   for (int i = 0; i < hair.NumVertices() - 2; i++) {
     for (int j = std::max(i - 1, 0); j < i + 2; j++) {
       computeElementStiffness(hair, i, j, H_i);
-      for (int k = 0; k < 3; k++) {
-        for (int l = 0; l < 3; l++) {
+      for (int k = 0; k < 3; k++)
+        for (int l = 0; l < 3; l++)
           addStiffness(J, 4 * i + k, 4 * j + l, H_i(k, l));
-        }
-      }
     }
     addStiffness(J, 4 * i + 3, 4 * i + 3,
                  0.25 * hair.G() * hair.area() * hair.radius() * hair.radius() /

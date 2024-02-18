@@ -8,7 +8,7 @@
 #include <HairSim/hair-dof.h>
 #include <HairSim/hair-sim.h>
 #include <HairSim/hair.h>
-#include <HairSim/math-utils.h>
+#include <HairSim/utils.h>
 namespace hairsim {
 class Force {
 public:
@@ -19,7 +19,7 @@ public:
   virtual ~Force() = default;
 };
 
-class BendingForce : public Force {
+class BendingForce final : public Force {
 public:
   void computeElementForce(const Hair &hair, Index e, Vec4d &f) const override;
   void computeElementStiffness(const Hair &hair, Index i, Index j,
@@ -28,7 +28,7 @@ public:
   void computeStiffness(const Hair &hair, vector<Triplet<Real>> &J) const override;
 };
 
-class TwistingForce : public Force {
+class TwistingForce final : public Force {
 public:
   void computeElementForce(const Hair &hair, Index e, Vec4d &f) const override;
   void computeElementStiffness(const Hair &hair, Index i, Index j,
@@ -37,7 +37,7 @@ public:
   void computeStiffness(const Hair &hair, vector<Triplet<Real>> &J) const override;
 };
 
-class StretchingForce : public Force {
+class StretchingForce final : public Force {
 public:
   void computeElementForce(const Hair &hair, Index e, Vec4d &f) const override;
   void computeElementStiffness(const Hair &hair, Index e,

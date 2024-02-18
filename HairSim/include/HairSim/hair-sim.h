@@ -13,7 +13,7 @@ using Real = double;
 using Eigen::VectorXd;
 using Vec3d = Eigen::Vector3d;
 using Vec4d = Eigen::Vector4d;
-using VecXd = Eigen::VectorXd;
+using VecXd = VectorXd;
 using Mat3d = Eigen::Matrix3d;
 using Mat4d = Eigen::Matrix4d;
 using MatXd = Eigen::MatrixXd;

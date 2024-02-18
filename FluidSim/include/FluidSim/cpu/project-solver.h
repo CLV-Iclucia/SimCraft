@@ -110,7 +110,7 @@ class CgSolver3D final : public CompressedSolver3D {
     Array3D<Real> s;
     Preconditioner3D* preconditioner = {};
     Real tolerance = 1e-6;
-    int max_iterations = 100;
+    int max_iterations = 300;
 };
 
 class FvmSolver3D final : public ProjectionSolver3D {

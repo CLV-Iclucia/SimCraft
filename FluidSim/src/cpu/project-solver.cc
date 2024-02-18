@@ -143,10 +143,10 @@ void FvmSolver3D::buildSystem(const FaceCentredGrid<Real, Real, 3, 0>& ug,
     // left
     if (i > 0) {
       if (fluidSdf(i - 1, j, k) > 0.0) {
-        Real theta = std::max(
+        Real theta = std::min(
             fluidSdf(i - 1, j, k) / (fluidSdf(i - 1, j, k) - signed_dist),
-            0.01);
-        Adiag(i, j, k) += uWeights(i, j, k) * factor / theta;
+            0.99);
+        Adiag(i, j, k) += uWeights(i, j, k) * factor / (1.0 - theta);
       } else {
         Adiag(i, j, k) += uWeights(i, j, k) * factor;
         Aneighbour[Left](i, j, k) -= uWeights(i, j, k) * factor;
@@ -172,17 +172,16 @@ void FvmSolver3D::buildSystem(const FaceCentredGrid<Real, Real, 3, 0>& ug,
     // down
     if (j > 0) {
       if (fluidSdf(i, j - 1, k) > 0.0) {
-        Real theta = std::max(
+        Real theta = std::min(
             fluidSdf(i, j - 1, k) / (fluidSdf(i, j - 1, k) - signed_dist),
-            0.01);
-        Adiag(i, j, k) += vWeights(i, j, k) * factor / theta;
+            0.99);
+        Adiag(i, j, k) += vWeights(i, j, k) * factor / (1.0 - theta);
       } else {
         Adiag(i, j, k) += vWeights(i, j, k) * factor;
         Aneighbour[Down](i, j, k) -= vWeights(i, j, k) * factor;
       }
       rhs(i, j, k) += vWeights(i, j, k) * vg(i, j, k);
     }
-
     // up
     if (j < fluidSdf.width() - 1) {
       if (fluidSdf(i, j + 1, k) > 0.0) {
@@ -199,10 +198,10 @@ void FvmSolver3D::buildSystem(const FaceCentredGrid<Real, Real, 3, 0>& ug,
     // back
     if (k > 0) {
       if (fluidSdf(i, j, k - 1) > 0.0) {
-        Real theta = std::max(
+        Real theta = std::min(
             fluidSdf(i, j, k - 1) / (fluidSdf(i, j, k - 1) - signed_dist),
-            0.01);
-        Adiag(i, j, k) += wWeights(i, j, k) * factor / theta;
+            0.99);
+        Adiag(i, j, k) += wWeights(i, j, k) * factor / (1.0 - theta);
       } else {
         Adiag(i, j, k) += wWeights(i, j, k) * factor;
         Aneighbour[Back](i, j, k) -= wWeights(i, j, k) * factor;
@@ -368,11 +367,13 @@ void FvmSolver3D::project(FaceCentredGrid<Real, Real, 3, 0>& ug,
       ug(i, j, k) -= (pg(i, j, k) - pg(i - 1, j, k)) * dt / h;
       return;
     }
-    Real theta = std::max(sd_left / (sd_left - sd_right), 0.01);
-    if (sd_left < 0.0)
+    if (sd_left < 0.0) {
+      Real theta = std::max(sd_left / (sd_left - sd_right), 0.01);
       ug(i, j, k) += pg(i - 1, j, k) * dt / h / theta;
-    else
+    } else {
+      Real theta = std::min(sd_left / (sd_left - sd_right), 0.99);
       ug(i, j, k) -= pg(i, j, k) * dt / h / (1.0 - theta);
+    }
   });
   vg.parallelForEach([&](int i, int j, int k) {
     if (vWeights(i, j, k) <= 0.0) return;
@@ -388,11 +389,13 @@ void FvmSolver3D::project(FaceCentredGrid<Real, Real, 3, 0>& ug,
       vg(i, j, k) -= (pg(i, j, k) - pg(i, j - 1, k)) * dt / h;
       return;
     }
-    Real theta = std::max(sd_down / (sd_down - sd_up), 0.01);
-    if (sd_down < 0.0)
+    if (sd_down < 0.0) {
+      Real theta = std::max(sd_down / (sd_down - sd_up), 0.01);
       vg(i, j, k) += pg(i, j - 1, k) * dt / h / theta;
-    else
+    } else {
+      Real theta = std::min(sd_down / (sd_down - sd_up), 0.99);
       vg(i, j, k) -= pg(i, j, k) * dt / h / (1.0 - theta);
+    }
   });
   wg.parallelForEach([&](int i, int j, int k) {
     if (wWeights(i, j, k) <= 0.0) return;
@@ -408,11 +411,13 @@ void FvmSolver3D::project(FaceCentredGrid<Real, Real, 3, 0>& ug,
       wg(i, j, k) -= (pg(i, j, k) - pg(i, j, k - 1)) * dt / h;
       return;
     }
-    Real theta = std::max(sd_back / (sd_back - sd_front), 0.01);
-    if (sd_back < 0.0)
+    if (sd_back < 0.0) {
+      Real theta = std::max(sd_back / (sd_back - sd_front), 0.01);
       wg(i, j, k) += pg(i, j, k - 1) * dt / h / theta;
-    else
+    } else {
+      Real theta = std::min(sd_back / (sd_back - sd_front), 0.99);
       wg(i, j, k) -= pg(i, j, k) * dt / h / (1.0 - theta);
+    }
   });
   // check divergence free
   Adiag.forEach([&](int i, int j, int k) {
@@ -425,7 +430,7 @@ void FvmSolver3D::project(FaceCentredGrid<Real, Real, 3, 0>& ug,
     div -= vg(i, j + 1, k) * vWeights(i, j + 1, k);
     div += wg(i, j, k) * wWeights(i, j, k);
     div -= wg(i, j, k + 1) * wWeights(i, j, k + 1);
-    // assert(approx(div, 0.0));
+    assert(approx(div, 0.0));
   });
 }
 }

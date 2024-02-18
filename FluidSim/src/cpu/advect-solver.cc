@@ -107,27 +107,32 @@ void PicAdvector3D::handleCollision(const SDF<3>& collider_sdf, Vec3d& p,
   }
   if (p.x < 0.0) {
     p.x = 0.0;
-    v.x = 0.0;
+    if (v.x < 0.0) v.x = 0.0;
   }
   if (p.x > width) {
     p.x = width;
-    v.x = 0.0;
+    if (v.x > 0.0)
+      v.x = 0.0;
   }
   if (p.y < 0.0) {
     p.y = 0.0;
-    v.y = 0.0;
+    if (v.y < 0.0)
+      v.y = 0.0;
   }
   if (p.y > height) {
     p.y = height;
-    v.y = 0.0;
+    if (v.y > 0.0)
+      v.y = 0.0;
   }
   if (p.z < 0.0) {
     p.z = 0.0;
-    v.z = 0.0;
+    if (v.z < 0.0)
+      v.z = 0.0;
   }
   if (p.z > depth) {
     p.z = depth;
-    v.z = 0.0;
+    if (v.z > 0.0)
+      v.z = 0.0;
   }
 }
 void PicAdvector3D::advect(const std::span<Vec3d> pos,

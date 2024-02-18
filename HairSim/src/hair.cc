@@ -18,7 +18,7 @@ void Hair::init(const vector<Vec3d> &init_pos, const vector<Vec3d> &init_vel,
   ref.m2.resize(m_nVertices - 1);
   ref.e.resize(m_nVertices - 1);
   ref.t.resize(m_nVertices - 1);
-  ref.m.resize(m_nVertices - 1);
+  ref.mass.resize(m_nVertices - 1);
   for (int i = 0; i < m_nVertices - 1; i++) {
     ref.length[i] = (m_q.pos(i + 1) - m_q.pos(i)).norm();
     ref.pos[i] = (m_q.pos(i + 1) + m_q.pos(i)) / 2;
