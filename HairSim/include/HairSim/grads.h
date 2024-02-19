@@ -15,15 +15,13 @@ inline Vec3d pmpe(const Hair& hair, Index i, Index j) {
   assert(abs(i - j) <= 1);
   if (j == i - 1 || j == i)
     return 0.5 * hair.curvatureBinormal(i) / hair.edgeLength(j);
-  else
-    return {};
+  return {};
 }
 inline Vec3d pInvlen_pe(const Hair& hair, Index i, Index j) {
   assert(abs(i - j) <= 1);
   if (j == i)
     return -hair.edge(j) / cube(hair.edgeLength(j));
-  else
-    return {};
+  return {};
 }
 inline Vec3d pKappa1_pe(const Hair& hair, Index i, Index j, Index k) {
   assert(j == i + 1 || j == i);
@@ -53,13 +51,13 @@ inline Mat43d pCurv_pe(const Hair& hair, Index i, Index j) {
       pKappa2_pe(hair, i + 1, i, j).transpose();
   return res;
 }
-inline Real pEt_pm(const Hair& hair, Index i) {
-  return hair.G() * hair.area() / (4 * hair.vertexReferenceLength(i)) *
-         hair.radius() * hair.radius() * hair.m(i);
+inline Real pEt_pm(const HairParams& params, const Hair& hair, Index i) {
+  return params.G * params.area() / (4 * hair.vertexReferenceLength(i)) *
+         params.radius * params.radius * hair.m(i);
 }
-inline Vec3d pEt_pe(const Hair& hair, Index i) {
-  return pEt_pm(hair, i) * pmpe(hair, i, i) +
-         pEt_pm(hair, i + 1) * pmpe(hair, i + 1, i);
+inline Vec3d pEt_pe(const HairParams& params, const Hair& hair, Index i) {
+  return pEt_pm(params, hair, i) * pmpe(hair, i, i) +
+         pEt_pm(params, hair, i + 1) * pmpe(hair, i + 1, i);
 }
 inline Mat3d pkb_pe(const Hair& hair, Index i, Index j) {
   assert(j == i - 1 || j == i || j == i + 1);

@@ -7,7 +7,11 @@ add_library(HairSim STATIC ${srcs})
 
 target_include_directories(HairSim PUBLIC include)
 target_include_directories(HairSim PUBLIC ${MKL_INCLUDE})
-target_link_libraries(HairSim PUBLIC Core Eigen3::Eigen MKL::MKL)
+target_link_libraries(HairSim PUBLIC Core Eigen MKL::MKL)
+target_include_directories(HairSim PUBLIC ${EIGEN3_INCLUDE_DIR})
+
+add_executable(hair-sim apps/hair-sim-app.cc)
+target_link_libraries(hair-sim PUBLIC Core HairSim)
 
 file(GLOB_RECURSE test_srcs CONFIGURE_DEPENDS tests/*.cc)
 foreach(test_src ${test_srcs})

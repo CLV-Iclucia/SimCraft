@@ -7,15 +7,14 @@
 #include <Core/properties.h>
 #include <FluidSim/fluid-sim.h>
 #include <cuda_runtime.h>
-#include <type_traits>
 
 namespace fluid {
 template <typename T>
-struct CudaArray : core::NonCopyable {
+struct CudaArray3D : NonCopyable {
   cudaArray* cuda_array{};
   uint3 dim;
 
-  explicit CudaArray(const uint3& dim_)
+  explicit CudaArray3D(const uint3& dim_)
     : dim(dim_) {
     cudaExtent extent = make_cudaExtent(dim.x, dim.y, dim.z);
     cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<T>();
@@ -45,7 +44,7 @@ struct CudaArray : core::NonCopyable {
   }
   [[nodiscard]] cudaArray* Array() const { return cuda_array; }
   cudaArray_t* ArrayPtr() { return &cuda_array; }
-  ~CudaArray() { cudaFreeArray(cuda_array); }
+  ~CudaArray3D() { cudaFreeArray(cuda_array); }
 };
 
 template <typename T>
@@ -62,13 +61,13 @@ struct CudaSurfaceAccessor {
 };
 
 template <typename T>
-struct CudaSurface : CudaArray<T> {
+struct CudaSurface : CudaArray3D<T> {
   cudaSurfaceObject_t cuda_surf{};
   explicit CudaSurface(const uint3& dim_)
-    : CudaArray<T>(dim_) {
+    : CudaArray3D<T>(dim_) {
     cudaResourceDesc res_desc{};
     res_desc.resType = cudaResourceTypeArray;
-    res_desc.res.array.array = CudaArray<T>::Array();
+    res_desc.res.array.array = CudaArray3D<T>::Array();
     cudaCreateSurfaceObject(&cuda_surf, &res_desc);
   }
   [[nodiscard]] cudaSurfaceObject_t surface() const { return cuda_surf; }

@@ -1,13 +1,14 @@
 //
 // Created by creeper on 23-8-10.
 //
-#include "HairSim/grads.h"
+#include <HairSim/grads.h>
 #include <HairSim/forces.h>
+#include <HairSim/band-matrix.h>
 #include <iostream>
 
 namespace hairsim {
-static void addStiffness(vector<Triplet<Real>> &J, int i, int j, Real v) {
-  J.emplace_back(i, j, v);
+static void addStiffness(BandSquareMatrix<Real, 5>& J, int i, int j, Real v) {
+  J(i, j) += v;
 }
 void StretchingForce::computeElementForce(const Hair &hair, Index e,
                                           Vec4d &f) const {
@@ -34,19 +35,14 @@ void StretchingForce::computeElementForce(const Hair &hair, Index e,
 }
 void StretchingForce::computeElementStiffness(const Hair &hair, Index e,
                                               Mat4d &H) const {
-  for (int i = 0; i < 4; i++) {
-    for (int j = 0; j < 4; j++) {
-      if (i < 3 && j < 3) {
+  for (int i = 0; i < 3; i++)
+    for (int j = 0; j < 3; j++)
         H(i, j) = hair.E() * hair.area() *
                   ((1.0 / hair.referenceConfig().length[e] -
                     1.0 / hair.edgeLength(e)) *
                        ((i == j) - hair.tangent(e)(i) * hair.tangent(e)(j)) +
                    hair.tangent(e)(i) * hair.tangent(e)(j) /
                        hair.referenceConfig().length[e]);
-      } else
-        H(i, j) = 0.0;
-    }
-  }
 }
 void StretchingForce::computeForce(const Hair &hair, VecXd &f) const {
   Vec4d f_i;

@@ -1,6 +1,8 @@
 # FluidSim: A Playground for Fluid Simulation
 
-## Currently Support: 
+## Currently Support:
 
-- 2D fluid simulation inside a box, using PIC-style transfer. But there are still some problems.
+- 3D PIC Fluid Simulation, using finite volume method and modified incomplete Cholesky preconditioned conjugate gradient
+  method to solve the pressure Poisson equation.
+- GPU smoke simulation, using brute force Jacobi iteration to solve the pressure Poisson equation.
 

@@ -4,19 +4,33 @@
 
 #ifndef SIMCRAFT_HAIRSIM_INCLUDE_HAIRSIM_HAIR_H_
 #define SIMCRAFT_HAIRSIM_INCLUDE_HAIRSIM_HAIR_H_
-#include <HairSim/hair-dof.h>
 #include <HairSim/hair-sim.h>
-#include <HairSim/utils.h>
+#include <vector>
+
 namespace hairsim {
 struct RefConfig {
-  vector<Real> length;
-  vector<Vec3d> pos;
-  vector<Real> theta;
-  vector<Vec3d> m1;
-  vector<Vec3d> m2;
-  vector<Vec3d> e;
-  vector<Vec3d> t;
-  vector<Vec4d> curv_vec;
+  std::vector<Vec3d> ref_pos;
+  std::vector<Real> ref_theta;
+  std::vector<Real> length;
+  std::vector<Vec3d> m1;
+  std::vector<Vec3d> m2;
+  std::vector<Vec3d> e;
+  std::vector<Vec4d> curv_vec;
+  RefConfig(std::vector<Vec3d> ref_pos_, std::vector<Real> ref_theta_)
+      : ref_pos(std::move(ref_pos_)), ref_theta(std::move(ref_theta_)) {
+    int nVertices = ref_pos_.size();
+    length.resize(nVertices - 1);
+    m1.resize(nVertices - 1);
+    m2.resize(nVertices - 1);
+    e.resize(nVertices - 1);
+    for (int i = 0; i < nVertices - 1; i++) {
+      length[i] = (ref_pos[i + 1] - ref_pos[i]).norm();
+      m1[i] = Vec3d(cos(ref_theta[i]), sin(ref_theta[i]), 0);
+      m2[i] = Vec3d(-sin(ref_theta[i]), cos(ref_theta[i]), 0);
+      e[i] = ref_pos[i + 1] - ref_pos[i];
+      curv_vec.emplace_back(Vec4d(0, 0, 0, 0));
+    }
+  }
 };
 
 struct HairParams {
@@ -25,76 +39,110 @@ struct HairParams {
   Real radius = 5e-5;
   Vec3d color = {0.8, 0.8, 0.8};
   Real rho = 1e3;
+  [[nodiscard]] Real area() const { return M_PI * radius * radius; }
 };
-class Hair {
-public:
-  explicit Hair(int numVertices) {}
-  const RefConfig &referenceConfig() const { return ref; }
+
+struct System;
+
+struct Hair : core::NonCopyable {
   // this is for initing the vertices on the hair by indices
-  void init(const vector<Vec3d> &init_pos, const vector<Vec3d> &init_vel,
-            const vector<Index> &indices);
-  int NumVertices() const { return m_nVertices; }
-  Index v(Index i) const { return m_vertices[i]; }
-  Vec3d pos(Index i) const { return m_q.pos(i); }
-  Real theta(Index i) const { return m_q.theta(i); }
-  Real radius() const { return m_radius; }
-  [[nodiscard]] const HairDof &q() const { return m_q; }
-  HairDof &q() { return m_q; }
-  [[nodiscard]] const HairDof &qdot() const { return m_qdot; }
-  HairDof &qdot() { return m_qdot; }
-  [[nodiscard]] Vec3d edge(Index i) const { return m_q.pos(i + 1) - m_q.pos(i); }
-  [[nodiscard]] Vec3d tangent(Index i) const {
-    return (m_q.pos(i + 1) - m_q.pos(i)).normalized();
+  Hair(System* system_, int idx, RefConfig ref_config);
+  Real& theta(int i) {
+    assert(m_q.size() % 4 == 3);
+    assert(4 * i + 3 < m_q.size());
+    return m_q(4 * i + 3);
   }
+
+  [[nodiscard]] Real theta(int i) const {
+    assert(m_q.size() % 4 == 3);
+    assert(4 * i + 3 < m_q.size());
+    return m_q(4 * i + 3);
+  }
+
+  [[nodiscard]] Vec3d pos(int i) const {
+    assert(m_q.size() % 4 == 3);
+    assert(4 * i + 2 < m_q.size());
+    return m_q.segment<3>(4 * i);
+  }
+
+  Eigen::Ref<Vec3d> pos(int i) {
+    assert(m_q.size() % 4 == 3);
+    assert(4 * i + 2 < m_q.size());
+    return {m_q.segment<3>(4 * i)};
+  }
+
+  Eigen::Ref<Vec3d> vel(int i) {
+    assert(m_qdot.size() % 4 == 3);
+    assert(4 * i + 2 < m_qdot.size());
+    return {m_qdot.segment<3>(4 * i)};
+  }
+
+  [[nodiscard]] Vec3d edge(Index i) const { return pos(i + 1) - pos(i); }
+
+  [[nodiscard]] Vec3d tangent(Index i) const {
+    return (pos(i + 1) - pos(i)).normalized();
+  }
+
   Vec3d m1(Index i) const { return {}; }
   Vec3d m2(Index i) const { return {}; }
-  Real twsitingAngle(Index i) const {
-    return i > 0 ? theta(i) - theta(i - 1) + ref.mass[i] : theta(i);
-  }
-  Real area() const { return PI * m_radius * m_radius; }
-  void updateFrame() {}
 
-  const Vec3d &curvatureBinormal(Index i) const { return m_kb[i]; }
-  Real edgeLength(Index i) const {
-    return (m_q.pos(i + 1) - m_q.pos(i)).norm();
+  Real twsitingAngle(Index i) const {
+    return i > 0 ? theta(i) - theta(i - 1) : theta(i);
   }
-  Real kappa1(Index i, Index j) const {
+
+  const Vec3d& curvatureBinormal(Index i) const { return m_kb[i]; }
+  Real ShearModulus() const;
+  Real YoungsModulus() const;
+
+  [[nodiscard]] Real edgeLength(Index i) const {
+    return (pos(i + 1) - pos(i)).norm();
+  }
+
+  [[nodiscard]] Real kappa1(Index i, Index j) const {
     return -m2(i).dot(curvatureBinormal(j));
   }
-  Real kappa2(Index i, Index j) const {
+
+  [[nodiscard]] Real kappa2(Index i, Index j) const {
     return m1(i).dot(curvatureBinormal(j));
   }
+
   // (kappa1(i - 1, i), kappa1(i, i), -kappa2(i - 1, i), -kappa2(i, i))
-  const Vec4d &materialCurvature(Index i) const { return m_curv_vec[i]; }
-  Vec3d tangentTilde(Index i) const {
+  [[nodiscard]] const Vec4d& materialCurvature(Index i) const {
+    return m_curv_vec[i];
+  }
+
+  [[nodiscard]] Vec3d tangentTilde(Index i) const {
     return (tangent(i - 1) + tangent(i)) /
            (1.0 + tangent(i - 1).dot(tangent(i)));
   }
-  Vec3d vertexTangent(Index i) const {
+
+  [[nodiscard]] Vec3d vertexTangent(Index i) const {
     return (tangent(i - 1) + tangent(i)) * 0.5;
   }
-  Real m(int i) const {
+
+  [[nodiscard]] Real m(int i) const {
     assert(i >= 0);
-    if (i > 0) return theta(i) - theta(i - 1) + ref.theta[i];
+    if (i > 0) return theta(i) - theta(i - 1) + ref.ref_theta[i];
     return theta(i);
   }
-  [[nodiscard]] const HairDof &force() const { return m_force; }
-  HairDof &force() { return m_force; }
-  void addForce(Index i, const Vec3d &f) const { m_force.addPos(i, f); }
-  void addTorsion(Index i, Real f) const { m_force.addTheta(i, f); }
+
   Real vertexReferenceLength(Index i) const {
     assert(i >= 0);
-    if (i > 0 && i < m_nVertices - 1) return 0.5 * (ref.length[i] + ref.length[i - 1]);
+    if (i > 0 && i < m_q.size() - 1)
+      return
+          0.5 * (ref.length[i] + ref.length[i - 1]);
     if (i == 0) return 0.5 * ref.length[0];
-    return 0.5 * ref.length[m_nVertices - 2];
+    return 0.5 * ref.length[m_q.size() - 2];
   }
 
-private:
+  System* system;
+  RefConfig ref;
+  Eigen::Map<VecXd> m_q;
+  Eigen::Map<VecXd> m_qdot;
   std::vector<Vec3d> m_a1;
   std::vector<Vec3d> m_a2;
   std::vector<Vec3d> m_kb;
   std::vector<Vec4d> m_curv_vec;
-  RefConfig ref;
 };
 } // namespace hairsim
 

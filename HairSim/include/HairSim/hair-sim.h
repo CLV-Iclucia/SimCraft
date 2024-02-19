@@ -8,6 +8,7 @@
 #include <Eigen/Core>
 #include <glm/glm.hpp>
 #include <Eigen/SparseCore>
+#include <Core/properties.h>
 namespace hairsim {
 using Real = double;
 using Eigen::VectorXd;
