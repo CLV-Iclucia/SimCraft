@@ -56,7 +56,7 @@ class HybridFluidSimulator3D final : public core::Animation {
       fluidSurfaceBuf = std::make_unique<SDF<3>>(resolution, size);
       colliderSdf = std::make_unique<SDF<3>>(resolution, size);
       for (auto& p : m_particles.positions) {
-        p = core::randomVec<Real, 3>() * Vec3d(0.5, 0.3, 0.5) + Vec3d(0.0, 0.5, 0.0);
+        p = core::randomVec<Real, 3>() * Vec3d(1.0, 0.45, 1.0) + Vec3d(0.0, 0.5, 0.0);
         p *= size;
       }
       assert(

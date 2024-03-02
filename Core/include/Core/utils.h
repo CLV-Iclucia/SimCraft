@@ -84,6 +84,22 @@ inline T triCatmullRomSpline(const T &AAA, const T &BAA, const T &ABA,
       biCatmullRomSpline(AAB, BAB, ABB, BBB, Vector<T, 2>(t.x, t.y)), t.z);
 }
 
+template <typename T, int Dim>
+Vector<T, Dim> cwiseMin(const Vector<T, Dim> &a, const Vector<T, Dim> &b) {
+  Vector<T, Dim> result;
+  for (int i = 0; i < Dim; i++)
+    result[i] = std::min(a[i], b[i]);
+  return result;
+}
+
+template <typename T, int Dim>
+Vector<T, Dim> cwiseMax(const Vector<T, Dim> &a, const Vector<T, Dim> &b) {
+  Vector<T, Dim> result;
+  for (int i = 0; i < Dim; i++)
+    result[i] = std::max(a[i], b[i]);
+  return result;
+}
+
 bool quadraticSolve(Real a, Real b, Real c, Real& x1, Real& x2);
 Real cubicSolve(Real a, Real b, Real c, Real d, Real l, Real r, Real tolerance);
 

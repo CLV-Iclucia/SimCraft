@@ -8,8 +8,7 @@ file(GLOB_RECURSE gpu_headers CONFIGURE_DEPENDS include/FluidSim/gpu/*.h include
 
 file(GLOB common_headers CONFIGURE_DEPENDS include/FluidSim/*.h)
 
-add_library(CpuFluid STATIC ${cpu_srcs} ${cpu_headers} ${common_headers}
-        include/FluidSim/gpu/kernels.cuh)
+add_library(CpuFluid STATIC ${cpu_srcs} ${cpu_headers} ${common_headers})
 add_library(GpuFluid STATIC ${gpu_srcs} ${gpu_headers} ${common_headers})
 
 target_include_directories(CpuFluid PUBLIC include)

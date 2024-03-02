@@ -47,7 +47,7 @@ ImGuiIO& initImGui(GLFWwindow* window) {
 }
 
 struct Options {
-  int nParticles = 65536;
+  int nParticles = 32768;
   core::Vec3d size = core::Vec3d(1.0);
   core::Vec3i resolution = core::Vec3i(64);
   std::string colliderPath = std::format("{}/spot.obj", SIMCRAFT_ASSETS_DIR);
