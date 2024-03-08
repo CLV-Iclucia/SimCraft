@@ -38,7 +38,13 @@ void recursiveDrawBVH(const collision::LBVH<core::Real, 2>& lbvh, int nodeIdx) {
 }
 
 void drawBVH(const collision::LBVH<core::Real, 2>& lbvh) {
-  recursiveDrawBVH(lbvh, 0);
+  // recursiveDrawBVH(lbvh, 0);
+  glBegin(GL_LINE_LOOP);
+  glVertex2f(0, 0);
+  glVertex2f(0.5, 0);
+  glVertex2f(0.5, 0.5);
+  glVertex2f(0, 0.5);
+  glEnd();
 }
 
 bool initGLFW(GLFWwindow*& window) {
@@ -71,8 +77,6 @@ int main() {
     std::cout << "Failed to initialize GLAD" << std::endl;
     return -1;
   }
-
-  glEnable(GL_DEPTH_TEST);
 
   // random 10 AABBs
   std::vector<core::AABB<core::Real, 2>> aabbs;

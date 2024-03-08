@@ -126,9 +126,6 @@ void LBVH<T, Dim>::refit(const std::vector<AABB<T, Dim>>& updatedAABBs) {
   tbb::parallel_for(0, nPrs, [this, &mortons_copy](int i) {
     mortons[i] = mortons_copy[idx[i]];
   });
-  for (int i = 0; i < nPrs; ++i) {
-    std::cout << std::format("morton code {}: {}\n", i, toBinary(mortons[i]));
-  }
   fa[0] = -1;
   tbb::parallel_for(0, nPrs - 1, [this](int i) {
     int dir = delta(i, i + 1) > delta(i, i - 1) ? 1 : -1;
@@ -163,10 +160,5 @@ void LBVH<T, Dim>::refit(const std::vector<AABB<T, Dim>>& updatedAABBs) {
       node_idx = parent;
     }
   });
-  // print tree structure: fa, lch, rch
-  for (int i = 0; i < nPrs - 1; ++i) {
-    std::cout << std::format("fa[{}]: {}, lch[{}]: {}, rch[{}]: {}\n", i, fa[i],
-                             i, lch[i], i, rch[i]);
-  }
 }
 }
