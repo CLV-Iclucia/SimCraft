@@ -154,7 +154,7 @@ void LBVH<T, Dim>::refit(const std::vector<AABB<T, Dim>>& updatedAABBs) {
     aabbs[node_idx] = updatedAABBs[idx[i]];
     while (fa[node_idx] != -1) {
       int parent = fa[node_idx];
-      if (processed[parent].exchange(true)) break;
+      if (!processed[parent].exchange(true)) return;
       aabbs[parent] = aabbs[lch[parent]].merge(
           aabbs[rch[parent]]);
       node_idx = parent;
