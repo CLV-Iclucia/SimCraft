@@ -52,7 +52,8 @@ struct Options {
   int nParticles = 32768;
   core::Vec3d size = core::Vec3d(1.0);
   core::Vec3i resolution = core::Vec3i(64);
-  std::string colliderPath = std::format("{}/spot.obj", SIMCRAFT_ASSETS_DIR);
+  std::string colliderPath = std::format("{}/complex_bunny.obj",
+                                         SIMCRAFT_ASSETS_DIR);
 } opt;
 
 void processWindowInput(GLFWwindow* window, TargetCamera& camera) {
@@ -158,16 +159,16 @@ void drawFluid(OpenGLContext* fluidCtx, ShaderProg* fluidShader,
   glDrawArrays(GL_POINTS, 0, positions.size());
 }
 
-void drawCollider(OpenGLContext* colliderCtx, ShaderProg* colliderShader,
+void drawCollider(OpenGLContext* colliderCtx, ShaderProg* meshShader,
                   TargetCamera& camera, const core::Mesh& colliderMesh,
                   int display_w, int display_h) {
   core::Mat4f model;
   model[0][0] = model[1][1] = model[2][2] = model[3][3] = 1.f;
   colliderCtx->vao.bind();
-  colliderShader->use();
-  colliderShader->setMat4f("view", camera.getViewMatrix());
-  colliderShader->setMat4f("model", model);
-  colliderShader->setMat4f(
+  meshShader->use();
+  meshShader->setMat4f("view", camera.getViewMatrix());
+  meshShader->setMat4f("model", model);
+  meshShader->setMat4f(
       "proj", camera.getProjectionMatrix(display_w, display_h));
   glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
   OpenGLContext::draw(GL_TRIANGLES, colliderMesh.indices.size());
@@ -241,7 +242,7 @@ int main(int argc, char** argv) {
   // check this, if not true then it means the sdf is not properly initialized
   auto [fluidCtx, fluidShader] = initFluidRender(simulator->positions());
   // auto [sdfCtx, sdfShader] = initSdfRender(simulator->exportFluidSurface());
-  auto [colliderCtx, colliderShader] = initColliderRender(colliderMesh);
+  auto [colliderCtx, meshShader] = initColliderRender(colliderMesh);
 
   core::Frame frame;
   TargetCamera camera(core::Vec3f(size.x, size.y, size.z) * 0.5f, 90.f);
@@ -278,7 +279,7 @@ int main(int argc, char** argv) {
         exit(-1);
       }
     }
-    drawCollider(colliderCtx.get(), colliderShader.get(), camera, colliderMesh,
+    drawCollider(colliderCtx.get(), meshShader.get(), camera, colliderMesh,
                  display_w, display_h);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     glfwSwapBuffers(window);

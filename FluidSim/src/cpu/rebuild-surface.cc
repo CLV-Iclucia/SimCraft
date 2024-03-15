@@ -647,30 +647,41 @@ static int globalVertexIdx(int x, int y, int z, int height, int depth,
       {1, 2, 2}, {0, 2, 1}, {0, 1, 0}, {2, 1, 0}, {2, 1, 2}, {0, 1, 2}
   };
   assert(localIdx >= 0 && localIdx < 12);
-  return (2 * y + vertexOffset3D[localIdx][1] + (
-            2 * x + vertexOffset3D[localIdx][0]) * height) * depth
-         + 2 * z + vertexOffset3D[localIdx][2];
+  return (2 * (y + 1) + vertexOffset3D[localIdx][1] + (
+            2 * (x + 1) + vertexOffset3D[localIdx][0]) * (height + 2)) * (depth + 2)
+         + 2 * (z + 1) + vertexOffset3D[localIdx][2];
+}
+
+static Real evalSdf(const SDF<3>& sdf, int x, int y, int z) {
+  if (x < 0 || x >= sdf.width() || y < 0 || y >= sdf.height() || z < 0 ||
+      z >= sdf.depth())
+    return 0.5 * sdf.grid.gridSpacing().x;
+  return sdf.grid(x, y, z);
+}
+
+static Real evalSdf(const SDF<3>& sdf, Vec3i idx) {
+  return evalSdf(sdf, idx.x, idx.y, idx.z);
 }
 
 static Vec3d grad(const SDF<3>& sdf, Vec3i idx) {
-  int xn = idx.x < sdf.width() - 1 ? idx.x + 1 : idx.x;
-  int xp = idx.x > 0 ? idx.x - 1 : idx.x;
-  int yn = idx.y < sdf.height() - 1 ? idx.y + 1 : idx.y;
-  int yp = idx.y > 0 ? idx.y - 1 : idx.y;
-  int zn = idx.z < sdf.depth() - 1 ? idx.z + 1 : idx.z;
-  int zp = idx.z > 0 ? idx.z - 1 : idx.z;
-  Real dx = idx.x > 0 && idx.x < sdf.width() - 1
+  int xn = idx.x < sdf.width() ? idx.x + 1 : idx.x;
+  int xp = idx.x > -1 ? idx.x - 1 : idx.x;
+  int yn = idx.y < sdf.height() ? idx.y + 1 : idx.y;
+  int yp = idx.y > -1 ? idx.y - 1 : idx.y;
+  int zn = idx.z < sdf.depth() ? idx.z + 1 : idx.z;
+  int zp = idx.z > -1 ? idx.z - 1 : idx.z;
+  Real dx = idx.x > -1 && idx.x < sdf.width() - 1
               ? 2 * sdf.grid.gridSpacing().x
               : sdf.grid.gridSpacing().x;
-  Real dy = idx.y > 0 && idx.y < sdf.height() - 1
+  Real dy = idx.y > -1 && idx.y < sdf.height() - 1
               ? 2 * sdf.grid.gridSpacing().y
               : sdf.grid.gridSpacing().y;
-  Real dz = idx.z > 0 && idx.z < sdf.depth() - 1
+  Real dz = idx.z > -1 && idx.z < sdf.depth() - 1
               ? 2 * sdf.grid.gridSpacing().z
               : sdf.grid.gridSpacing().z;
-  Real gx = sdf.grid(xn, idx.y, idx.z) - sdf.grid(xp, idx.y, idx.z);
-  Real gy = sdf.grid(idx.x, yn, idx.z) - sdf.grid(idx.x, yp, idx.z);
-  Real gz = sdf.grid(idx.x, idx.y, zn) - sdf.grid(idx.x, idx.y, zp);
+  Real gx = evalSdf(sdf, xn, idx.y, idx.z) - evalSdf(sdf, xp, idx.y, idx.z);
+  Real gy = evalSdf(sdf, idx.x, yn, idx.z) - evalSdf(sdf, idx.x, yp, idx.z);
+  Real gz = evalSdf(sdf, idx.x, idx.y, zn) - evalSdf(sdf, idx.x, idx.y, zp);
   return Vec3d(gx / dx, gy / dy, gz / dz);
 }
 
@@ -678,7 +689,7 @@ void singleCube(core::Mesh& manifold, const SDF<3>& sdf,
                 std::unordered_map<int, int>& vertexMap, int x, int y, int z) {
   int vertexNegativeMask = 0;
   for (int i = 0; i < 8; i++) {
-    if (sdf.grid(Vec3i(x, y, z) + vertexOffset[i]) < 0.0)
+    if (evalSdf(sdf, Vec3i(x, y, z) + vertexOffset[i]) < 0.0)
       vertexNegativeMask |= (1 << i);
   }
   int v_cnt = 0;
@@ -703,8 +714,8 @@ void singleCube(core::Mesh& manifold, const SDF<3>& sdf,
       Vec3d pb = sdf.grid.indexToCoord(idx2);
       Vec3d na = grad(sdf, idx1);
       Vec3d nb = grad(sdf, idx2);
-      Real va = sdf.grid(idx1);
-      Real vb = sdf.grid(idx2);
+      Real va = evalSdf(sdf, idx1);
+      Real vb = evalSdf(sdf, idx2);
       assert(va * vb <= 0.0);
       Real frac = va / (va - vb);
       Vec3d p = lerp(pa, pb, frac);
@@ -723,9 +734,9 @@ void rebuildSurface(core::Mesh& manifold, const SDF<3>& sdf) {
   int height = sdf.height();
   int depth = sdf.depth();
   std::unordered_map<int, int> vertexMap;
-  for (int i = 0; i < width - 1; i++)
-    for (int j = 0; j < height - 1; j++)
-      for (int k = 0; k < depth - 1; k++)
+  for (int i = -1; i < width; i++)
+    for (int j = -1; j < height; j++)
+      for (int k = -1; k < depth; k++)
         singleCube(manifold, sdf, vertexMap, i, j, k);
 }
 }
