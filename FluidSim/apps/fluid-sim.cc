@@ -6,6 +6,7 @@
 #include <FluidSim/cpu/advect-solver.h>
 #include <FluidSim/cpu/project-solver.h>
 #include <FluidSim/cpu/fluid-simulator.h>
+#include <FluidSim/cpu/rebuild-surface.h>
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
 #include <imgui/imgui_impl_glfw.h>
@@ -14,6 +15,7 @@
 #include <memory>
 using namespace opengl;
 ImVec4 kClearColor = ImVec4(1.0f, 1.0f, 1.0f, 1.00f);
+
 bool initGLFW(GLFWwindow*& window) {
   if (!glfwInit()) {
     std::cerr << "Failed to initialize GLFW" << std::endl;
@@ -155,6 +157,7 @@ void drawFluid(OpenGLContext* fluidCtx, ShaderProg* fluidShader,
       "proj", camera.getProjectionMatrix(display_w, display_h));
   glDrawArrays(GL_POINTS, 0, positions.size());
 }
+
 void drawCollider(OpenGLContext* colliderCtx, ShaderProg* colliderShader,
                   TargetCamera& camera, const core::Mesh& colliderMesh,
                   int display_w, int display_h) {
@@ -205,7 +208,6 @@ int main(int argc, char** argv) {
     std::cerr << "Failed to load mesh: " << colliderPath << std::endl;
     return -1;
   }
-
   relocateMesh(colliderMesh, size);
   simulator->buildCollider(colliderMesh);
   std::unique_ptr<fluid::HybridAdvectionSolver3D> advector = std::make_unique<
@@ -249,7 +251,8 @@ int main(int argc, char** argv) {
     processWindowInput(window, camera);
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame(); {
+    ImGui::NewFrame();
+    {
       ImGui::Begin("Hello, fluid simulation!");
       ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
                   1000.0f / io.Framerate, io.Framerate);
@@ -265,8 +268,16 @@ int main(int argc, char** argv) {
     simulator->step(frame);
     drawFluid(fluidCtx.get(), fluidShader.get(), camera, simulator->positions(),
               display_w, display_h);
-    // drawSDF(sdfCtx.get(), sdfShader.get(), camera,
-            // simulator->exportFluidSurface(), display_w, display_h);
+    if (frame.idx == 50) {
+      simulator->reconstruct();
+      simulator->smoothFluidSurface(5);
+      core::Mesh fluidMesh;
+      fluid::rebuildSurface(fluidMesh, simulator->exportFluidSurface());
+      if (!core::exportObj("fluid.obj", fluidMesh)) {
+        std::cerr << "Failed to export fluid mesh" << std::endl;
+        exit(-1);
+      }
+    }
     drawCollider(colliderCtx.get(), colliderShader.get(), camera, colliderMesh,
                  display_w, display_h);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

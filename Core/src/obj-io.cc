@@ -3,12 +3,14 @@
 //
 #include <Core/mesh.h>
 #include <Core/utils.h>
+
+#include <format>
 #include <iostream>
 #include <sstream>
 #include <fstream>
-namespace core {
 
-bool myLoadObj(const std::string &path, Mesh *mesh) {
+namespace core {
+bool myLoadObj(const std::string& path, Mesh* mesh) {
   std::ifstream file(path);
   if (!file.is_open()) {
     std::cerr << "[ERROR] Failed to load " << path << std::endl;
@@ -58,6 +60,33 @@ bool myLoadObj(const std::string &path, Mesh *mesh) {
     mesh->normals[i] = normalize(mesh->normals[i]);
   }
   file.close();
+  return true;
+}
+
+bool exportObj(const std::string& filename, const Mesh& mesh) {
+  std::ofstream file(filename);
+  if (!file.is_open()) {
+    file.open(filename, std::ios::out);
+    if (!file.is_open()) {
+      std::cerr << std::format("Error: Unable to create file {}", filename) <<
+          std::endl;
+      return false;
+    }
+  }
+
+  for (const auto& vertex : mesh.vertices)
+    file << std::format("v {} {} {}\n", vertex.x, vertex.y, vertex.z);
+  for (const auto& normal : mesh.normals)
+    file << std::format("vn {} {} {}\n", normal.x, normal.y, normal.z);
+
+  for (size_t i = 0; i < mesh.indices.size(); i += 3) {
+    file << "f ";
+    for (int j = 0; j < 3; ++j) {
+      file << std::format("{}//{} ", mesh.indices[i + j] + 1,
+                          mesh.indices[i + j] + 1);
+    }
+    file << "\n";
+  }
   return true;
 }
 }
