@@ -7,6 +7,8 @@
 
 #include <Core/core.h>
 #include <Core/properties.h>
+#include <Core/mesh.h>
+#include <Core/aabb.h>
 namespace fluid {
 using Index = int;
 using core::Real;
@@ -20,5 +22,7 @@ using core::Vec2d;
 using core::Vec3d;
 using core::Vector;
 using core::Matrix;
+using core::Mesh;
+using core::AABB;
 };
 #endif // SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_CORE_H_

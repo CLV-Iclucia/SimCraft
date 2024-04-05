@@ -1,6 +1,6 @@
-#include <FluidSim/gpu/kernels.cuh>
-#include <FluidSim/gpu/gpu-arrays.h>
-#include <FluidSim/gpu/vec-op.cuh>
+#include <FluidSim/cuda/kernels.cuh>
+#include <FluidSim/cuda/gpu-arrays.h>
+#include <FluidSim/cuda/vec-op.cuh>
 
 namespace fluid {
 __global__ void AdvectKernel(CudaTextureAccessor<float4> texVel,

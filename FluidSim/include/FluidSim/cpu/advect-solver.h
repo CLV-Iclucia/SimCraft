@@ -7,7 +7,7 @@
 #include <Spatify/arrays.h>
 #include <FluidSim/cpu/sdf.h>
 
-namespace fluid {
+namespace fluid::cpu {
 class HybridAdvectionSolver3D {
   public:
     HybridAdvectionSolver3D(int n, Real w, Real h, Real d)

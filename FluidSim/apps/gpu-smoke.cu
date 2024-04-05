@@ -8,7 +8,7 @@
 #include <imgui/imgui_impl_opengl3.h>
 #include <iostream>
 #include <memory>
-#include <FluidSim/gpu/smoke-simulator.cuh>
+#include <FluidSim/cuda/smoke-simulator.cuh>
 using namespace opengl;
 ImVec4 kClearColor = ImVec4(0.0f, 1.0f, 1.0f, 1.00f);
 bool initGLFW(GLFWwindow*& window) {

@@ -3,7 +3,7 @@
 #include <FluidSim/cpu/advect-solver.h>
 #include <FluidSim/cpu/util.h>
 
-namespace fluid {
+namespace fluid::cpu {
 enum Directions {
   Left,
   Right,

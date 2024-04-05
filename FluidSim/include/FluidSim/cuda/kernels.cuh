@@ -6,7 +6,7 @@
 #define KERNELS_CUH
 
 #include <cuda_runtime.h>
-#include <FluidSim/gpu/gpu-arrays.h>
+#include <FluidSim/cuda/gpu-arrays.h>
 
 inline void checkCUDAError(const char* msg, int line = -1) {
   cudaError_t err = cudaGetLastError();

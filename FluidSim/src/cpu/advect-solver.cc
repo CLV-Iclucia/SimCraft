@@ -2,7 +2,7 @@
 #include <FluidSim/cpu/util.h>
 #include <FluidSim/cpu/advect-solver.h>
 
-namespace fluid {
+namespace fluid::cpu {
 using core::CubicKernel;
 void PicAdvector3D::solveG2P(const std::span<Vec3d> pos,
                              const FaceCentredGrid<Real, Real, 3, 0>& ug,

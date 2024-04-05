@@ -4,8 +4,8 @@
 #include <Core/core.h>
 #include <Core/properties.h>
 #include <Core/animation.h>
-#include <FluidSim/gpu/kernels.cuh>
-#include <FluidSim/gpu/gpu-arrays.h>
+#include <FluidSim/cuda/kernels.cuh>
+#include <FluidSim/cuda/gpu-arrays.h>
 #include <vector_types.h>
 #include <memory>
 

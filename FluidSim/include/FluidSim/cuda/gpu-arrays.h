@@ -5,10 +5,16 @@
 #ifndef SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_GPU_ARRAYS_H_
 #define SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_GPU_ARRAYS_H_
 #include <Core/properties.h>
-#include <FluidSim/fluid-sim.h>
-#include <cuda_runtime.h>
+#include <Core/cuda-utils.h>
+#include <cstdint>
 
 namespace fluid {
+template <typename T>
+using core::Accessor;
+
+template <typename T>
+using core::ConstAccessor;
+
 template <typename T>
 struct CudaArray3D : NonCopyable {
   cudaArray* cuda_array{};
@@ -42,6 +48,7 @@ struct CudaArray3D : NonCopyable {
     copy3DParams.kind = cudaMemcpyDeviceToHost;
     cudaMemcpy3D(&copy3DParams);
   }
+
   [[nodiscard]] cudaArray* Array() const { return cuda_array; }
   cudaArray_t* ArrayPtr() { return &cuda_array; }
   ~CudaArray3D() { cudaFreeArray(cuda_array); }
@@ -51,11 +58,15 @@ template <typename T>
 struct CudaSurfaceAccessor {
   cudaSurfaceObject_t cuda_surf;
   template <cudaSurfaceBoundaryMode mode = cudaBoundaryModeTrap>
-  __device__ __forceinline__ T read(int x, int y, int z) {
+  CUDA_DEVICE CUDA_FORCEINLINE T read(int x, int y, int z) {
     return surf3Dread<T>(cuda_surf, x * sizeof(T), y, z, mode);
   }
   template <cudaSurfaceBoundaryMode mode = cudaBoundaryModeTrap>
-  __device__ __forceinline__ void write(T val, int x, int y, int z) {
+  CUDA_DEVICE CUDA_FORCEINLINE T read(const int3& idx) {
+    return surf3Dread<T>(cuda_surf, idx.x * sizeof(T), idx.y, idx.z, mode);
+  }
+  template <cudaSurfaceBoundaryMode mode = cudaBoundaryModeTrap>
+  CUDA_DEVICE CUDA_FORCEINLINE void write(T val, int x, int y, int z) {
     surf3Dwrite<T>(val, cuda_surf, x * sizeof(T), y, z, mode);
   }
 };
@@ -115,6 +126,117 @@ struct CudaTexture : CudaSurface<T> {
   [[nodiscard]] cudaTextureObject_t texture() const { return cuda_tex; }
   CudaTextureAccessor<T> texAccessor() const { return {cuda_tex}; }
   ~CudaTexture() { cudaDestroyTextureObject(cuda_tex); }
+};
+
+template <typename T>
+struct DeviceArray;
+
+template <typename T>
+struct Accessor<DeviceArray<T>> {
+  T* ptr;
+  CUDA_DEVICE CUDA_FORCEINLINE const T& operator[](size_t idx) const {
+    return ptr[idx];
+  }
+
+  CUDA_DEVICE CUDA_FORCEINLINE T& operator[](size_t idx) { return ptr[idx]; }
+};
+
+template <typename T>
+struct ConstAccessor<DeviceArray<T>> {
+  T* ptr;
+  CUDA_DEVICE CUDA_FORCEINLINE const T& operator[](size_t idx) const {
+    return ptr[idx];
+  }
+};
+
+template <typename T>
+struct DeviceArray : core::DeviceMemoryAccessible<DeviceArray<T>> {
+  DeviceArray() = default;
+  CUDA_CALLABLE DeviceArray& operator=(DeviceArray&& other) noexcept {
+    if (this != &other) {
+      m_size = other.m_size;
+      ptr = other.ptr;
+      other.ptr = nullptr;
+    }
+    return *this;
+  }
+
+  CUDA_CALLABLE DeviceArray(DeviceArray&& other) noexcept
+    : m_size(other.m_size), ptr(other.ptr) {
+    other.ptr = nullptr;
+  }
+
+  // constructor
+  CUDA_CALLABLE explicit DeviceArray(size_t size_) : m_size(size_) {
+    ptr = static_cast<T*>(cudaMalloc(m_size * sizeof(T)));
+  }
+
+  // construct from vector
+  explicit DeviceArray(const std::vector<T>& vec)
+    : m_size(vec.size()), ptr(nullptr) {
+    ptr = static_cast<T*>(cudaMalloc(m_size * sizeof(T)));
+    cudaMemcpy(ptr, vec.data(), m_size * sizeof(T), cudaMemcpyHostToDevice);
+  }
+
+  // construct from std::array
+  template <size_t N>
+  explicit DeviceArray(const std::array<T, N>& arr)
+    : m_size(N), ptr(nullptr) {
+    ptr = static_cast<T*>(cudaMalloc(m_size * sizeof(T)));
+    cudaMemcpy(ptr, arr.data(), m_size * sizeof(T), cudaMemcpyHostToDevice);
+  }
+
+  CUDA_CALLABLE~DeviceArray() { cudaFree(ptr); }
+  [[nodiscard]] T* data() const { return ptr; }
+  [[nodiscard]] size_t size() const { return m_size; }
+
+  void copyFrom(const T* data) {
+    cudaMemcpy(ptr, data, m_size * sizeof(T), cudaMemcpyHostToDevice);
+  }
+
+  void copyFrom(const std::vector<T>& vec) {
+    m_size = vec.size();
+    if (ptr)
+      cudaFree(ptr);
+    ptr = static_cast<T*>(cudaMalloc(m_size * sizeof(T)));
+    cudaMemcpy(ptr, vec.data(), m_size * sizeof(T), cudaMemcpyHostToDevice);
+  }
+
+  void copyTo(T* data) {
+    cudaMemcpy(data, ptr, m_size * sizeof(T), cudaMemcpyDeviceToHost);
+  }
+
+  void copyTo(std::vector<T>& vec) {
+    vec.resize(m_size);
+    cudaMemcpy(vec.data(), ptr, m_size * sizeof(T), cudaMemcpyDeviceToHost);
+  }
+
+  void resize(size_t size_) {
+    if (ptr)
+      cudaFree(ptr);
+    m_size = size_;
+    ptr = static_cast<T*>(cudaMalloc(m_size * sizeof(T)));
+  }
+
+  CUDA_HOST CUDA_FORCEINLINE Accessor<DeviceArray<T>> accessor() const {
+    return {ptr};
+  }
+
+  CUDA_HOST CUDA_FORCEINLINE ConstAccessor<DeviceArray<T>> constAccessor() const {
+    return {ptr};
+  }
+
+  CUDA_DEVICE CUDA_FORCEINLINE T& operator[](size_t idx) { return ptr[idx]; }
+  CUDA_DEVICE CUDA_FORCEINLINE const T& operator[](size_t idx) const {
+    return ptr[idx];
+  }
+
+  T* begin() { return ptr; }
+  T* end() { return ptr + m_size; }
+
+private:
+  uint32_t m_size{};
+  T* ptr{};
 };
 } // namespace fluid
 #endif // SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_GPU_ARRAYS_H_

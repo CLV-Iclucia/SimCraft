@@ -3,8 +3,6 @@
 #include <Core/mesh.h>
 #include <ogl-render/ogl-ctx.h>
 #include <ogl-render/camera.h>
-#include <FluidSim/cpu/advect-solver.h>
-#include <FluidSim/cpu/project-solver.h>
 #include <FluidSim/cpu/fluid-simulator.h>
 #include <FluidSim/cpu/rebuild-surface.h>
 #include <GLFW/glfw3.h>
@@ -201,7 +199,7 @@ int main(int argc, char** argv) {
   if (!initGLFW(window)) return -1;
   ImGuiIO& io = initImGui(window);
 
-  auto simulator = std::make_unique<fluid::HybridFluidSimulator3D>(
+  auto simulator = std::make_unique<fluid::cpu::FluidSimulator>(
       nParticles, size, resolution);
   core::Mesh colliderMesh;
 
@@ -210,26 +208,11 @@ int main(int argc, char** argv) {
     return -1;
   }
   relocateMesh(colliderMesh, size);
-  simulator->buildCollider(colliderMesh);
-  std::unique_ptr<fluid::HybridAdvectionSolver3D> advector = std::make_unique<
-    fluid::PicAdvector3D>(nParticles, resolution.x, resolution.y,
-                          resolution.z);
-  auto projector = std::make_unique<fluid::FvmSolver3D>(
-      resolution.x, resolution.y, resolution.z);
-  auto micpcg = std::make_unique<fluid::CgSolver3D>(
-      resolution.x, resolution.y, resolution.z);
-  std::unique_ptr<fluid::Preconditioner3D> preconder = std::make_unique<
-    fluid::ModifiedIncompleteCholesky3D>(resolution.x, resolution.y,
-                                         resolution.z);
-  std::unique_ptr<fluid::ParticleSystemReconstructor<core::Real, 3>>
-      reconstructor = std::make_unique<fluid::NaiveReconstructor<
-        core::Real, 3>>(nParticles, resolution.x, resolution.y, resolution.z,
-                        size);
-  micpcg->setPreconditioner(preconder.get());
-  projector->setCompressedSolver(micpcg.get());
-  simulator->setAdvector(advector.get());
-  simulator->setProjector(projector.get());
-  simulator->setReconstructor(reconstructor.get());
+
+  simulator->setCollider(colliderMesh);
+  simulator->setAdvector(fluid::AdvectionMethod::PIC);
+  simulator->setProjector(fluid::ProjectSolver::FVM);
+
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
     std::cerr << "Failed to initialize GLAD" << std::endl;
     return -1;

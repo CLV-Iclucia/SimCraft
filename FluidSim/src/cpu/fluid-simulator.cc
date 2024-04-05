@@ -9,15 +9,15 @@
 #include <FluidSim/cpu/util.h>
 #include <cassert>
 
-namespace fluid {
-void HybridFluidSimulator3D::applyForce(Real dt) const {
+namespace fluid::cpu {
+void FluidSimulator::applyForce(Real dt) const {
   vg->forEach([this, dt](int i, int j, int k) {
     if (vValid->at(i, j, k) && j > 0 && j < vg->height() - 1)
       vg->at(i, j, k) -= 9.8 * dt;
   });
 }
 
-void HybridFluidSimulator3D::clear() {
+void FluidSimulator::clear() {
   uValid->fill(0);
   vValid->fill(0);
   wValid->fill(0);
@@ -36,7 +36,7 @@ void HybridFluidSimulator3D::clear() {
   pg.fill(0);
 }
 
-void HybridFluidSimulator3D::smoothFluidSurface(int iters) {
+void FluidSimulator::smoothFluidSurface(int iters) {
   for (int iter = 0; iter < iters; iter++) {
     fluidSurfaceBuf->grid.forEach([&](int i, int j, int k) {
       Real sum = 0;
@@ -73,7 +73,7 @@ void HybridFluidSimulator3D::smoothFluidSurface(int iters) {
   }
 }
 
-void HybridFluidSimulator3D::applyCollider() const {
+void FluidSimulator::applyCollider() const {
   ug->parallelForEach([&](int i, int j, int k) {
     if (i == 0 || i == ug->width() - 1) {
       ug->at(i, j, k) = 0.0;
@@ -110,7 +110,7 @@ void HybridFluidSimulator3D::applyCollider() const {
   });
 }
 
-void HybridFluidSimulator3D::applyDirichletBoundary() const {
+void FluidSimulator::applyDirichletBoundary() const {
   for (int j = 0; j < ug->height(); j++) {
     for (int k = 0; k < ug->depth(); k++) {
       ug->at(0, j, k) = 0.0;
@@ -137,7 +137,7 @@ void HybridFluidSimulator3D::applyDirichletBoundary() const {
   }
 }
 
-void HybridFluidSimulator3D::substep(Real dt) {
+void FluidSimulator::substep(Real dt) {
   clear();
   std::cout << "Solving advection... ";
   advector->advect(std::span(positions()), *ug, *vg, *wg, *colliderSdf, dt);
@@ -181,7 +181,7 @@ void HybridFluidSimulator3D::substep(Real dt) {
   std::cout << "Done" << std::endl;
 }
 
-Real HybridFluidSimulator3D::CFL() const {
+Real FluidSimulator::CFL() const {
   Real h{ug->gridSpacing().x};
   Real cfl{h / 1e-6};
   ug->forEach([&cfl, h, this](int x, int y, int z) {
@@ -202,7 +202,7 @@ Real HybridFluidSimulator3D::CFL() const {
   return cfl;
 }
 
-void HybridFluidSimulator3D::step(core::Frame& frame) {
+void FluidSimulator::step(core::Frame& frame) {
   Real t = 0;
   std::cout << std::format("********* Frame {} *********", frame.idx) <<
       std::endl;

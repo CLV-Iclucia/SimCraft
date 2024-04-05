@@ -12,7 +12,9 @@ enable_testing()
 file(GLOB_RECURSE test_srcs CONFIGURE_DEPENDS tests/*.cc)
 foreach(test_src ${test_srcs})
     get_filename_component(test_name ${test_src} NAME_WE)
-    add_executable(${test_name} ${test_src})
+    add_executable(${test_name} ${test_src}
+            include/Core/debug.h
+            include/Core/cuda-utils.h)
     target_link_libraries(${test_name} PUBLIC Core gtest gtest_main)
     add_test(NAME ${test_name} CONFIGURATIONS Release COMMAND ${test_name})
 endforeach()

@@ -78,5 +78,31 @@ __device__ __forceinline__ float3 cross(const float3& a, const float3& b) {
   return make_float3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z,
                      a.x * b.y - a.y * b.x);
 }
+// implement double versions
+__device__ __forceinline__ double3 operator+(const double3& a, const double3& b) {
+  return make_double3(a.x + b.x, a.y + b.y, a.z + b.z);
+}
+__device__ __forceinline__ double3 operator-(const double3& a, const double3& b) {
+  return make_double3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+__device__ __forceinline__ double3 operator*(const double3& a, double b) {
+  return make_double3(a.x * b, a.y * b, a.z * b);
+}
+__device__ __forceinline__ double3 operator/(const double3& a, double b) {
+  return make_double3(a.x / b, a.y / b, a.z / b);
+}
+__device__ __forceinline__ double3 operator*(double a, const double3& b) {
+  return make_double3(a * b.x, a * b.y, a * b.z);
+}
+__device__ __forceinline__ double3 operator/(double a, const double3& b) {
+  return make_double3(a / b.x, a / b.y, a / b.z);
+}
+__device__ __forceinline__ double3& operator+=(double3& a, const double3& b) {
+  a.x += b.x;
+  a.y += b.y;
+  a.z += b.z;
+  return a;
+}
+
 }
 #endif //FLUIDSIM_VEC_OP_CUH

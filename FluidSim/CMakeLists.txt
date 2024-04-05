@@ -3,14 +3,21 @@ project(Fluid LANGUAGES CXX CUDA)
 file(GLOB_RECURSE cpu_srcs CONFIGURE_DEPENDS src/cpu/*.cc src/cpu/*.cpp)
 file(GLOB_RECURSE cpu_headers CONFIGURE_DEPENDS include/FluidSim/cpu/*.h)
 
-file(GLOB_RECURSE gpu_srcs CONFIGURE_DEPENDS src/gpu/*.cc src/gpu/*.cpp src/gpu/*.cu src/gpu/*.cc)
-file(GLOB_RECURSE gpu_headers CONFIGURE_DEPENDS include/FluidSim/gpu/*.h include/FluidSim/gpu/*.cuh)
+file(GLOB_RECURSE gpu_srcs CONFIGURE_DEPENDS src/cuda/*.cc src/cuda/*.cpp src/cuda/*.cu src/cuda/*.cc)
+file(GLOB_RECURSE gpu_headers CONFIGURE_DEPENDS include/FluidSim/cuda/*.h include/FluidSim/cuda/*.cuh)
 
 file(GLOB common_headers CONFIGURE_DEPENDS include/FluidSim/*.h)
+file(GLOB common_srcs CONFIGURE_DEPENDS src/*.cc src/*.cpp)
 
-add_library(CpuFluid STATIC ${cpu_srcs} ${cpu_headers} ${common_headers}
-        include/FluidSim/cpu/rebuild-surface.h)
-add_library(GpuFluid STATIC ${gpu_srcs} ${gpu_headers} ${common_headers})
+add_library(CpuFluid STATIC ${cpu_srcs} ${cpu_headers} ${common_headers} ${common_srcs}
+        include/FluidSim/cuda/particle-system.h
+        include/FluidSim/cuda/utils.h
+        include/FluidSim/cuda/particle-reconstructor.h
+        include/FluidSim/cuda/project-solver.h
+)
+add_library(GpuFluid STATIC ${gpu_srcs} ${gpu_headers} ${common_headers} ${common_srcs}
+        src/cuda/advect-solver.cu
+        src/cuda/project-solver.cu)
 
 target_include_directories(CpuFluid PUBLIC include)
 target_include_directories(GpuFluid PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} include)
