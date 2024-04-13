@@ -8,7 +8,7 @@
 #include <array>
 #include <map>
 
-namespace fluid {
+namespace fluid::cpu {
 // Still, all the tables in this code come from fluid-engine-dev
 
 // vertexOffset lists the positions, relative to vertex0, of each of the 8

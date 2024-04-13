@@ -36,7 +36,7 @@ enum class CompressedSolverMethod {
   CG
 };
 
-struct FluidComputeBackend {
+struct FluidComputeBackend : NonCopyable {
   virtual void setCollider(const Mesh& collider_mesh) const = 0;
   virtual void setInitialFluid(const Mesh& fluid_mesh) = 0;
   virtual void setAdvector(AdvectionMethod advection_method) = 0;
@@ -83,7 +83,7 @@ struct FluidSimulator final : core::Animation {
   void step(core::Frame& frame) override {
   }
 
-  void setBackend(const std::string& backend_name);
+  void setBackend(Backend backend);
 };
 }
 #endif //FLUID_SIMULATOR_H

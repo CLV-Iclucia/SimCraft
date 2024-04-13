@@ -11,49 +11,55 @@
 namespace fluid::cuda {
 struct AdvectionSolver {
   std::unique_ptr<ParticleSystem> particles;
-  virtual void advect(const ParticleSystem& particles,
-                      CudaTextureAccessor<double> u,
-                      CudaTextureAccessor<double> v,
-                      CudaTextureAccessor<double> w,
+  virtual void advect(const ParticleSystem &particles,
+                      const CudaTexture<Real> &u,
+                      const CudaTexture<Real> &v,
+                      const CudaTexture<Real> &w,
+                      int3 resolution,
                       double h,
                       Real dt) = 0;
-  virtual void solveP2G(const ParticleSystem& particles,
-                        CudaTextureAccessor<double> u,
-                        CudaTextureAccessor<double> v,
-                        CudaTextureAccessor<double> w,
-                        CudaTextureAccessor<double> collider_sdf,
-                        CudaSurfaceAccessor<double> uw,
-                        CudaSurfaceAccessor<double> vw,
-                        CudaSurfaceAccessor<double> ww,
-                        CudaSurfaceAccessor<int> uValid,
-                        CudaSurfaceAccessor<int> vValid,
-                        CudaSurfaceAccessor<int> wValid,
+  virtual void solveP2G(const ParticleSystem &particles,
+                        const CudaTexture<Real> &u,
+                        const CudaTexture<Real> &v,
+                        const CudaTexture<Real> &w,
+                        const CudaTexture<Real> &collider_sdf,
+                        const CudaSurface<Real> &uw,
+                        const CudaSurface<Real> &vw,
+                        const CudaSurface<Real> &ww,
+                        const CudaSurface<int> &uValid,
+                        const CudaSurface<int> &vValid,
+                        const CudaSurface<int> &wValid,
+                        int3 resolution,
                         Real h, Real dt) = 0;
-  virtual void solveG2P(const ParticleSystem& particles,
-                        CudaTextureAccessor<double> u,
-                        CudaTextureAccessor<double> v,
-                        CudaTextureAccessor<double> w
-                        , Real h, Real dt) = 0;
+  virtual void solveG2P(const ParticleSystem &particles,
+                        const CudaTexture<Real> &u,
+                        const CudaTexture<Real> &v,
+                        const CudaTexture<Real> &w,
+                        int3 resolution,
+                        Real h, Real dt) = 0;
   virtual ~AdvectionSolver() = default;
 };
 
 struct PicSolver final : AdvectionSolver {
-  void advect(const ParticleSystem& particles,
-              CudaTextureAccessor<double> u,
-              CudaTextureAccessor<double> v,
-              CudaTextureAccessor<double> w,
+  void advect(const ParticleSystem &particles,
+              const CudaTexture<Real> &u,
+              const CudaTexture<Real> &v,
+              const CudaTexture<Real> &w,
+              int3 resolution,
               Real h,
               Real dt) override;
-  void solveP2G(const ParticleSystem& particles, CudaTextureAccessor<double> u,
-                CudaTextureAccessor<double> v, CudaTextureAccessor<double> w,
-                CudaTextureAccessor<double> collider_sdf,
-                CudaSurfaceAccessor<double> uw, CudaSurfaceAccessor<double> vw,
-                CudaSurfaceAccessor<double> ww, CudaSurfaceAccessor<int> uValid,
-                CudaSurfaceAccessor<int> vValid,
-                CudaSurfaceAccessor<int> wValid,
+  void solveP2G(const ParticleSystem &particles, const CudaTexture<Real>& u,
+                const CudaTexture<Real>& v, const CudaTexture<Real>& w,
+                const CudaTexture<Real>& collider_sdf,
+                const CudaSurface<Real>& uw, const CudaSurface<Real>& vw,
+                const CudaSurface<Real>& ww, const CudaSurface<int>& uValid,
+                const CudaSurface<int>& vValid,
+                const CudaSurface<int>& wValid,
+                int3 resolution,
                 Real h, Real dt) override;
-  void solveG2P(const ParticleSystem& particles, CudaTextureAccessor<double> u,
-                CudaTextureAccessor<double> v, CudaTextureAccessor<double> w,
+  void solveG2P(const ParticleSystem &particles, const CudaTexture<Real>& u,
+                const CudaTexture<Real>& v, const CudaTexture<Real>& w,
+                int3 resolution,
                 Real h, Real dt) override;
   PicSolver() = default;
 };

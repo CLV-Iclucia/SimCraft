@@ -5,7 +5,7 @@
 #ifndef SIMCRAFT_CORE_INCLUDE_CORE_UTILS_H_
 #define SIMCRAFT_CORE_INCLUDE_CORE_UTILS_H_
 #include <Core/core.h>
-
+#include <Core/cuda-utils.h>
 namespace core {
 constexpr Real PI = 3.141592653589793238462643383279502884197169399375105820974;
 constexpr Real PI_2 =
@@ -19,7 +19,16 @@ constexpr Real PI_180_INV =
 
 using glm::normalize;
 using glm::dot;
-using glm::clamp;
+
+template <typename T>
+CUDA_CALLABLE CUDA_FORCEINLINE T clamp(const T& x, const T& min, const T& max) {
+#ifndef __CUDA_ARCH__
+  return glm::clamp(x, min, max);
+#else
+  return fmaxf(min, fminf(x, max));
+#endif
+}
+
 template <typename T> inline T cubic(T x) { return x * x * x; }
 
 template <typename T> inline T sqr(T x) { return x * x; }

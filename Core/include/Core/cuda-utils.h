@@ -9,27 +9,35 @@
 #include <Core/properties.h>
 #include <iostream>
 
+static constexpr int kThreadBlockSize = 128;
+static constexpr int kThreadBlockSize2D = 16;
+static constexpr int kThreadBlockSize3D = 8;
+
 namespace core {
 #define CUDA_CALLABLE __host__ __device__
 #define CUDA_FORCEINLINE __forceinline__
 #define CUDA_INLINE __inline__
+#define CUDA_SHARED __shared__
 
-#define cudaSafeCall(kernel) do { \
-kernel; \
-cudaError_t error = cudaGetLastError(); \
-if (error != cudaSuccess) { \
-fprintf(stderr, "CUDA error at %s:%d: %s\n", __FILE__, __LINE__, cudaGetErrorString(error)); \
-exit(-1); \
-} \
+#ifndef NDEBUG
+#define cudaSafeCheck(kernel) do { \
+  kernel;                          \
+  cudaDeviceSynchronize();         \
+  cudaError_t error = cudaGetLastError(); \
+  if (error != cudaSuccess) { \
+    printf("CUDA error at %s:%d: %s\n", __FILE__, __LINE__, cudaGetErrorString(error)); \
+    assert(false); \
+  } \
 } while (0)
-
+#else
+#define cudaSafeCheck(kernel) kernel
+#endif
 #define CUDA_DEVICE __device__
 #define CUDA_HOST __host__
 #define CUDA_GLOBAL __global__
 #define CUDA_CONSTANT __constant__
-#define CUDA_SHARED __shared__
 
-#define ktid(axis) (blockIdx.##axis * blockDim.##axis + threadIdx.##axis)
+#define ktid(axis) (blockIdx.axis * blockDim.axis + threadIdx.axis)
 #define get_tid(tid) int tid = ktid(x)
 #define get_tid_2d(tid) int tid = ktid(x); int tid_y = ktid(y)
 #define get_tid_3d(tid) int tid = ktid(x); int tid_y = ktid(y); int tid_z = ktid(z)
@@ -46,61 +54,57 @@ exit(-1); \
 
 #define cuExit() asm("exit;")
 
-template <typename T>
+template<typename T>
 struct best_return_type_for_const {
   using const_ref = std::add_lvalue_reference_t<std::add_const_t<T>>;
-  using type = std::conditional_t<std::is_trivially_copyable_v<T>, T, const_ref>
-  ;
+  using type = std::conditional_t<std::is_trivially_copyable_v<T>, T, const_ref>;
 };
 
-template <typename T>
+template<typename T>
 using best_return_type_for_const_t = typename best_return_type_for_const<
-  T>::type;
+    T>::type;
 
-template <typename T> requires std::is_pointer_v<T>
+template<typename T>
+requires std::is_pointer_v<T>
 bool checkDevicePtr(T arg) {
   cudaPointerAttributes attr{};
   cudaSafeCall(cudaPointerGetAttributes(&attr, arg));
   return attr.devicePointer != nullptr;
 }
 
-static constexpr int kThreadBlockSize = 128;
-static constexpr int kThreadBlockSize2D = 16;
-static constexpr int kThreadBlockSize3D = 8;
-
-#define LAUNCH_THREADS(x) (((x) + kThreadBlockSize - 1) / kThreadBlockSize, kThreadBlockSize)
+#define LAUNCH_THREADS(x) ((x) + kThreadBlockSize - 1) / kThreadBlockSize, kThreadBlockSize
 #define LAUNCH_THREADS_3D(x, y, z) \
-  (dim3(((x) + kThreadBlockSize3D - 1) / kThreadBlockSize3D, \
+  dim3(((x) + kThreadBlockSize3D - 1) / kThreadBlockSize3D, \
   ((y) + kThreadBlockSize3D - 1) / kThreadBlockSize3D, \
   ((z) + kThreadBlockSize3D - 1) / kThreadBlockSize3D), \
-  dim3(kThreadBlockSize3D, kThreadBlockSize3D, kThreadBlockSize3D))
+  dim3(kThreadBlockSize3D, kThreadBlockSize3D, kThreadBlockSize3D)
 
-template <typename T>
+template<typename T>
 struct DeviceAutoPtr {
-  T* ptr{};
+  T *ptr{};
   DeviceAutoPtr() = default;
 
-  explicit DeviceAutoPtr(T* ptr_) {
+  explicit DeviceAutoPtr(T *ptr_) {
     checkDevicePtr(ptr_);
     ptr = ptr_;
   }
 
-  template <typename... Args>
-  explicit DeviceAutoPtr(Args&&... args) {
-    cudaSafeCall(cudaMalloc(&ptr, sizeof(T)));
+  template<typename... Args>
+  explicit DeviceAutoPtr(Args &&... args) {
+    cudaMalloc(&ptr, sizeof(T));
     new(ptr) T(std::forward<Args>(args)...);
   }
 
   // disallow copy
-  DeviceAutoPtr(const DeviceAutoPtr&) = delete;
-  DeviceAutoPtr& operator=(const DeviceAutoPtr&) = delete;
+  DeviceAutoPtr(const DeviceAutoPtr &) = delete;
+  DeviceAutoPtr &operator=(const DeviceAutoPtr &) = delete;
   // move
-  DeviceAutoPtr(DeviceAutoPtr&& other) noexcept {
+  DeviceAutoPtr(DeviceAutoPtr &&other) noexcept {
     ptr = other.ptr;
     other.ptr = nullptr;
   }
 
-  DeviceAutoPtr& operator=(DeviceAutoPtr&& other) noexcept {
+  DeviceAutoPtr &operator=(DeviceAutoPtr &&other) noexcept {
     if (ptr) {
       ptr->~T();
       cudaFree(ptr);
@@ -110,7 +114,7 @@ struct DeviceAutoPtr {
     return *this;
   }
 
-  T* get() const { return ptr; }
+  T *get() const { return ptr; }
 
   ~DeviceAutoPtr() {
     if (ptr) {
@@ -119,20 +123,19 @@ struct DeviceAutoPtr {
     }
   }
 };
-
-template <typename Derived>
+template<typename Derived>
 struct Accessor;
-template <typename Derived>
+template<typename Derived>
 struct ConstAccessor;
 
-template <typename Derived>
+template<typename Derived>
 struct DeviceMemoryAccessible : NonCopyable {
-  const Derived& derived() const {
-    return static_cast<const Derived&>(*this);
+  const Derived &derived() const {
+    return static_cast<const Derived &>(*this);
   }
 
-  Derived& derived() {
-    return static_cast<Derived&>(*this);
+  Derived &derived() {
+    return static_cast<Derived &>(*this);
   }
 
   Accessor<Derived> accessorInterface() {
@@ -144,14 +147,14 @@ struct DeviceMemoryAccessible : NonCopyable {
   }
 };
 
-template <typename Derived>
+template<typename Derived>
 struct DeviceMemoryReadable : DeviceMemoryAccessible<Derived> {
-  const Derived& derived() const {
-    return static_cast<const Derived&>(*this);
+  const Derived &derived() const {
+    return static_cast<const Derived &>(*this);
   }
 
-  Derived& derived() {
-    return static_cast<Derived&>(*this);
+  Derived &derived() {
+    return static_cast<Derived &>(*this);
   }
 
   ConstAccessor<Derived> constAccessorInterface() const {
@@ -159,17 +162,16 @@ struct DeviceMemoryReadable : DeviceMemoryAccessible<Derived> {
   }
 };
 
-template <typename Derived>
-Accessor<Derived>
-access(std::unique_ptr<Derived>& ptr) {
+template<typename Derived>
+Accessor<Derived> access(std::unique_ptr<Derived> &ptr) {
   return static_cast<DeviceMemoryAccessible<Derived>>(ptr)->accessorInterface();
 }
 
-template <typename Derived>
-ConstAccessor<Derived> constAccess(
-    const std::unique_ptr<Derived>& ptr) {
+template<typename Derived>
+ConstAccessor<Derived> constAccess(const std::unique_ptr<Derived> &ptr) {
   return static_cast<DeviceMemoryAccessible<Derived>>(ptr)->
       constAccessorInterface();
 }
 }
+
 #endif //CORE_CUDA_UTILS_H

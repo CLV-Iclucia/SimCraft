@@ -9,7 +9,7 @@
 #include <vector_types.h>
 #include <memory>
 
-namespace fluid {
+namespace fluid::cuda {
 struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
   uint n;
   std::unique_ptr<CudaSurface<float4>> loc;
@@ -155,13 +155,6 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
     // smooth(dt);
     applyForce(dt);
     projection(dt);
-  }
-  Real CFL() {
-    // uint nthreads_dim = 8;
-    // uint nblocks = (n + nthreads_dim - 1) / 8;
-    // MaxVelKernel<<<dim3(nblocks, nblocks, nblocks),
-    //     dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
-    //         vel->surfAccessor(), n, );
   }
   void step(core::Frame& frame) override {
     // std::cout << "Substep " << i << std::endl;

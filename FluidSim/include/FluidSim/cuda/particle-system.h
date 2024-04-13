@@ -9,15 +9,15 @@
 
 namespace fluid::cuda {
 struct VelAccessor {
-  DeviceArrayAccessor<double> vx;
-  DeviceArrayAccessor<double> vy;
-  DeviceArrayAccessor<double> vz;
+  Accessor<DeviceArray<Real>> vx;
+  Accessor<DeviceArray<Real>> vy;
+  Accessor<DeviceArray<Real>> vz;
 
-  [[nodiscard]] double3 read(int idx) const {
-    return make_double3(vx[idx], vy[idx], vz[idx]);
+  [[nodiscard]] Real3 read(int idx) const {
+    return make_Real3(vx[idx], vy[idx], vz[idx]);
   }
 
-  void write(int idx, const double3& val) {
+  void write(int idx, const Real3& val) {
     vx[idx] = val.x;
     vy[idx] = val.y;
     vz[idx] = val.z;
@@ -25,15 +25,15 @@ struct VelAccessor {
 };
 
 struct PosAccessor {
-  DeviceArrayAccessor<double> px;
-  DeviceArrayAccessor<double> py;
-  DeviceArrayAccessor<double> pz;
+  Accessor<DeviceArray<Real>> px;
+  Accessor<DeviceArray<Real>> py;
+  Accessor<DeviceArray<Real>> pz;
 
-  [[nodiscard]] double3 read(int idx) const {
-    return make_double3(px[idx], py[idx], pz[idx]);
+  [[nodiscard]] Real3 read(int idx) const {
+    return make_Real3(px[idx], py[idx], pz[idx]);
   }
 
-  void write(int idx, const double3& val) {
+  void write(int idx, const Real3& val) {
     px[idx] = val.x;
     py[idx] = val.y;
     pz[idx] = val.z;
@@ -43,13 +43,12 @@ struct PosAccessor {
 // Basic particle system, contains particle positions and velocities
 struct ParticleSystem {
   int size() const { return vx->size(); }
-  std::unique_ptr<DeviceArray<double>> vx;
-  std::unique_ptr<DeviceArray<double>> vy;
-  std::unique_ptr<DeviceArray<double>> vz;
-  std::unique_ptr<DeviceArray<double>> px;
-  std::unique_ptr<DeviceArray<double>> py;
-  std::unique_ptr<DeviceArray<double>> pz;
-
+  std::unique_ptr<DeviceArray<Real>> vx;
+  std::unique_ptr<DeviceArray<Real>> vy;
+  std::unique_ptr<DeviceArray<Real>> vz;
+  std::unique_ptr<DeviceArray<Real>> px;
+  std::unique_ptr<DeviceArray<Real>> py;
+  std::unique_ptr<DeviceArray<Real>> pz;
   [[nodiscard]] VelAccessor velAccessor() const {
     return {vx->accessor(), vy->accessor(), vz->accessor()};
   }

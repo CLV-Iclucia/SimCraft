@@ -25,8 +25,6 @@ using spatify::PaddedCellCentredGrid;
 class FluidSimulator final : FluidComputeBackend {
 public:
   core::Timer timer;
-  ~FluidSimulator() override = default;
-
   FluidSimulator(int n, const Vec3d& size, const Vec3i& resolution)
     : nParticles(n), uw(resolution + Vec3i(1, 0, 0)),
       vw(resolution + Vec3i(0, 1, 0)), ww(resolution + Vec3i(0, 0, 1)),
@@ -86,7 +84,7 @@ public:
                                                  pg.height(), pg.depth());
       return;
     }
-    ERROR("Unknown advector type: {}", advector_name);
+    ERROR("Unknown advection solver");
   }
 
   void setProjector(ProjectSolver project_solver) override {
@@ -95,7 +93,7 @@ public:
                                                 pg.depth());
       return;
     }
-    ERROR("Unknown project solver type: {}", project_solver_name);
+    ERROR("Unknown projection solver");
   }
 
   void setCompressedSolver(CompressedSolverMethod solver_method,

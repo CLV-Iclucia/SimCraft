@@ -20,7 +20,7 @@ inline void checkCUDAError(const char* msg, int line = -1) {
 }
 #define checkCUDAErrorWithLine(msg) checkCUDAError(msg, __LINE__)
 
-namespace fluid {
+namespace fluid::cuda {
 __device__ __forceinline__ bool withinSource(float x, float y, float z,
                                              int n) {
   float centre = static_cast<float>(n) * 0.5f;
@@ -56,7 +56,6 @@ __global__ void ResampleKernel(CudaSurfaceAccessor<float4> surf_loc,
   if (x >= n || y >= n || z >= n)
     return;
   float4 loc = surf_loc.read(x, y, z);
-  assert(loc.x == loc.x && loc.y == loc.y && loc.z == loc.z && loc.w == loc.w);
   auto val = withinSource(loc.x, loc.y, loc.z, n)
                ? src_val
                : tex.sample(loc.x, loc.y, loc.z);

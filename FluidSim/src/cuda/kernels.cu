@@ -18,14 +18,10 @@ __global__ void AdvectKernel(CudaTextureAccessor<float4> texVel,
 
   float3 loc = makeCellCenter(x, y, z);
   float3 vel1 = sample(texVel, loc);
-  assert(vel1.x == vel1.x && vel1.y == vel1.y && vel1.z == vel1.z);
   float3 vel2 = sample(texVel, loc - 0.5f * vel1 * dt);
-  assert(vel2.x == vel2.x && vel2.y == vel2.y && vel2.z == vel2.z);
   float3 vel3 = sample(texVel, loc - 0.75f * vel2 * dt);
-  assert(vel3.x == vel3.x && vel3.y == vel3.y && vel3.z == vel3.z);
   loc -= (2.f / 9.f) * vel1 * dt + (1.f / 3.f) * vel2 * dt + (4.f / 9.f) * vel3
       * dt;
-  assert(loc.x == loc.x && loc.y == loc.y && loc.z == loc.z);
   surf_loc.write(make_float4(loc.x, loc.y, loc.z, 0.f), x, y, z);
 }
 
@@ -94,7 +90,6 @@ __global__ void JacobiKernel(CudaSurfaceAccessor<float> surf_div,
   float pzp = surf_p.read<cudaBoundaryModeClamp>(x, y, z - 1);
   float pzn = surf_p.read<cudaBoundaryModeClamp>(x, y, z + 1);
   float div = surf_div.read(x, y, z);
-  assert(div == div);
   surf_p_nxt.write((pxp + pxn + pyp + pyn + pzp + pzn - div) / 6.f, x, y, z);
 }
 
@@ -114,11 +109,9 @@ __global__ void SubgradientKernel(CudaSurfaceAccessor<float> surf_p,
   float pzp = surf_p.read<cudaBoundaryModeClamp>(x, y, z - 1);
   float pzn = surf_p.read<cudaBoundaryModeClamp>(x, y, z + 1);
   float4 vel = surf_vel.read(x, y, z);
-  assert(vel.x == vel.x && vel.y == vel.y && vel.z == vel.z);
   vel.x -= (pxn - pxp) * 0.5f;
   vel.y -= (pyn - pyp) * 0.5f;
   vel.z -= (pzn - pzp) * 0.5f;
-  assert(vel.x == vel.x && vel.y == vel.y && vel.z == vel.z);
   float4 result = withinSource(x, y, z, n) ? src_vel : vel;
   surf_vel.write(result, x, y, z);
 }
@@ -136,13 +129,10 @@ __global__ void AccumulateForceKernel(CudaSurfaceAccessor<float4> surf_force,
     return;
   // Buoyancy = -alpha * (T - T_ambient) * z + beta * (T - T_ambient) * z
   float T = surf_T.read(x, y, z);
-  assert(T == T);
   float rho = surf_rho.read(x, y, z);
-  assert(rho == rho);
   float3 loc = makeCellCenter(x, y, z);
   float buoyancy = -alpha * rho * loc.y / n + beta * (T - ambientTemperature) *
                    loc.y / n;
-  assert(buoyancy == buoyancy);
   float nwnx = norm(surf_vort.read<cudaBoundaryModeZero>(x + 1, y, z));
   float nwpx = norm(surf_vort.read<cudaBoundaryModeZero>(x - 1, y, z));
   float nwny = norm(surf_vort.read<cudaBoundaryModeZero>(x, y + 1, z));
@@ -150,19 +140,14 @@ __global__ void AccumulateForceKernel(CudaSurfaceAccessor<float4> surf_force,
   float nwnz = norm(surf_vort.read<cudaBoundaryModeZero>(x, y, z + 1));
   float nwpz = norm(surf_vort.read<cudaBoundaryModeZero>(x, y, z - 1));
   float4 vort = surf_vort.read(x, y, z);
-  assert(vort.x == vort.x && vort.y == vort.y && vort.z == vort.z);
   float3 eta = make_float3((nwnx - nwpx) * 0.5f,
                            (nwny - nwpy) * 0.5f,
                            (nwnz - nwpz) * 0.5f);
-  assert(eta.x == eta.x && eta.y == eta.y && eta.z == eta.z);
   float3 confine = epsilon * cross(eta, make_float3(vort.x, vort.y, vort.z));
   float neta = norm(eta);
   confine = neta == 0.f || withinSource(x, y, z, n)
               ? make_float3(0.f, 0.f, 0.f)
               : confine / neta;
-  assert(
-      confine.x == confine.x && confine.y == confine.y && confine.z == confine.
-      z);
   float wind = 9.8f;
   float gravity = -9.8f;
   surf_force.write(make_float4(confine.x, confine.y + buoyancy + gravity,

@@ -117,7 +117,7 @@ public:
     } else if (precond_method == PreconditionerMethod::Multigrid) {
       ERROR("Not supported yet!");
     } else
-      ERROR("Unknown preconditioner type: {}", precond_name);
+      ERROR("Unknown preconditioner type");
   }
 
   ~CgSolver3D() override = default;
@@ -168,7 +168,7 @@ public:
       cg_solver->setPreconditioner(precond_method);
       solver = std::move(cg_solver);
     } else
-      ERROR("Unknown solver type: {}", solver_name);
+      ERROR("Unknown solver type");
   }
 
   ~FvmSolver3D() override = default;
