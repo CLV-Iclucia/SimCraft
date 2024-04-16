@@ -164,8 +164,7 @@ static CUDA_GLOBAL void kernelL1Norm(CudaSurfaceAccessor<Real> surface,
                                        cub::BLOCK_REDUCE_WARP_REDUCTIONS,
                                        kThreadBlockSize3D,
                                        kThreadBlockSize3D>;
-  CUDA_SHARED
-  BlockReduce::TempStorage temp_storage;
+  CUDA_SHARED BlockReduce::TempStorage temp_storage;
   auto block_result = BlockReduce(temp_storage).Sum(local_result,
                                                     blockDim.x * blockDim.y * blockDim.z);
   if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0)

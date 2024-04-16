@@ -13,6 +13,9 @@
 namespace fluid::cuda {
 class FluidSimulator final : public FluidComputeBackend {
  public:
+  FluidSimulator(int nParticles_, const Vec3d& size, const Vec3i& resolution) {
+
+  }
   void setCollider(const Mesh &collider_mesh) const override {
   }
 
@@ -31,6 +34,10 @@ class FluidSimulator final : public FluidComputeBackend {
       ERROR("Invalid project solver");
     }
   }
+  void setCompressedSolver(CompressedSolverMethod solver_method,
+                           PreconditionerMethod preconditioner_method) override {
+    projectSolver->setCompressedSolver(solver_method, preconditioner_method);
+  }
   int3 resolution;
   Real h;
   std::unique_ptr<CudaTexture<double>> fluidSurface, fluidSurfaceBuf;
@@ -42,12 +49,31 @@ class FluidSimulator final : public FluidComputeBackend {
       sdfValidBuf;
   std::unique_ptr<ProjectionSolver> projectSolver{};
   std::unique_ptr<AdvectionSolver> advectionSolver{};
-  void step(Real dt) {
+  void substep(Real dt);
+  double CFL() const;
+  void step(core::Frame& frame) {
+    Real t = 0;
+    std::cout << std::format("********* Frame {} *********", frame.idx) <<
+              std::endl;
+    int substep_cnt = 0;
+    while (t < frame.dt) {
+      Real cfl = CFL();
+      Real dt = std::min(cfl, frame.dt - t);
+      substep_cnt++;
+      std::cout << std::format("<<<<< Substep {}, dt = {} >>>>>", substep_cnt, dt)
+                << std::endl;
+      substep(dt);
+      t += dt;
+    }
+    frame.onAdvance();
   }
 
   ~FluidSimulator() override = default;
   void smoothFluidSurface(int iters);
   void applyCollider() const;
+  void applyForce(Real dt) const;
+  void applyDirichletBoundary() const;
+  void extrapolateFluidSdf(int iters) const;
 };
 }
 

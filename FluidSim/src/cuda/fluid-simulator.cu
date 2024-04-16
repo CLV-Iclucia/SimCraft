@@ -4,17 +4,18 @@
 #include <FluidSim/cuda/advect-solver.h>
 #include <FluidSim/cuda/project-solver.h>
 #include <FluidSim/cuda/utils.h>
+#include <FluidSim/cuda/vec-op.cuh>
 #include <cassert>
 
 namespace fluid::cuda {
 void FluidSimulator::applyForce(Real dt) const {
   vg->forEach([this, dt](int i, int j, int k) {
-    if (vValid->at(i, j, k) && j > 0 && j < vg->height() - 1)
-      vg->at(i, j, k) -= 9.8 * dt;
+    if (vValid.read(i, j, k) && j > 0 && j < vg->height() - 1)
+      vg.read(i, j, k) -= 9.8 * dt;
   });
 }
 
-void FluidSimulator::clear() {
+void FluidSimulator::clear() const {
   uValid->zero();
   vValid->zero();
   wValid->zero();
@@ -33,111 +34,124 @@ void FluidSimulator::clear() {
   p->zero();
 }
 
+static CUDA_GLOBAL void kernelSmooth(CudaSurfaceAccessor<Real> grid,
+                                     CudaSurfaceAccessor<Real> buf,
+                                     CudaSurfaceAccessor<uint8_t> valid,
+                                     CudaSurfaceAccessor<uint8_t> validBuf,
+                                     int3 resolution) {
+  get_and_restrict_tid_3d(i, j, k, resolution.x, resolution.y, resolution.z);
+  if (valid.read(i, j, k))
+    return;
+  Real sum = 0;
+  int count = 0;
+  if (i > 0) {
+    sum += grid.read(i - 1, j, k);
+    count++;
+  }
+  if (i < resolution.x - 1) {
+    sum += grid.read(i + 1, j, k);
+    count++;
+  }
+  if (j > 0) {
+    sum += grid.read(i, j - 1, k);
+    count++;
+  }
+  if (j < resolution.y - 1) {
+    sum += grid.read(i, j + 1, k);
+    count++;
+  }
+  if (k > 0) {
+    sum += grid.read(i, j, k - 1);
+    count++;
+  }
+  if (k < resolution.z - 1) {
+    sum += grid.read(i, j, k + 1);
+    count++;
+  }
+  Real val = fmin(grid.read(i, j, k), sum / count);
+  buf.write(val, i, j, k);
+}
+
 void FluidSimulator::smoothFluidSurface(int iters) {
   for (int iter = 0; iter < iters; iter++) {
-    fluidSurfaceBuf->grid.forEach([&](int i, int j, int k) {
-      Real sum = 0;
-      int count = 0;
-      if (i > 0) {
-        sum += fluidSurface->grid(i - 1, j, k);
-        count++;
-      }
-      if (i < fluidSurface->width() - 1) {
-        sum += fluidSurface->grid(i + 1, j, k);
-        count++;
-      }
-      if (j > 0) {
-        sum += fluidSurface->grid(i, j - 1, k);
-        count++;
-      }
-      if (j < fluidSurface->height() - 1) {
-        sum += fluidSurface->grid(i, j + 1, k);
-        count++;
-      }
-      if (k > 0) {
-        sum += fluidSurface->grid(i, j, k - 1);
-        count++;
-      }
-      if (k < fluidSurface->depth() - 1) {
-        sum += fluidSurface->grid(i, j, k + 1);
-        count++;
-      }
-      fluidSurfaceBuf->grid(i, j, k) = sum / count;
-      if (fluidSurface->grid(i, j, k) < fluidSurfaceBuf->grid(i, j, k))
-        fluidSurfaceBuf->grid(i, j, k) = fluidSurface->grid(i, j, k);
-    });
+    cudaSafeCheck(kernelSmooth<<<>>>());
     std::swap(fluidSurface, fluidSurfaceBuf);
   }
 }
-
+static CUDA_GLOBAL void kernelApplyCollider(CudaSurfaceAccessor<Real> ug,
+                                            CudaSurfaceAccessor<Real> vg,
+                                            CudaSurfaceAccessor<Real> wg,
+                                            CudaTextureAccessor<Real> colliderSdf,
+                                            int3 resolution,
+                                            Real h) {
+  get_and_restrict_tid_3d(i, j, k, resolution.x, resolution.y, resolution.z);
+  if (i == 0 || i == resolution.x) {
+    ug.write(0.0, i, j, k);
+    return;
+  }
+  auto pos =
+      make_float3(static_cast<float>(i * h), static_cast<float>((j + 0.5) * h), static_cast<float>((k + 0.5) * h));
+  double3 normal{normalize(grad(colliderSdf, pos, resolution, h))};
+  if (colliderSdf.sample(pos) < 0.0) {
+    // calc the normal, and project out the x component
+    Real val = ug.read(i, j, k);
+    ug.write(val - val * normal.x, i, j, k);
+  }
+  if (j == 0 || j == resolution.y) {
+    vg.write(0.0, i, j, k);
+    return;
+  }
+  pos = make_float3(static_cast<float>((i + 0.5) * h), static_cast<float>(j * h), static_cast<float>((k + 0.5) * h));
+  if (colliderSdf.sample(pos) < 0.0) {
+    Real val = vg.read(i, j, k);
+    vg.write(val - val * normal.y, i, j, k);
+  }
+  if (k == 0 || k == resolution.z) {
+    wg.write(0.0, i, j, k);
+    return;
+  }
+  pos = make_float3(static_cast<float>((i + 0.5) * h), static_cast<float>((j + 0.5) * h), static_cast<float>(k * h));
+  if (colliderSdf.sample(pos) < 0.0) {
+    Real val = wg.read(i, j, k);
+    wg.write(val - val * normal.z, i, j, k);
+  }
+}
 void FluidSimulator::applyCollider() const {
-  ug->parallelForEach([&](int i, int j, int k) {
-    if (i == 0 || i == ug->width() - 1) {
-      ug->at(i, j, k) = 0.0;
-      return;
-    }
-    Vec3d pos{ug->indexToCoord(i, j, k)};
-    if (colliderSdf->eval(pos) < 0.0) {
-      // calc the normal, and project out the x component
-      Vec3d normal{normalize(colliderSdf->grad(pos))};
-      ug->at(i, j, k) -= ug->at(i, j, k) * normal.x;
-    }
-  });
-  vg->parallelForEach([&](int i, int j, int k) {
-    if (j == 0 || j == vg->height() - 1) {
-      vg->at(i, j, k) = 0.0;
-      return;
-    }
-    Vec3d pos = vg->indexToCoord(i, j, k);
-    if (colliderSdf->eval(pos) < 0.0) {
-      Vec3d normal{normalize(colliderSdf->grad(pos))};
-      vg->at(i, j, k) -= vg->at(i, j, k) * normal.y;
-    }
-  });
-  wg->parallelForEach([&](int i, int j, int k) {
-    if (k == 0 || k == wg->depth() - 1) {
-      wg->at(i, j, k) = 0.0;
-      return;
-    }
-    Vec3d pos{wg->indexToCoord(i, j, k)};
-    if (colliderSdf->eval(pos) < 0.0) {
-      Vec3d normal{normalize(colliderSdf->grad(pos))};
-      wg->at(i, j, k) -= wg->at(i, j, k) * normal.z;
-    }
-  });
+
 }
 
 void FluidSimulator::applyDirichletBoundary() const {
-  for (int j = 0; j < ug->height(); j++) {
-    for (int k = 0; k < ug->depth(); k++) {
-      ug->at(0, j, k) = 0.0;
-      uValid->at(0, j, k) = 1;
-      ug->at(ug->width() - 1, j, k) = 0.0;
-      uValid->at(ug->width() - 1, j, k) = 1;
-    }
+
+}
+
+// here, resolution is the resolution of the grid
+// resolution is not necceasarily the same as the resolution of the fluid surface
+static void extrapolate(std::unique_ptr<CudaSurface<Real>> &grid,
+                        std::unique_ptr<CudaSurface<Real>> &buf,
+                        std::unique_ptr<CudaSurface<uint8_t>> &valid,
+                        std::unique_ptr<CudaSurface<uint8_t>> &validBuf,
+                        int3 resolution,
+                        int iters) {
+  for (int iter = 0; iter < iters; iter++) {
+    cudaSafeCheck(kernelSmooth<<<>>>(grid->accessor(), buf->accessor(),
+                                     valid->accessor(), validBuf->accessor(),
+                                     grid->resolution()));
+    std::swap(grid, buf);
+    std::swap(valid, validBuf);
   }
-  for (int i = 0; i < vg->width(); i++) {
-    for (int k = 0; k < vg->depth(); k++) {
-      vg->at(i, 0, k) = 0.0;
-      vValid->at(i, 0, k) = 1;
-      vg->at(i, vg->height() - 1, k) = 0.0;
-      vValid->at(i, vg->height() - 1, k) = 1;
-    }
-  }
-  for (int i = 0; i < wg->width(); i++) {
-    for (int j = 0; j < wg->height(); j++) {
-      wg->at(i, j, 0) = 0.0;
-      wValid->at(i, j, 0) = 1;
-      wg->at(i, j, wg->depth() - 1) = 0.0;
-      wValid->at(i, j, wg->depth() - 1) = 1;
-    }
+}
+
+void FluidSimulator::extrapolateFluidSdf(int iters) const {
+  for (int iter = 0; iter < iters; iter++) {
+    cudaSafeCheck(kernelSmooth<<<>>>());
+    std::swap(sdfValid, sdfValidBuf);
   }
 }
 
 void FluidSimulator::substep(Real dt) {
   clear();
   std::cout << "Solving advection... ";
-  advectionSolver->advect(*advectionSolver->particles, *u, *v, *w, p->dim, h, dt);
+  advectionSolver->advect(*advectionSolver->particles, *u, *v, *w, resolution, h, dt);
   std::cout << "Done." << std::endl;
   std::cout << "Reconstructing surface... ";
   fluidSurfaceReconstructor->reconstruct(
@@ -154,13 +168,13 @@ void FluidSimulator::substep(Real dt) {
   applyDirichletBoundary();
   std::cout << "Done." << std::endl;
   std::cout << "Extrapolating velocities... ";
-  extrapolate(ug, ubuf, uValid, uValidBuf, 10);
-  extrapolate(vg, vbuf, vValid, vValidBuf, 10);
-  extrapolate(wg, wbuf, wValid, wValidBuf, 10);
+  extrapolate(u, uBuf, uValid, uValidBuf, 10);
+  extrapolate(v, vBuf, vValid, vValidBuf, 10);
+  extrapolate(w, wBuf, wValid, wValidBuf, 10);
   std::cout << "Done." << std::endl;
   applyForce(dt);
   std::cout << "Building linear system... ";
-  projector->buildSystem(*ug, *vg, *wg, *fluidSurface, *colliderSdf, dt);
+  projector->buildSystem(*u, *v, *w, *fluidSurface, *colliderSdf, dt);
   std::cout << "Done." << std::endl;
   std::cout << "Solving linear system... ";
   if (Real residual{projector->solvePressure(*fluidSurface, pg)};
@@ -179,27 +193,10 @@ void FluidSimulator::substep(Real dt) {
 }
 
 Real FluidSimulator::CFL() const {
-  Real h{ug->gridSpacing().x};
-  Real cfl{h / 1e-6};
-  ug->forEach([&cfl, h, this](int x, int y, int z) {
-    assert(notNan(ug->at(x, y ,z)));
-    if (ug->at(x, y, z) != 0.0)
-      cfl = std::max(cfl, h / abs(ug->at(x, y, z)));
-  });
-  vg->forEach([&cfl, h, this](int x, int y, int z) {
-    assert(notNan(vg->at(x, y, z)));
-    if (vg->at(x, y, z) != 0.0)
-      cfl = std::max(cfl, h / abs(vg->at(x, y, z)));
-  });
-  wg->forEach([&cfl, h, this](int x, int y, int z) {
-    assert(notNan(wg->at(x, y, z)));
-    if (wg->at(x, y, z) != 0.0)
-      cfl = std::max(cfl, h / abs(wg->at(x, y, z)));
-  });
-  return cfl;
+
 }
 
-void FluidSimulator::step(core::Frame& frame) {
+void FluidSimulator::step(core::Frame &frame) {
   Real t = 0;
   std::cout << std::format("********* Frame {} *********", frame.idx) <<
             std::endl;

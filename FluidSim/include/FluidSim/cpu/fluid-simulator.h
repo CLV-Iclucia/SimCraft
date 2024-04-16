@@ -22,7 +22,7 @@ using spatify::CellCentredGrid;
 using spatify::FaceCentredGrid;
 using spatify::PaddedCellCentredGrid;
 
-class FluidSimulator final : FluidComputeBackend {
+class FluidSimulator final : public FluidComputeBackend {
 public:
   core::Timer timer;
   FluidSimulator(int n, const Vec3d& size, const Vec3i& resolution)

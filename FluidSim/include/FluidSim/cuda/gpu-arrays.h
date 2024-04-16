@@ -81,12 +81,11 @@ struct CudaArray3D : NonCopyable {
   }
 
   void zero() {
-    cudaMemset3D(cuda_array, 0, make_cudaExtent(dim.x * sizeof(T), dim.y, dim.z));
+    auto ptr = make_cudaPitchedPtr(static_cast<void *>(cuda_array), dim.x * sizeof(T), dim.x, dim.y);
+    cudaMemset3D(ptr, 0, make_cudaExtent(dim.x * sizeof(T), dim.y, dim.z));
   }
 
   [[nodiscard]] cudaArray *Array() const { return cuda_array; }
-
-  cudaArray_t *ArrayPtr() { return &cuda_array; }
 
   ~CudaArray3D() { cudaFreeArray(cuda_array); }
 };
@@ -139,7 +138,6 @@ struct CudaTextureAccessor {
   __device__ __forceinline__ T sample(float x, float y, float z) const {
     return tex3D<T>(m_cuTex, x, y, z);
   }
-
   __device__ __forceinline__ T sample(const float3 &pos) const {
     return tex3D<T>(m_cuTex, pos.x, pos.y, pos.z);
   }
