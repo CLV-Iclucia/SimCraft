@@ -8,11 +8,25 @@
 #include <cassert>
 
 namespace fluid::cuda {
+static CUDA_GLOBAL void kernelApplyForce(CudaSurfaceAccessor<Real> u,
+                                         CudaSurfaceAccessor<Real> v,
+                                         CudaSurfaceAccessor<Real> w,
+                                         double3 acceleration,
+                                         int3 resolution,
+                                         Real dt) {
+  get_and_restrict_tid_3d(i, j, k, resolution.x, resolution.y, resolution.z);
+  u.write(u.read(i, j, k) + acceleration.x * dt, i, j, k);
+  v.write(v.read(i, j, k) + acceleration.y * dt, i, j, k);
+  w.write(w.read(i, j, k) + acceleration.z * dt, i, j, k);
+}
 void FluidSimulator::applyForce(Real dt) const {
-  vg->forEach([this, dt](int i, int j, int k) {
-    if (vValid.read(i, j, k) && j > 0 && j < vg->height() - 1)
-      vg.read(i, j, k) -= 9.8 * dt;
-  });
+  cudaSafeCheck(kernelApplyForce<<<
+  LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(u->surfaceAccessor(),
+                                                                 v->surfaceAccessor(),
+                                                                 w->surfaceAccessor(),
+                                                                 make_double3(0, -9.8, 0),
+                                                                 resolution,
+                                                                 dt));
 }
 
 void FluidSimulator::clear() const {
@@ -74,7 +88,9 @@ static CUDA_GLOBAL void kernelSmooth(CudaSurfaceAccessor<Real> grid,
 
 void FluidSimulator::smoothFluidSurface(int iters) {
   for (int iter = 0; iter < iters; iter++) {
-    cudaSafeCheck(kernelSmooth<<<>>>());
+    cudaSafeCheck(kernelSmooth<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
+        fluidSurface->surfaceAccessor(), fluidSurfaceBuf->surfaceAccessor(),
+        sdfValid->surfaceAccessor(), sdfValidBuf->surfaceAccessor(), resolution));
     std::swap(fluidSurface, fluidSurfaceBuf);
   }
 }
@@ -133,17 +149,19 @@ static void extrapolate(std::unique_ptr<CudaSurface<Real>> &grid,
                         int3 resolution,
                         int iters) {
   for (int iter = 0; iter < iters; iter++) {
-    cudaSafeCheck(kernelSmooth<<<>>>(grid->accessor(), buf->accessor(),
-                                     valid->accessor(), validBuf->accessor(),
-                                     grid->resolution()));
+    cudaSafeCheck(kernelExtrapolate<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
+        grid->surfaceAccessor(), buf->surfaceAccessor(), valid->surfaceAccessor(),
+        validBuf->surfaceAccessor(), resolution));
     std::swap(grid, buf);
     std::swap(valid, validBuf);
   }
 }
 
-void FluidSimulator::extrapolateFluidSdf(int iters) const {
+void FluidSimulator::extrapolateFluidSdf(int iters) {
   for (int iter = 0; iter < iters; iter++) {
-    cudaSafeCheck(kernelSmooth<<<>>>());
+    cudaSafeCheck(kernelSmooth<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
+        fluidSurface->surfaceAccessor(), fluidSurfaceBuf->surfaceAccessor(),
+        sdfValid->surfaceAccessor(), sdfValidBuf->surfaceAccessor(), resolution));
     std::swap(sdfValid, sdfValidBuf);
   }
 }
@@ -151,65 +169,45 @@ void FluidSimulator::extrapolateFluidSdf(int iters) const {
 void FluidSimulator::substep(Real dt) {
   clear();
   std::cout << "Solving advection... ";
-  advectionSolver->advect(*advectionSolver->particles, *u, *v, *w, resolution, h, dt);
+  advectionSolver->advect(particles, *u, *v, *w, resolution, h, dt);
   std::cout << "Done." << std::endl;
   std::cout << "Reconstructing surface... ";
-  fluidSurfaceReconstructor->reconstruct(
-      m_particles.positions, 1.2 * ug->gridSpacing().x / std::sqrt(2.0),
-      *fluidSurface, *sdfValid);
+
   std::cout << "Done." << std::endl;
   std::cout << "Smoothing surface... ";
   extrapolateFluidSdf(10);
   smoothFluidSurface(5);
   std::cout << "Done." << std::endl;
   std::cout << "Solving P2G... ";
-  advector->solveP2G(std::span(positions()), *ug, *vg, *wg,
-                     *colliderSdf, uw, vw, ww, *uValid, *vValid, *wValid, dt);
+  advectionSolver->solveP2G(particles, *u, *v, *w,
+                            *colliderSdf, uw, vw, ww, *uValid, *vValid, *wValid, dt);
   applyDirichletBoundary();
   std::cout << "Done." << std::endl;
   std::cout << "Extrapolating velocities... ";
-  extrapolate(u, uBuf, uValid, uValidBuf, 10);
-  extrapolate(v, vBuf, vValid, vValidBuf, 10);
-  extrapolate(w, wBuf, wValid, wValidBuf, 10);
+  extrapolate(u, uBuf, uValid, uValidBuf, resolution, 5);
+  extrapolate(v, vBuf, vValid, vValidBuf, resolution, 5);
+  extrapolate(w, wBuf, wValid, wValidBuf, resolution, 5);
   std::cout << "Done." << std::endl;
   applyForce(dt);
   std::cout << "Building linear system... ";
-  projector->buildSystem(*u, *v, *w, *fluidSurface, *colliderSdf, dt);
+  projectionSolver->buildSystem(*u, *v, *w, *fluidSurface, *colliderSdf, resolution, h, dt);
   std::cout << "Done." << std::endl;
   std::cout << "Solving linear system... ";
-  if (Real residual{projector->solvePressure(*fluidSurface, pg)};
+  if (Real residual{projectionSolver->solvePressure(*fluidSurface, *p, resolution, h, dt)};
       residual > 1e-4)
     std::cerr << "Warning: projection residual is " << residual << std::endl;
   else std::cout << "Projection residual is " << residual << std::endl;
   std::cout << "Done." << std::endl;
   std::cout << "Doing projection and applying collider... ";
-  projector->project(*ug, *vg, *wg, pg, *fluidSurface, *colliderSdf, dt);
+  projectionSolver->project(*u, *v, *w, *fluidSurface, *colliderSdf, *p, resolution, h, dt);
   applyCollider();
   std::cout << "Done." << std::endl;
   std::cout << "Solving G2P... ";
-  advector->solveG2P(std::span(positions()), *ug, *vg, *wg,
-                     *colliderSdf, dt);
+  advectionSolver->solveG2P(, *u, *v, *w, *colliderSdf, dt);
   std::cout << "Done" << std::endl;
 }
 
 Real FluidSimulator::CFL() const {
 
-}
-
-void FluidSimulator::step(core::Frame &frame) {
-  Real t = 0;
-  std::cout << std::format("********* Frame {} *********", frame.idx) <<
-            std::endl;
-  int substep_cnt = 0;
-  while (t < frame.dt) {
-    Real cfl = CFL();
-    Real dt = std::min(cfl, frame.dt - t);
-    substep_cnt++;
-    std::cout << std::format("<<<<< Substep {}, dt = {} >>>>>", substep_cnt, dt)
-              << std::endl;
-    substep(dt);
-    t += dt;
-  }
-  frame.onAdvance();
 }
 }

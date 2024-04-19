@@ -9,11 +9,11 @@
 #include <FluidSim/cuda/gpu-arrays.h>
 #include <FluidSim/cuda/project-solver.h>
 #include <FluidSim/cuda/advect-solver.h>
-
+#include <format>
 namespace fluid::cuda {
 class FluidSimulator final : public FluidComputeBackend {
  public:
-  FluidSimulator(int nParticles_, const Vec3d& size, const Vec3i& resolution) {
+  FluidSimulator(int nParticles_, const Vec3d &size, const Vec3i &resolution) {
 
   }
   void setCollider(const Mesh &collider_mesh) const override {
@@ -28,15 +28,15 @@ class FluidSimulator final : public FluidComputeBackend {
 
   void setProjector(ProjectSolver project_solver) override {
     if (project_solver == ProjectSolver::FVM) {
-      projectSolver = std::make_unique<FvmSolver>(resolution.x, resolution.y,
-                                                  resolution.z);
+      projectionSolver = std::make_unique<FvmSolver>(resolution.x, resolution.y,
+                                                     resolution.z);
     } else {
       ERROR("Invalid project solver");
     }
   }
   void setCompressedSolver(CompressedSolverMethod solver_method,
                            PreconditionerMethod preconditioner_method) override {
-    projectSolver->setCompressedSolver(solver_method, preconditioner_method);
+    projectionSolver->setCompressedSolver(solver_method, preconditioner_method);
   }
   int3 resolution;
   Real h;
@@ -44,14 +44,12 @@ class FluidSimulator final : public FluidComputeBackend {
   std::unique_ptr<CudaTexture<double>> colliderSdf;
   std::unique_ptr<CudaTexture<double>> u, v, w, uBuf, vBuf, wBuf;
   std::unique_ptr<CudaSurface<double>> uw, vw, ww, p;
-  std::unique_ptr<CudaSurface<uint8_t>>
-      uValid, vValid, wValid, uValidBuf, vValidBuf, wValidBuf, sdfValid,
-      sdfValidBuf;
-  std::unique_ptr<ProjectionSolver> projectSolver{};
+  std::unique_ptr<CudaSurface<uint8_t>> uValid, vValid, wValid, uValidBuf, vValidBuf, wValidBuf, sdfValid, sdfValidBuf;
+  std::unique_ptr<ProjectionSolver> projectionSolver{};
   std::unique_ptr<AdvectionSolver> advectionSolver{};
   void substep(Real dt);
   double CFL() const;
-  void step(core::Frame& frame) {
+  void step(core::Frame &frame) {
     Real t = 0;
     std::cout << std::format("********* Frame {} *********", frame.idx) <<
               std::endl;
@@ -69,11 +67,12 @@ class FluidSimulator final : public FluidComputeBackend {
   }
 
   ~FluidSimulator() override = default;
+  void clear() const;
   void smoothFluidSurface(int iters);
   void applyCollider() const;
   void applyForce(Real dt) const;
   void applyDirichletBoundary() const;
-  void extrapolateFluidSdf(int iters) const;
+  void extrapolateFluidSdf(int iters);
 };
 }
 

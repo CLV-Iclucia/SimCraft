@@ -37,6 +37,8 @@ class ProjectionSolver {
       Real dt) = 0;
   virtual Real solvePressure(const CudaSurface<Real> &fluidSdf,
                              CudaSurface<Real> &p,
+                             int3 resolution,
+                             Real h,
                              Real dt) = 0;
   virtual void project(const CudaSurface<Real> &ug,
                        const CudaSurface<Real> &vg,
@@ -85,24 +87,24 @@ struct CompressedSystem : core::DeviceMemoryAccessible<CompressedSystem> {
   }
 
   Accessor<CompressedSystem> accessor() {
-    return {diag->surfAccessor(),
-            {neighbour[0]->surfAccessor(),
-             neighbour[1]->surfAccessor(),
-             neighbour[2]->surfAccessor(),
-             neighbour[3]->surfAccessor(),
-             neighbour[4]->surfAccessor(),
-             neighbour[5]->surfAccessor()},
-            rhs->surfAccessor()};
+    return {diag->surfaceAccessor(),
+            {neighbour[0]->surfaceAccessor(),
+             neighbour[1]->surfaceAccessor(),
+             neighbour[2]->surfaceAccessor(),
+             neighbour[3]->surfaceAccessor(),
+             neighbour[4]->surfaceAccessor(),
+             neighbour[5]->surfaceAccessor()},
+            rhs->surfaceAccessor()};
   }
   [[nodiscard]] ConstAccessor<CompressedSystem> constAccessor() const {
-    return {diag->surfAccessor(),
-            {neighbour[0]->surfAccessor(),
-             neighbour[1]->surfAccessor(),
-             neighbour[2]->surfAccessor(),
-             neighbour[3]->surfAccessor(),
-             neighbour[4]->surfAccessor(),
-             neighbour[5]->surfAccessor()},
-            rhs->surfAccessor()};
+    return {diag->surfaceAccessor(),
+            {neighbour[0]->surfaceAccessor(),
+             neighbour[1]->surfaceAccessor(),
+             neighbour[2]->surfaceAccessor(),
+             neighbour[3]->surfaceAccessor(),
+             neighbour[4]->surfaceAccessor(),
+             neighbour[5]->surfaceAccessor()},
+            rhs->surfaceAccessor()};
   }
 };
 
@@ -199,6 +201,8 @@ class FvmSolver final : public ProjectionSolver {
 
   Real solvePressure(const CudaSurface<Real> &fluidSdf,
                      CudaSurface<Real> &pg,
+                     int3 resolution,
+                     Real h,
                      Real dt) override {
     return solver->solve(*sys, *active, pg);
   }

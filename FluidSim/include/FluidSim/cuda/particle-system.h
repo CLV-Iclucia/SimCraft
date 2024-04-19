@@ -6,18 +6,20 @@
 #define SIM_CRAFT_PARTICLE_SYSTEM_H
 #include <memory>
 #include <FluidSim/cuda/gpu-arrays.h>
-
+#include <FluidSim/fluid-sim.h>
 namespace fluid::cuda {
 struct VelAccessor {
   Accessor<DeviceArray<Real>> vx;
   Accessor<DeviceArray<Real>> vy;
   Accessor<DeviceArray<Real>> vz;
 
-  [[nodiscard]] Real3 read(int idx) const {
-    return make_Real3(vx[idx], vy[idx], vz[idx]);
+  CUDA_DEVICE CUDA_FORCEINLINE
+  double3 read(int idx) const {
+    return make_double3(vx[idx], vy[idx], vz[idx]);
   }
 
-  void write(int idx, const Real3& val) {
+  CUDA_DEVICE CUDA_FORCEINLINE
+  void write(int idx, const double3& val) {
     vx[idx] = val.x;
     vy[idx] = val.y;
     vz[idx] = val.z;
@@ -29,11 +31,13 @@ struct PosAccessor {
   Accessor<DeviceArray<Real>> py;
   Accessor<DeviceArray<Real>> pz;
 
-  [[nodiscard]] Real3 read(int idx) const {
-    return make_Real3(px[idx], py[idx], pz[idx]);
+  CUDA_DEVICE CUDA_FORCEINLINE
+  double3 read(int idx) const {
+    return make_double3(px[idx], py[idx], pz[idx]);
   }
 
-  void write(int idx, const Real3& val) {
+  CUDA_DEVICE CUDA_FORCEINLINE
+  void write(int idx, const double3& val) {
     px[idx] = val.x;
     py[idx] = val.y;
     pz[idx] = val.z;

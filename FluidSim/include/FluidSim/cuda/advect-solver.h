@@ -10,8 +10,7 @@
 
 namespace fluid::cuda {
 struct AdvectionSolver {
-  std::unique_ptr<ParticleSystem> particles;
-  virtual void advect(const ParticleSystem &particles,
+  virtual void advect(ParticleSystem &particles,
                       const CudaTexture<Real> &u,
                       const CudaTexture<Real> &v,
                       const CudaTexture<Real> &w,
@@ -41,7 +40,7 @@ struct AdvectionSolver {
 };
 
 struct PicSolver final : AdvectionSolver {
-  void advect(const ParticleSystem &particles,
+  void advect(ParticleSystem &particles,
               const CudaTexture<Real> &u,
               const CudaTexture<Real> &v,
               const CudaTexture<Real> &w,

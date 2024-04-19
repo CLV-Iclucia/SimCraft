@@ -98,7 +98,7 @@ static void applyCompressedMatrix(const CompressedSystem &sys,
                                   CudaSurface<Real> &b,
                                   int3 resolution) {
   cudaSafeCheck(kernrelApplyCompressedMatrix<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
-      sys.constAccessor(), x.surfAccessor(), active.surfAccessor(), b.surfAccessor(), resolution));
+      sys.constAccessor(), x.surfaceAccessor(), active.surfaceAccessor(), b.surfaceAccessor(), resolution));
 }
 
 static CUDA_GLOBAL void kernelSaxpy(CudaSurfaceAccessor<Real> x,
@@ -128,7 +128,7 @@ static void scaleAndAdd(CudaSurface<Real> &x,
                         const CudaSurface<uint8_t> &active,
                         int3 resolution) {
   cudaSafeCheck(kernelScaleAndAdd<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
-      x.surfAccessor(), y.surfAccessor(), alpha, active.surfAccessor(), resolution));
+      x.surfaceAccessor(), y.surfaceAccessor(), alpha, active.surfaceAccessor(), resolution));
 }
 
 static CUDA_GLOBAL void kernelDotProduct(CudaSurfaceAccessor<Real> surfaceA,
@@ -177,7 +177,7 @@ static void saxpy(CudaSurface<Real> &x,
                   const CudaSurface<uint8_t> &active,
                   int3 resolution) {
   cudaSafeCheck(kernelSaxpy<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
-      x.surfAccessor(), y.surfAccessor(), alpha, active.surfAccessor(), resolution));
+      x.surfaceAccessor(), y.surfaceAccessor(), alpha, active.surfaceAccessor(), resolution));
 }
 
 Real CgSolver::dotProduct(const CudaSurface<Real> &surfaceA,
@@ -188,7 +188,8 @@ Real CgSolver::dotProduct(const CudaSurface<Real> &surfaceA,
       * (resolution.y + kThreadBlockSize3D - 1) / kThreadBlockSize3D
       * (resolution.z + kThreadBlockSize3D - 1) / kThreadBlockSize3D;
   cudaSafeCheck(kernelDotProduct<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
-      surfaceA.surfAccessor(), surfaceB.surfAccessor(), active.surfAccessor(), device_reduce_buffer->accessor(), resolution));
+      surfaceA.surfaceAccessor(), surfaceB.surfaceAccessor(),
+      active.surfaceAccessor(), device_reduce_buffer->accessor(), resolution));
   device_reduce_buffer->copyTo(host_reduce_buffer);
   Real sum = 0.0;
   for (int i = 0; i < block_num; i++)
@@ -374,7 +375,7 @@ Real CgSolver::L1Norm(const CudaSurface<Real> &surface,
       * (resolution.y + kThreadBlockSize3D - 1) / kThreadBlockSize3D
       * (resolution.z + kThreadBlockSize3D - 1) / kThreadBlockSize3D;
   cudaSafeCheck(kernelL1Norm<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
-      surface.surfAccessor(), active.surfAccessor(), device_reduce_buffer->accessor(), resolution));
+      surface.surfaceAccessor(), active.surfaceAccessor(), device_reduce_buffer->accessor(), resolution));
   device_reduce_buffer->copyTo(host_reduce_buffer);
   Real sum = 0.0;
   for (int i = 0; i < block_num; i++)
@@ -483,6 +484,14 @@ void FvmSolver::buildSystem(const CudaSurface<Real> &ug,
   vWeights->zero();
   wWeights->zero();
   active->zero();
+  cudaSafeCheck(kernelComputeAreaWeights<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
+      uWeights->surfaceAccessor(), vWeights->surfaceAccessor(), wWeights->surfaceAccessor(),
+      fluidSdf.surfaceAccessor(), colliderSdf.texAccessor(), resolution, h));
+    cudaSafeCheck(kernelComputeMatrix<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
+        sys->accessor(), uWeights->surfaceAccessor(), vWeights->surfaceAccessor(), wWeights->surfaceAccessor(),
+        sys->rhs->surfaceAccessor(), active->surfaceAccessor(),
+        ug.surfaceAccessor(), vg.surfaceAccessor(), wg.surfaceAccessor(),
+        fluidSdf.surfaceAccessor(), h, dt, resolution));
 }
 Real CgSolver::solve(const CompressedSystem &sys,
                      const CudaSurface<uint8_t> &active,

@@ -124,7 +124,7 @@ struct CudaSurface : CudaArray3D<T> {
 
   [[nodiscard]] cudaSurfaceObject_t surface() const { return cuda_surf; }
 
-  CudaSurfaceAccessor<T> surfAccessor() const { return {cuda_surf}; }
+  CudaSurfaceAccessor<T> surfaceAccessor() const { return {cuda_surf}; }
   ~CudaSurface() { cudaDestroySurfaceObject(cuda_surf); }
 };
 

@@ -61,7 +61,7 @@ static CUDA_GLOBAL void kernelPicP2G(int nParticles,
 
 }
 
-void PicSolver::advect(const ParticleSystem &particles,
+void PicSolver::advect(ParticleSystem &particles,
                        const CudaTexture<Real> &u,
                        const CudaTexture<Real> &v,
                        const CudaTexture<Real> &w,

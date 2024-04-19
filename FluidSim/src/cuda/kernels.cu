@@ -2,15 +2,11 @@
 #include <FluidSim/cuda/gpu-arrays.h>
 #include <FluidSim/cuda/vec-op.cuh>
 
-namespace fluid {
+namespace fluid::cuda{
 __global__ void AdvectKernel(CudaTextureAccessor<float4> texVel,
                              CudaSurfaceAccessor<float4> surf_loc, uint n,
                              float dt) {
-  int x = threadIdx.x + blockDim.x * blockIdx.x;
-  int y = threadIdx.y + blockDim.y * blockIdx.y;
-  int z = threadIdx.z + blockDim.z * blockIdx.z;
-  if (x >= n || y >= n || z >= n)
-    return;
+  get_and_restrict_tid_3d(x, y, z, n, n, n);
   auto sample = [](CudaTextureAccessor<float4> tex, float3 loc) -> float3 {
     auto [x, y, z, w] = tex.sample(loc.x, loc.y, loc.z);
     return make_float3(x, y, z);
@@ -28,11 +24,7 @@ __global__ void AdvectKernel(CudaTextureAccessor<float4> texVel,
 __global__ void DivergenceKernel(CudaSurfaceAccessor<float4> surf_vel,
                                  CudaSurfaceAccessor<float> surf_div,
                                  uint n) {
-  int x = threadIdx.x + blockDim.x * blockIdx.x;
-  int y = threadIdx.y + blockDim.y * blockIdx.y;
-  int z = threadIdx.z + blockDim.z * blockIdx.z;
-  if (x >= n || y >= n || z >= n)
-    return;
+  get_and_restrict_tid_3d(x, y, z, n, n, n);
   float vxn = surf_vel.read<cudaBoundaryModeZero>(x + 1, y, z).x;
   float vxp = surf_vel.read<cudaBoundaryModeZero>(x - 1, y, z).x;
   float vyn = surf_vel.read<cudaBoundaryModeZero>(x, y + 1, z).y;
@@ -46,11 +38,7 @@ __global__ void DivergenceKernel(CudaSurfaceAccessor<float4> surf_vel,
 __global__ void CurlKernel(CudaSurfaceAccessor<float4> surf_vel,
                            CudaSurfaceAccessor<float4> surf_curl,
                            uint n) {
-  int x = threadIdx.x + blockDim.x * blockIdx.x;
-  int y = threadIdx.y + blockDim.y * blockIdx.y;
-  int z = threadIdx.z + blockDim.z * blockIdx.z;
-  if (x >= n || y >= n || z >= n)
-    return;
+  get_and_restrict_tid_3d(x, y, z, n, n, n);
   float vxny = surf_vel.read<cudaBoundaryModeZero>(x, y + 1, z).x;
   float vxpy = surf_vel.read<cudaBoundaryModeZero>(x, y - 1, z).x;
   float vxnz = surf_vel.read<cudaBoundaryModeZero>(x, y, z + 1).x;
@@ -78,11 +66,7 @@ __global__ void CurlKernel(CudaSurfaceAccessor<float4> surf_vel,
 __global__ void JacobiKernel(CudaSurfaceAccessor<float> surf_div,
                              CudaSurfaceAccessor<float> surf_p,
                              CudaSurfaceAccessor<float> surf_p_nxt, uint n) {
-  int x = threadIdx.x + blockDim.x * blockIdx.x;
-  int y = threadIdx.y + blockDim.y * blockIdx.y;
-  int z = threadIdx.z + blockDim.z * blockIdx.z;
-  if (x >= n || y >= n || z >= n)
-    return;
+  get_and_restrict_tid_3d(x, y, z, n, n, n);
   float pxp = surf_p.read<cudaBoundaryModeClamp>(x - 1, y, z);
   float pxn = surf_p.read<cudaBoundaryModeClamp>(x + 1, y, z);
   float pyp = surf_p.read<cudaBoundaryModeClamp>(x, y - 1, z);
@@ -96,11 +80,7 @@ __global__ void JacobiKernel(CudaSurfaceAccessor<float> surf_div,
 __global__ void SubgradientKernel(CudaSurfaceAccessor<float> surf_p,
                                   CudaSurfaceAccessor<float4> surf_vel,
                                   float4 src_vel, uint n) {
-  int x = threadIdx.x + blockDim.x * blockIdx.x;
-  int y = threadIdx.y + blockDim.y * blockIdx.y;
-  int z = threadIdx.z + blockDim.z * blockIdx.z;
-  if (x >= n || y >= n || z >= n)
-    return;
+  get_and_restrict_tid_3d(x, y, z, n, n, n);
   //  if (surf_bound.read(x, y, z) < 0) return ;
   float pxp = surf_p.read<cudaBoundaryModeClamp>(x - 1, y, z);
   float pxn = surf_p.read<cudaBoundaryModeClamp>(x + 1, y, z);
@@ -122,11 +102,7 @@ __global__ void AccumulateForceKernel(CudaSurfaceAccessor<float4> surf_force,
                                       uint n, float alpha, float beta,
                                       float epsilon,
                                       float ambientTemperature, float dt) {
-  int x = threadIdx.x + blockDim.x * blockIdx.x;
-  int y = threadIdx.y + blockDim.y * blockIdx.y;
-  int z = threadIdx.z + blockDim.z * blockIdx.z;
-  if (x >= n || y >= n || z >= n)
-    return;
+  get_and_restrict_tid_3d(x, y, z, n, n, n);
   // Buoyancy = -alpha * (T - T_ambient) * z + beta * (T - T_ambient) * z
   float T = surf_T.read(x, y, z);
   float rho = surf_rho.read(x, y, z);
@@ -157,11 +133,7 @@ __global__ void ApplyForceKernel(CudaSurfaceAccessor<float4> surf_vel,
                                  CudaSurfaceAccessor<float4> surf_vel_nxt,
                                  CudaSurfaceAccessor<float4> surf_force, uint n,
                                  float dt) {
-  int x = threadIdx.x + blockDim.x * blockIdx.x;
-  int y = threadIdx.y + blockDim.y * blockIdx.y;
-  int z = threadIdx.z + blockDim.z * blockIdx.z;
-  if (x >= n || y >= n || z >= n)
-    return;
+  get_and_restrict_tid_3d(x, y, z, n, n, n);
   float4 vel = surf_vel.read(x, y, z);
   float4 force = surf_force.read(x, y, z);
   surf_vel_nxt.write(vel + dt * force, x, y, z);
@@ -171,11 +143,7 @@ __global__ void CoolingKernel(CudaSurfaceAccessor<float> surf_T,
                               CudaSurfaceAccessor<float> surf_rho,
                               CudaSurfaceAccessor<float> surf_rho_nxt,
                               uint n, float ambientTemperature, float dt) {
-  int x = threadIdx.x + blockDim.x * blockIdx.x;
-  int y = threadIdx.y + blockDim.y * blockIdx.y;
-  int z = threadIdx.z + blockDim.z * blockIdx.z;
-  if (x >= n || y >= n || z >= n)
-    return;
+  get_and_restrict_tid_3d(x, y, z, n, n, n);
   float rho = surf_rho.read(x, y, z);
   float T = surf_T.read(x, y, z);
   float txp = surf_T.read<cudaBoundaryModeClamp>(x + 1, y, z);
@@ -192,9 +160,7 @@ __global__ void CoolingKernel(CudaSurfaceAccessor<float> surf_T,
 __global__ void SmoothingKernel(CudaSurfaceAccessor<float> surf_rho,
                                 CudaSurfaceAccessor<float> surf_rho_nxt,
                                 uint n) {
-  int x = threadIdx.x + blockDim.x * blockIdx.x;
-  int y = threadIdx.y + blockDim.y * blockIdx.y;
-  int z = threadIdx.z + blockDim.z * blockIdx.z;
+  get_and_restrict_tid_3d(x, y, z, n, n, n);
   if (withinSource(x, y, z, n))
     return;
   float rxp = surf_rho.read<cudaBoundaryModeClamp>(x + 1, y, z);
