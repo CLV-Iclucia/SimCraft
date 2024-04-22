@@ -31,7 +31,7 @@ class ProjectionSolver {
       const CudaSurface<Real> &vg,
       const CudaSurface<Real> &wg,
       const CudaSurface<Real> &fluidSdf,
-      const CudaSurface<Real> &colliderSdf,
+      const CudaTexture<Real> &colliderSdf,
       int3 resolution,
       Real h,
       Real dt) = 0;
@@ -44,7 +44,7 @@ class ProjectionSolver {
                        const CudaSurface<Real> &vg,
                        const CudaSurface<Real> &wg,
                        const CudaSurface<Real> &fluidSdf,
-                       const CudaSurface<Real> &colliderSdf,
+                       const CudaTexture<Real> &colliderSdf,
                        CudaSurface<Real> &pg,
                        int3 resolution,
                        Real h,
@@ -116,7 +116,8 @@ class CompressedSolver {
 
   virtual Real solve(const CompressedSystem &sys,
                      const CudaSurface<uint8_t> &active,
-                     CudaSurface<Real> &pg) = 0;
+                     CudaSurface<Real> &pg,
+                     int3 resolution)= 0;
   virtual void setPreconditioner(PreconditionerMethod precond_method) = 0;
   virtual ~CompressedSolver() = default;
 
@@ -136,8 +137,7 @@ class Preconditioner {
 
 class CgSolver final : public CompressedSolver {
  public:
-  CgSolver(int w, int h, int d)
-      : CompressedSolver(w, h, d) {
+  CgSolver(int w, int h, int d) : CompressedSolver(w, h, d) {
     z = std::make_unique<CudaSurface<Real>>(make_uint3(w, h, d));
     s = std::make_unique<CudaSurface<Real>>(make_uint3(w, h, d));
     device_reduce_buffer = std::make_unique<DeviceArray<Real>>(
@@ -149,7 +149,8 @@ class CgSolver final : public CompressedSolver {
 
   Real solve(const CompressedSystem &sys,
              const CudaSurface<uint8_t> &active,
-             CudaSurface<Real> &pg) override;
+             CudaSurface<Real> &pg,
+             int3 resolution) override;
 
   void setPreconditioner(PreconditionerMethod precond_method) override {
     if (precond_method == PreconditionerMethod::ModifiedIncompleteCholesky) {
@@ -176,7 +177,6 @@ class CgSolver final : public CompressedSolver {
   mutable std::vector<Real> host_reduce_buffer{};
   Real tolerance = 1e-6;
   int max_iterations = 300;
-  Real solve(const CompressedSystem &sys, const CudaSurface <uint8_t> &active, CudaSurface <Real> &pg, int3 resolution);
 };
 
 class FvmSolver final : public ProjectionSolver {
@@ -194,7 +194,7 @@ class FvmSolver final : public ProjectionSolver {
       const CudaSurface<Real> &v,
       const CudaSurface<Real> &w,
       const CudaSurface<Real> &fluidSdf,
-      const CudaSurface<Real> &colliderSdf,
+      const CudaTexture<Real> &colliderSdf,
       int3 resolution,
       Real h,
       Real dt) override;
@@ -204,20 +204,20 @@ class FvmSolver final : public ProjectionSolver {
                      int3 resolution,
                      Real h,
                      Real dt) override {
-    return solver->solve(*sys, *active, pg);
+    return solver->solve(*sys, *active, pg, resolution);
   }
 
   void project(const CudaSurface<Real> &ug,
                const CudaSurface<Real> &vg,
                const CudaSurface<Real> &wg,
                const CudaSurface<Real> &fluidSdf,
-               const CudaSurface<Real> &colliderSdf,
+               const CudaTexture<Real> &colliderSdf,
                CudaSurface<Real> &pg,
                int3 resolution,
                Real h,
                Real dt) override {
     buildSystem(ug, vg, wg, fluidSdf, colliderSdf, resolution, h, dt);
-    Real residual = solvePressure(fluidSdf, pg, dt);
+    Real residual = solvePressure(fluidSdf, pg, resolution, h, dt);
     if (residual > 1e-6)
       ERROR("Pressure solve did not converge");
   }

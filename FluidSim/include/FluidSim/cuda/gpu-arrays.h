@@ -249,6 +249,7 @@ struct DeviceArray : core::DeviceMemoryAccessible<DeviceArray<T>> {
   }
 
   void resize(size_t size_) {
+    if (m_size == size_) return;
     if (ptr)
       cudaFree(ptr);
     m_size = size_;

@@ -63,6 +63,14 @@ __device__ __forceinline__ float3 &operator-=(float3 &a, const float3 &b) {
 __device__ __forceinline__ float norm(const float4 &vec) {
   return sqrtf(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
 }
+__device__ __forceinline__ float distance(const float3 &a, const float3 &b) {
+  return sqrtf((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) +
+              (a.z - b.z) * (a.z - b.z));
+}
+__device__ __forceinline__ double distance(const double3 &a, const double3 &b) {
+  return sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) +
+              (a.z - b.z) * (a.z - b.z));
+}
 __device__ __forceinline__ float norm(const float3 &vec) {
   return sqrtf(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
 }

@@ -468,7 +468,7 @@ void FvmSolver::buildSystem(const CudaSurface<Real> &ug,
                             const CudaSurface<Real> &vg,
                             const CudaSurface<Real> &wg,
                             const CudaSurface<Real> &fluidSdf,
-                            const CudaSurface<Real> &colliderSdf,
+                            const CudaTexture<Real> &colliderSdf,
                             int3 resolution,
                             Real h,
                             Real dt) {
