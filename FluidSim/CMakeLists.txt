@@ -9,8 +9,10 @@ file(GLOB_RECURSE gpu_headers CONFIGURE_DEPENDS include/FluidSim/cuda/*.h includ
 file(GLOB common_headers CONFIGURE_DEPENDS include/FluidSim/*.h)
 file(GLOB common_srcs CONFIGURE_DEPENDS src/*.cc src/*.cpp)
 
-add_library(CpuFluid STATIC ${cpu_srcs} ${cpu_headers} ${common_headers} ${common_srcs})
-add_library(GpuFluid STATIC ${gpu_srcs} ${gpu_headers} ${common_headers} ${common_srcs})
+add_library(CpuFluid STATIC ${cpu_srcs} ${cpu_headers} ${common_headers} ${common_srcs}
+        include/FluidSim/cuda/rebuild-surface.h)
+add_library(GpuFluid STATIC ${gpu_srcs} ${gpu_headers} ${common_headers} ${common_srcs}
+        src/cuda/rebuild-surface.cu)
 
 target_include_directories(CpuFluid PUBLIC include)
 target_include_directories(GpuFluid PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} include)

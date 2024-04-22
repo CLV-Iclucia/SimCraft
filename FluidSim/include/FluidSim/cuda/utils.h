@@ -21,8 +21,6 @@ CUDA_FORCEINLINE CUDA_CALLABLE int3 getCellIndex(double3 p, double h) {
                    static_cast<int>(p.z / h));
 }
 
-CUDA_FORCEINLINE CUDA_DEVICE
-
 CUDA_FORCEINLINE CUDA_DEVICE double3 grad(CudaTextureAccessor<Real> field,
                                           const float3& pos, int3 resolution, Real h) {
 

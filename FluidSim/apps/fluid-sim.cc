@@ -256,7 +256,7 @@ int main(int argc, char** argv) {
       simulator->reconstruct();
       simulator->smoothFluidSurface(5);
       core::Mesh fluidMesh;
-      fluid::rebuildSurface(fluidMesh, simulator->exportFluidSurface());
+      fluid::cpu::rebuildSurface(fluidMesh, simulator->exportFluidSurface());
       if (!core::exportObj("fluid.obj", fluidMesh)) {
         std::cerr << "Failed to export fluid mesh" << std::endl;
         exit(-1);

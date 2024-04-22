@@ -7,6 +7,7 @@
 
 #include <cuda_runtime.h>
 #include <Core/properties.h>
+#include <memory>
 #include <iostream>
 
 static constexpr int kThreadBlockSize = 128;

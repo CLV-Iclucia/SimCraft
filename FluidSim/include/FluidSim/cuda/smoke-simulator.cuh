@@ -10,6 +10,10 @@
 #include <memory>
 
 namespace fluid::cuda {
+struct SmokeProjectionSolver : core::NonCopyable {
+
+};
+
 struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
   uint n;
   std::unique_ptr<CudaSurface<float4>> loc;

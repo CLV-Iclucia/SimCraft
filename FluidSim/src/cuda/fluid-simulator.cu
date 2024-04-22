@@ -169,7 +169,7 @@ void FluidSimulator::extrapolateFluidSdf(int iters) {
 void FluidSimulator::substep(Real dt) {
   clear();
   std::cout << "Solving advection... ";
-  advectionSolver->advect(particles, *u, *v, *w, resolution, h, dt);
+  advectionSolver->advect(*particles, *u, *v, *w, resolution, h, dt);
   std::cout << "Done." << std::endl;
   std::cout << "Reconstructing surface... ";
 
@@ -179,7 +179,7 @@ void FluidSimulator::substep(Real dt) {
   smoothFluidSurface(5);
   std::cout << "Done." << std::endl;
   std::cout << "Solving P2G... ";
-  advectionSolver->solveP2G(particles, *u, *v, *w,
+  advectionSolver->solveP2G(*particles, *u, *v, *w,
                             *colliderSdf, uw, vw, ww, *uValid, *vValid, *wValid, dt);
   applyDirichletBoundary();
   std::cout << "Done." << std::endl;
@@ -203,7 +203,7 @@ void FluidSimulator::substep(Real dt) {
   applyCollider();
   std::cout << "Done." << std::endl;
   std::cout << "Solving G2P... ";
-  advectionSolver->solveG2P(, *u, *v, *w, *colliderSdf, dt);
+  advectionSolver->solveG2P(*particles, *u, *v, *w, resolution, h, dt);
   std::cout << "Done" << std::endl;
 }
 

@@ -47,6 +47,7 @@ class FluidSimulator final : public FluidComputeBackend {
   std::unique_ptr<CudaSurface<uint8_t>> uValid, vValid, wValid, uValidBuf, vValidBuf, wValidBuf, sdfValid, sdfValidBuf;
   std::unique_ptr<ProjectionSolver> projectionSolver{};
   std::unique_ptr<AdvectionSolver> advectionSolver{};
+  std::unique_ptr<ParticleSystem> particles{};
   void substep(Real dt);
   double CFL() const;
   void step(core::Frame &frame) {
