@@ -208,7 +208,10 @@ int main(int argc, char** argv) {
     return -1;
   }
   relocateMesh(colliderMesh, size);
-
+  if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+    std::cerr << "Failed to initialize GLAD" << std::endl;
+    return -1;
+  }
   simulator->setCollider(colliderMesh);
   simulator->setAdvector(fluid::AdvectionMethod::PIC);
   simulator->setProjector(fluid::ProjectSolver::FVM);
@@ -216,10 +219,6 @@ int main(int argc, char** argv) {
   simulator->setParticleReconstructor(fluid::ReconstructionMethod::Naive);
   simulator->setCompressedSolver(fluid::CompressedSolverMethod::CG,
                                  fluid::PreconditionerMethod::ModifiedIncompleteCholesky);
-  if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-    std::cerr << "Failed to initialize GLAD" << std::endl;
-    return -1;
-  }
   simulator->reconstruct();
   simulator->smoothFluidSurface(5);
   simulator->extrapolateFluidSdf(10);

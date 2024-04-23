@@ -104,7 +104,7 @@ int main(int argc, char** argv) {
   Options opt = parseOptions(argc, argv);
   GLFWwindow* window;
   if (!initGLFW(window)) return -1;
-  auto simulator = std::make_unique<fluid::GpuSmokeSimulator>(opt.resolution);
+  auto simulator = std::make_unique<fluid::cuda::GpuSmokeSimulator>(opt.resolution);
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
     std::cerr << "Failed to initialize GLAD" << std::endl;
     return -1;

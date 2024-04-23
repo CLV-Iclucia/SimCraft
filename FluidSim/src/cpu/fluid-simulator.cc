@@ -4,8 +4,6 @@
 #include <Core/animation.h>
 #include <Core/rand-gen.h>
 #include <FluidSim/cpu/fluid-simulator.h>
-#include <FluidSim/cpu/advect-solver.h>
-#include <FluidSim/cpu/project-solver.h>
 #include <FluidSim/cpu/util.h>
 #include <cassert>
 
