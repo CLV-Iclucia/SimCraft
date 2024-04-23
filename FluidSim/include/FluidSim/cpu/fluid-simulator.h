@@ -23,26 +23,20 @@ using spatify::FaceCentredGrid;
 using spatify::PaddedCellCentredGrid;
 
 class FluidSimulator final : public FluidComputeBackend {
-public:
+ public:
   core::Timer timer;
-  FluidSimulator(int n, const Vec3d& size, const Vec3i& resolution)
-    : nParticles(n), uw(resolution + Vec3i(1, 0, 0)),
-      vw(resolution + Vec3i(0, 1, 0)), ww(resolution + Vec3i(0, 0, 1)),
-      pg(resolution) {
+  FluidSimulator(int n, const Vec3d &size, const Vec3i &resolution)
+      : nParticles(n), uw(resolution + Vec3i(1, 0, 0)),
+        vw(resolution + Vec3i(0, 1, 0)), ww(resolution + Vec3i(0, 0, 1)),
+        pg(resolution) {
     m_particles.positions.resize(n);
     // initialize grids
-    ug = std::make_unique<FaceCentredGrid<
-      Real, Real, 3, 0>>(resolution, size);
-    vg = std::make_unique<FaceCentredGrid<
-      Real, Real, 3, 1>>(resolution, size);
-    wg = std::make_unique<FaceCentredGrid<
-      Real, Real, 3, 2>>(resolution, size);
-    ubuf = std::make_unique<FaceCentredGrid<Real, Real, 3, 0>>(
-        resolution, size);
-    vbuf = std::make_unique<FaceCentredGrid<Real, Real, 3, 1>>(
-        resolution, size);
-    wbuf = std::make_unique<FaceCentredGrid<Real, Real, 3, 2>>(
-        resolution, size);
+    ug = std::make_unique<FaceCentredGrid<Real, Real, 3, 0>>(resolution, size);
+    vg = std::make_unique<FaceCentredGrid<Real, Real, 3, 1>>(resolution, size);
+    wg = std::make_unique<FaceCentredGrid<Real, Real, 3, 2>>(resolution, size);
+    ubuf = std::make_unique<FaceCentredGrid<Real, Real, 3, 0>>(resolution, size);
+    vbuf = std::make_unique<FaceCentredGrid<Real, Real, 3, 1>>(resolution, size);
+    wbuf = std::make_unique<FaceCentredGrid<Real, Real, 3, 2>>(resolution, size);
     uValid = std::make_unique<Array3D<char>>(resolution + Vec3i(1, 0, 0));
     vValid = std::make_unique<Array3D<char>>(resolution + Vec3i(0, 1, 0));
     wValid = std::make_unique<Array3D<char>>(resolution + Vec3i(0, 0, 1));
@@ -56,10 +50,10 @@ public:
     colliderSdf = std::make_unique<SDF<3>>(resolution, size);
     assert(
         ug->gridSpacing() == vg->gridSpacing() && vg->gridSpacing() == wg->
-        gridSpacing());
+            gridSpacing());
   }
 
-  void setCollider(const Mesh& colliderMesh) const override {
+  void setCollider(const Mesh &colliderMesh) const override {
     std::cout << "Building collider SDF..." << std::endl;
     Array3D<int> closest(colliderSdf->width(), colliderSdf->height(),
                          colliderSdf->depth());
@@ -70,10 +64,10 @@ public:
     std::cout << "Done." << std::endl;
   }
 
-  void setInitialFluid(const Mesh& fluid_mesh) override {
-    for (auto& p : m_particles.positions) {
+  void setInitialFluid(const Mesh &fluid_mesh) override {
+    for (auto &p : m_particles.positions) {
       p = core::randomVec<Real, 3>() * Vec3d(1.0, 0.45, 1.0) + Vec3d(
-              0.0, 0.5, 0.0);
+          0.0, 0.5, 0.0);
       p *= ug->size();
     }
   }
@@ -95,7 +89,15 @@ public:
     }
     ERROR("Unknown projection solver");
   }
-
+  void setParticleReconstructor(ReconstructionMethod reconstruction_method) override {
+    if (reconstruction_method == ReconstructionMethod::Naive) {
+      Vec3d size(pg.width() * ug->gridSpacing().x, pg.height() * ug->gridSpacing().y,
+                 pg.depth() * ug->gridSpacing().z);
+      fluidSurfaceReconstructor =
+          std::make_unique<NaiveReconstructor<Real, 3>>(nParticles, pg.width(), pg.height(), pg.depth(), size);
+    } else
+      ERROR("Unknown particle reconstructor");
+  }
   void setCompressedSolver(CompressedSolverMethod solver_method,
                            PreconditionerMethod
                            preconditioner_method) override {
@@ -155,38 +157,34 @@ public:
     }
   }
 
-  void setReconstructor(ParticleSystemReconstructor<Real, 3>* reconstructor) {
-    fluidSurfaceReconstructor = reconstructor;
-  }
+  void step(core::Frame &frame);
 
-  void step(core::Frame& frame);
-
-  [[nodiscard]] const std::vector<Vec3d>& positions() const {
+  [[nodiscard]] const std::vector<Vec3d> &positions() const {
     return m_particles.positions;
   }
 
-  [[nodiscard]] const SDF<3>& exportFluidSurface() const {
+  [[nodiscard]] const SDF<3> &exportFluidSurface() const {
     return *fluidSurface;
   }
 
-  [[nodiscard]] const SDF<3>& exportColliderSurface() const {
+  [[nodiscard]] const SDF<3> &exportColliderSurface() const {
     return *colliderSdf;
   }
 
-  std::vector<Vec3d>& positions() { return m_particles.positions; }
+  std::vector<Vec3d> &positions() { return m_particles.positions; }
 
-private:
+ private:
   int nParticles{};
 
   struct ParticleList {
     std::vector<Vec3d> positions{};
   } m_particles;
 
-  template <typename GridType>
-  void extrapolate(std::unique_ptr<GridType>& g,
-                   std::unique_ptr<GridType>& gbuf,
-                   std::unique_ptr<Array3D<char>>& valid,
-                   std::unique_ptr<Array3D<char>>& validBuf, int iters) {
+  template<typename GridType>
+  void extrapolate(std::unique_ptr<GridType> &g,
+                   std::unique_ptr<GridType> &gbuf,
+                   std::unique_ptr<Array3D<char>> &valid,
+                   std::unique_ptr<Array3D<char>> &validBuf, int iters) {
     for (int iter = 0; iter < iters; iter++) {
       validBuf->fill(false);
       g->parallelForEach([&](int i, int j, int k) {
@@ -243,10 +241,10 @@ private:
   std::unique_ptr<FaceCentredGrid<Real, Real, 3, 1>> vg, vbuf;
   std::unique_ptr<FaceCentredGrid<Real, Real, 3, 2>> wg, wbuf;
   std::unique_ptr<Array3D<char>> uValid, vValid, wValid, uValidBuf, vValidBuf,
-                                 wValidBuf, sdfValid, sdfValidBuf;
+      wValidBuf, sdfValid, sdfValidBuf;
   Array3D<Real> uw, vw, ww;
   Array3D<Real> pg;
-  ParticleSystemReconstructor<Real, 3>* fluidSurfaceReconstructor{};
+  std::unique_ptr<ParticleSystemReconstructor<Real, 3>> fluidSurfaceReconstructor{};
   std::unique_ptr<SDF<3>> fluidSurface{}, fluidSurfaceBuf{}, colliderSdf{};
   std::unique_ptr<ProjectionSolver3D> projector{};
   std::unique_ptr<HybridAdvectionSolver3D> advector{};

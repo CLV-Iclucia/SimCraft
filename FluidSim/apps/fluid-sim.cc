@@ -47,7 +47,7 @@ ImGuiIO& initImGui(GLFWwindow* window) {
 }
 
 struct Options {
-  int nParticles = 32768;
+  int nParticles = 65536;
   core::Vec3d size = core::Vec3d(1.0);
   core::Vec3i resolution = core::Vec3i(64);
   std::string colliderPath = std::format("{}/complex_bunny.obj",
@@ -212,7 +212,10 @@ int main(int argc, char** argv) {
   simulator->setCollider(colliderMesh);
   simulator->setAdvector(fluid::AdvectionMethod::PIC);
   simulator->setProjector(fluid::ProjectSolver::FVM);
-
+  simulator->setInitialFluid(colliderMesh);
+  simulator->setParticleReconstructor(fluid::ReconstructionMethod::Naive);
+  simulator->setCompressedSolver(fluid::CompressedSolverMethod::CG,
+                                 fluid::PreconditionerMethod::ModifiedIncompleteCholesky);
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
     std::cerr << "Failed to initialize GLAD" << std::endl;
     return -1;
