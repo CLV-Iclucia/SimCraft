@@ -47,12 +47,12 @@ ImGuiIO& initImGui(GLFWwindow* window) {
 }
 
 struct Options {
-  int nParticles = 32768;
+  int nParticles = 65536;
   core::Vec3d size = core::Vec3d(1.0);
   core::Vec3i resolution = core::Vec3i(64);
   std::string colliderPath = std::format("{}/complex_bunny.obj",
                                          SIMCRAFT_ASSETS_DIR);
-} opt;
+};
 
 void processWindowInput(GLFWwindow* window, TargetCamera& camera) {
   static float lastFrame = 0.f;
@@ -208,11 +208,13 @@ int main(int argc, char** argv) {
     return -1;
   }
   relocateMesh(colliderMesh, size);
-
   simulator->setCollider(colliderMesh);
   simulator->setAdvector(fluid::AdvectionMethod::PIC);
   simulator->setProjector(fluid::ProjectSolver::FVM);
-
+  simulator->setReconstructor(fluid::ReconstructorMethod::Naive);
+  simulator->setInitialFluid(colliderMesh);
+  simulator->setCompressedSolver(fluid::CompressedSolverMethod::CG,
+                                 fluid::PreconditionerMethod::ModifiedIncompleteCholesky);
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
     std::cerr << "Failed to initialize GLAD" << std::endl;
     return -1;
@@ -252,7 +254,7 @@ int main(int argc, char** argv) {
     simulator->step(frame);
     drawFluid(fluidCtx.get(), fluidShader.get(), camera, simulator->positions(),
               display_w, display_h);
-    if (frame.idx == 50) {
+    if (frame.idx == 52) {
       simulator->reconstruct();
       simulator->smoothFluidSurface(5);
       core::Mesh fluidMesh;

@@ -52,8 +52,8 @@ protected:
 
 class CompressedSolver3D {
 public:
-  CompressedSolver3D(int m, int h, int d)
-    : r(m, h, d) {
+  CompressedSolver3D(int w, int h, int d)
+    : r(w, h, d) {
   }
 
   virtual Real solve(const Array3D<Real>& Adiag,
@@ -133,7 +133,7 @@ protected:
 class FvmSolver3D final : public ProjectionSolver3D {
 public:
   FvmSolver3D(int w, int h, int d)
-    : Adiag(w, h, d), rhs(w, h, d), uWeights(w + 1, h, d),
+    : ProjectionSolver3D(w, h, d), Adiag(w, h, d), rhs(w, h, d), uWeights(w + 1, h, d),
       vWeights(w, h + 1, d), wWeights(w, h, d + 1),
       Aneighbour{Array3D<Real>(w, h, d), Array3D<Real>(w, h, d),
                  Array3D<Real>(w, h, d), Array3D<Real>(w, h, d),

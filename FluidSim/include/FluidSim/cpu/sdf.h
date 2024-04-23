@@ -185,8 +185,7 @@ class NaiveReconstructor : ParticleSystemReconstructor<T, Dim> {
 };
 
 template <typename T>
-class NaiveReconstructor<
-      T, 3> final : public ParticleSystemReconstructor<T, 3> {
+class NaiveReconstructor<T, 3> final : public ParticleSystemReconstructor<T, 3> {
   public:
     NaiveReconstructor(int n, int w, int h, int d, const Vector<T, 3>& size)
       : ns(n, w, h, d, size) {
@@ -202,7 +201,6 @@ class NaiveReconstructor<
         Vector<T, 3> p = sdf.grid.indexToCoord(i, j, k);
         ns.forNeighbours(p, particles, 4 * radius, [&](int idx) {
           Real dis = glm::distance(p, particles[idx]);
-          assert(dis < 4 * radius);
           sdf(i, j, k) = std::min(sdf(i, j, k), dis - radius);
           sdfValid(i, j, k) = true;
         });

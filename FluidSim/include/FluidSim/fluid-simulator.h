@@ -36,6 +36,10 @@ enum class CompressedSolverMethod {
   CG
 };
 
+enum class ReconstructorMethod {
+  Naive
+};
+
 struct FluidComputeBackend : NonCopyable {
   virtual void setCollider(const Mesh& collider_mesh) const = 0;
   virtual void setInitialFluid(const Mesh& fluid_mesh) = 0;
@@ -44,6 +48,7 @@ struct FluidComputeBackend : NonCopyable {
   virtual void setCompressedSolver(CompressedSolverMethod solver_method,
                                    PreconditionerMethod preconditioner_method) =
   0;
+  virtual void setReconstructor(ReconstructorMethod reconstructor_method) = 0;
   virtual ~FluidComputeBackend() = default;
 };
 
