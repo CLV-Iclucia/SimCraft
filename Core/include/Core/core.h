@@ -27,6 +27,7 @@ using Mat4f = glm::mat4;
 using Mat2d = glm::highp_mat2;
 using Mat3d = glm::highp_mat3;
 using Mat4d = glm::highp_mat4;
+using uint = unsigned int;
 using std::vector;
 template <typename T, int Dim> struct TVector {
   static_assert(Dim == 2 || Dim == 3 || Dim == 4, "Dim must be 2, 3 or 4");
