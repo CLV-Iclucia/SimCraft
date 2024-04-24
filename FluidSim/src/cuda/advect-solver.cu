@@ -52,9 +52,9 @@ static CUDA_GLOBAL void kernelPicG2P(int nParticles,
 static CUDA_GLOBAL void kernelPicP2G(int nParticles,
                                      VelAccessor vel,
                                      PosAccessor pos,
-                                     CudaTextureAccessor<float> u,
-                                     CudaTextureAccessor<float> v,
-                                     CudaTextureAccessor<float> w,
+                                     CudaTextureAccessor<double> u,
+                                     CudaTextureAccessor<double> v,
+                                     CudaTextureAccessor<double> w,
                                      Real h, Real dt) {
   get_and_restrict_tid(tid, nParticles);
   double3 p = pos.read(tid);

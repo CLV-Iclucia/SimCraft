@@ -5,7 +5,7 @@
 #ifndef SIM_CRAFT_PARTICLE_SYSTEM_H
 #define SIM_CRAFT_PARTICLE_SYSTEM_H
 #include <memory>
-#include <FluidSim/cuda/gpu-arrays.h>
+#include <FluidSim/cuda/gpu-arrays.cuh>
 #include <FluidSim/fluid-sim.h>
 namespace fluid::cuda {
 struct VelAccessor {

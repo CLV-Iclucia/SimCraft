@@ -6,7 +6,7 @@
 #define SIM_CRAFT_CUDA_FLUID_SIMULATOR_H
 
 #include <FluidSim/fluid-simulator.h>
-#include <FluidSim/cuda/gpu-arrays.h>
+#include <FluidSim/cuda/gpu-arrays.cuh>
 #include <FluidSim/cuda/project-solver.h>
 #include <FluidSim/cuda/advect-solver.h>
 #include <format>

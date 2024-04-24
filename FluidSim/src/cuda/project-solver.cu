@@ -2,7 +2,7 @@
 // Created by creeper on 24-3-26.
 //
 #include <FluidSim/cuda/project-solver.h>
-#include <FluidSim/cuda/gpu-arrays.h>
+#include <FluidSim/cuda/gpu-arrays.cuh>
 #include <FluidSim/cuda/vec-op.cuh>
 #include <cub/cub.cuh>
 #include <format>

@@ -6,7 +6,7 @@
 #define SIM_CRAFT_PARTICLE_RECONSTRUCTOR_H
 
 #include <FluidSim/cuda/particle-system.h>
-#include <FluidSim/cuda/gpu-arrays.h>
+#include <FluidSim/cuda/gpu-arrays.cuh>
 
 namespace fluid::cuda {
 struct ParticleSystemReconstructor {

@@ -1,5 +1,5 @@
 #include <FluidSim/cuda/kernels.cuh>
-#include <FluidSim/cuda/gpu-arrays.h>
+#include <FluidSim/cuda/gpu-arrays.cuh>
 #include <FluidSim/cuda/vec-op.cuh>
 
 namespace fluid::cuda{

@@ -5,7 +5,7 @@
 #include <Core/properties.h>
 #include <Core/animation.h>
 #include <FluidSim/cuda/kernels.cuh>
-#include <FluidSim/cuda/gpu-arrays.h>
+#include <FluidSim/cuda/gpu-arrays.cuh>
 #include <Spatify/arrays.h>
 #include <vector_types.h>
 #include <memory>
