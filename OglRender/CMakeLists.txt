@@ -3,7 +3,8 @@ file(GLOB_RECURSE srcs CONFIGURE_DEPENDS src/*.cpp include/*.h src/*.cc)
 
 add_library(ogl-render STATIC ${srcs})
 target_link_libraries(ogl-render PUBLIC GLAD glfw)
-target_include_directories(ogl-render PUBLIC include ${EXTERNAL_PATH}/glm)
+message(STATUS "glfw include dir: ${GLFW_INCLUDE_DIR}")
+target_include_directories(ogl-render PUBLIC include ${EXTERNAL_PATH}/glm ${GLFW_INCLUDE_DIR} OpenGL::GL)
 
 add_executable(demo apps/demo.cc)
 target_include_directories(demo PUBLIC ${EXTERNAL_PATH}/imgui)

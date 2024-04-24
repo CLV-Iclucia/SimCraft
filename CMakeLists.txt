@@ -5,6 +5,8 @@ set(CMAKE_CUDA_ARCHITECTURES 52;70;75;86)
 project(SimCraft)
 
 find_package(TBB REQUIRED)
+find_package(glfw3 REQUIRED)
+find_package(OpenGL REQUIRED)
 set(GLAD_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/glad/include)
 set(EXTERNAL_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external)
 set(ASSETS_PATH ${CMAKE_CURRENT_SOURCE_DIR}/assets)
