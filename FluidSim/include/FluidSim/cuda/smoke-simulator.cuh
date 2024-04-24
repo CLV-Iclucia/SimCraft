@@ -6,10 +6,12 @@
 #include <Core/animation.h>
 #include <FluidSim/cuda/kernels.cuh>
 #include <FluidSim/cuda/gpu-arrays.h>
+#include <Spatify/arrays.h>
 #include <vector_types.h>
 #include <memory>
 
 namespace fluid::cuda {
+constexpr int kVcycleLevel = 5;
 struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
   uint n;
   std::unique_ptr<CudaSurface<float4>> loc;
@@ -20,7 +22,7 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
   std::unique_ptr<CudaTexture<float>> rhoBuf;
   std::unique_ptr<CudaTexture<float>> T;
   std::unique_ptr<CudaTexture<float>> TBuf;
-  std::unique_ptr<CudaSurface<uint8_t>> collider;
+  std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel> collider{};
   std::unique_ptr<CudaSurface<float>> div;
   std::unique_ptr<CudaSurface<float4>> vort;
   std::unique_ptr<CudaSurface<float4>> normal;
@@ -63,6 +65,9 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
         T->surfaceAccessor(), 0.f, n);
   }
 
+  void setCollider(const spatify::Array3D<uint8_t>& collider) {
+
+  }
   void advection(float dt) {
     uint nthreads_dim = 8;
     uint nblocks = (n + nthreads_dim - 1) / 8;
