@@ -20,7 +20,7 @@ using glm::normalize;
 using glm::dot;
 
 template <typename T>
-CUDA_CALLABLE CUDA_FORCEINLINE T clamp(const T& x, const T& min, const T& max) {
+T clamp(const T& x, const T& min, const T& max) {
 #ifndef __CUDA_ARCH__
   return glm::clamp(x, min, max);
 #else

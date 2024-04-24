@@ -19,3 +19,8 @@ target_include_directories(fluid-sim PUBLIC ${EXTERNAL_PATH}/imgui)
 target_include_directories(fluid-sim PUBLIC ${GLAD_INCLUDE_DIR})
 target_link_libraries(fluid-sim PUBLIC ogl-render
         imgui imgui_impl_glfw imgui_impl_opengl3 CpuFluid glfw3)
+
+add_executable(bug apps/fluid-sim.cc)
+target_include_directories(bug PUBLIC ${EXTERNAL_PATH}/imgui)
+target_include_directories(bug PUBLIC ${GLAD_INCLUDE_DIR})
+target_link_libraries(bug PUBLIC ogl-render imgui imgui_impl_glfw imgui_impl_opengl3 CpuFluid glfw3)

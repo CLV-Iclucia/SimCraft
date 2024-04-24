@@ -9,6 +9,7 @@
 #include <Spatify/arrays.h>
 #include <Spatify/ns-util.h>
 #include <FluidSim/cpu/util.h>
+#include <fstream>
 
 namespace core {
 struct Mesh;
@@ -21,6 +22,8 @@ struct SDF : NonCopyable {
   SDF(const Vector<int, Dim>& resolution, const Vector<Real, Dim>& size,
       const Vector<Real, Dim>& origin = Vector<Real, Dim>(0.0))
     : grid(resolution, size, origin) {
+  }
+  SDF(SDF&& other) noexcept : grid(std::move(other.grid)) {
   }
   void init(const Vector<int, Dim>& resolution, const Vector<Real, Dim>& size,
             const Vector<Real, Dim>& origin = Vector<Real, Dim>(0.0)) {
@@ -154,6 +157,20 @@ struct SDF : NonCopyable {
     }
     return field;
   }
+  void saveSDF(const std::string& filename) const {
+    std::fstream file(filename);
+    if (!file.is_open()) {
+      std::cerr << "Failed to open file " << filename << std::endl;
+      return;
+    }
+    file << grid.origin().x << " " << grid.origin().y << " " << grid.origin().z << std::endl;
+    file << grid.size().x << " " << grid.size().y << " " << grid.size().z << std::endl;
+    file << grid.gridSpacing().x << " " << grid.gridSpacing().y << " " << grid.gridSpacing().z << std::endl;
+    for (int i = 0; i < grid.width(); i++)
+      for (int j = 0; j < grid.height(); j++)
+        for (int k = 0; k < grid.depth(); k++)
+          file << grid(i, j, k) << " ";
+  }
   int sampleCount() const {
     return grid.width() * grid.height() * grid.depth();
   }
@@ -214,5 +231,6 @@ class NaiveReconstructor<T, 3> final : public ParticleSystemReconstructor<T, 3> 
 void manifold2SDF(int exact_band, spatify::Array3D<int>& closest,
                   spatify::Array3D<int>& intersection_cnt,
                   const core::Mesh& mesh, SDF<3>* sdf);
+std::optional<SDF<3>> loadSDF(const std::string& filename);
 }
 #endif //JEOCRAFT_IMPLICITSURFACE_INCLUDE_IMPLICITSURFACE_SDF_H_
