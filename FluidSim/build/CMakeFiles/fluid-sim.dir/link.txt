@@ -1,0 +1,1 @@
+/usr/bin/c++ -rdynamic "CMakeFiles/fluid-sim.dir/apps/fluid-sim.o" -o fluid-sim   -L"/home/atopos/cs184/prj/final project/SimCraft/FluidSim/build"  -logl-render -limgui -limgui_impl_glfw -limgui_impl_opengl3 libCpuFluid.a -lglfw3 -lCore -lSpatify -lTBB::tbb

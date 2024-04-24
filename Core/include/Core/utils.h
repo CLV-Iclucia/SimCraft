@@ -5,7 +5,6 @@
 #ifndef SIMCRAFT_CORE_INCLUDE_CORE_UTILS_H_
 #define SIMCRAFT_CORE_INCLUDE_CORE_UTILS_H_
 #include <Core/core.h>
-#include <Core/cuda-utils.h>
 namespace core {
 constexpr Real PI = 3.141592653589793238462643383279502884197169399375105820974;
 constexpr Real PI_2 =
