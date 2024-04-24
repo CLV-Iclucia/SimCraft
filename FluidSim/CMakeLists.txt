@@ -18,7 +18,7 @@ target_include_directories(CpuFluid PUBLIC include)
 target_include_directories(GpuFluid PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} include)
 
 target_link_libraries(CpuFluid PUBLIC Core Spatify TBB::tbb)
-target_link_libraries(GpuFluid PUBLIC Core)
+target_link_libraries(GpuFluid PUBLIC Core Spatify)
 
 target_compile_options(GpuFluid PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>)
 
