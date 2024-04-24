@@ -19,7 +19,7 @@ namespace opengl {
 
 // RAII shader program
 struct ShaderProg {
-  uint id;
+  GLuint id;
   // create shader program from vertex and fragment shader source
   ShaderProg(const char *vs_path, const char *fs_path, const char *gs_path = nullptr) {
     // 1. retrieve the vertex/fragment source code from filePath

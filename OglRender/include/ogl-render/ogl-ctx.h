@@ -9,7 +9,9 @@
 #include <unordered_map>
 #include <string>
 namespace opengl {
+#ifndef offsetof
 #define offsetof(s, m) ((size_t)&(((s*)0)->m))
+#endif
 struct ShaderProg;
 
 struct NonCopyable {
