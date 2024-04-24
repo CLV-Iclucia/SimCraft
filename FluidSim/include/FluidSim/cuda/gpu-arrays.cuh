@@ -8,6 +8,7 @@
 #include <Core/properties.h>
 #include <Core/cuda-utils.h>
 #include <Core/properties.h>
+#include <Core/core.h>
 #include <cuda_runtime.h>
 #include <cstdint>
 

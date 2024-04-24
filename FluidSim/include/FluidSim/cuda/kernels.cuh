@@ -21,6 +21,7 @@ inline void checkCUDAError(const char* msg, int line = -1) {
 #define checkCUDAErrorWithLine(msg) checkCUDAError(msg, __LINE__)
 
 namespace fluid::cuda {
+    using core::uint;
 __device__ __forceinline__ bool withinSource(float x, float y, float z,
                                              int n) {
   float centre = static_cast<float>(n) * 0.5f;

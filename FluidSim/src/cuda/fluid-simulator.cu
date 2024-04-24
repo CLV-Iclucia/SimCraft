@@ -207,6 +207,6 @@ void FluidSimulator::substep(Real dt) {
 }
 
 Real FluidSimulator::CFL() const {
-
+return 0.0;
 }
 }

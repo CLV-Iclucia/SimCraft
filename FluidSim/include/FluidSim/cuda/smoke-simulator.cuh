@@ -8,6 +8,7 @@
 #include <FluidSim/cuda/gpu-arrays.cuh>
 #include <vector_types.h>
 #include <memory>
+#include <array>
 
 namespace fluid::cuda {
 constexpr int kVcycleLevel = 5;

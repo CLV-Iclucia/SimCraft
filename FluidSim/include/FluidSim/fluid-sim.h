@@ -24,5 +24,6 @@ using core::Vector;
 using core::Matrix;
 using core::Mesh;
 using core::AABB;
+using core::uint;
 };
 #endif // SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_CORE_H_
