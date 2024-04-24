@@ -39,7 +39,7 @@ struct ConstAccessor<fluid::cuda::DeviceArray<T>> {
 namespace fluid::cuda {
 
 template<typename T>
-struct CudaArray3D : NonCopyable {
+struct CudaArray3D : core::NonCopyable {
   cudaArray *cuda_array{};
   uint3 dim;
 
@@ -54,8 +54,7 @@ struct CudaArray3D : NonCopyable {
   void copyFrom(const T *data) {
     cudaMemcpy3DParms copy3DParams{};
     copy3DParams.srcPtr =
-        make_cudaPitchedPtr(static_cast<void *>(data), dim.x * sizeof(T), dim.x,
-                            dim.y);
+        make_cudaPitchedPtr(static_cast<void*>(data), dim.x * sizeof(T), dim.x, dim.y);
     copy3DParams.dstArray = cuda_array;
     copy3DParams.extent = make_cudaExtent(dim.x, dim.y, dim.z);
     copy3DParams.kind = cudaMemcpyHostToDevice;
