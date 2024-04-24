@@ -1,5 +1,5 @@
 #include <FluidSim/cpu/fluid-simulator.h>
-#include <FluidSim/cuda/fluid-simulator.h>
+//#include <FluidSim/cuda/fluid-simulator.h>
 #include <Core/debug.h>
 namespace fluid {
 void FluidSimulator::setBackend(Backend backend_type) {
@@ -10,7 +10,7 @@ void FluidSimulator::setBackend(Backend backend_type) {
   } else
     ERROR("Invalid backend");
 }
-void cuda::FluidSimulator::setInitialFluid(const Mesh &fluid_mesh) {
-
-}
+//void cuda::FluidSimulator::setInitialFluid(const Mesh &fluid_mesh) {
+//
+//}
 }

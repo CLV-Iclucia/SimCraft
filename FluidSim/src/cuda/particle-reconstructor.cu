@@ -81,13 +81,13 @@ void NeighbourSearcher::update(const fluid::cuda::ParticleSystem &particles) {
 static void CUDA_GLOBAL kernelReconstructSdf(int3 sdfResolution,
                                              int resolution,
                                              double3 spacing,
-                                             Real h,
-                                             Real r,
+                                             float h,
+                                             float r,
                                              PosAccessor positions,
                                              Accessor<DeviceArray<int>> particle_idx_mapping,
                                              Accessor<DeviceArray<int>> cell_begin_idx,
                                              Accessor<DeviceArray<int>> cell_end_idx,
-                                             CudaSurfaceAccessor<Real> sdf,
+                                             CudaSurfaceAccessor<float> sdf,
                                              CudaSurfaceAccessor<uint8_t> sdf_valid) {
   get_and_restrict_tid_3d(i, j, k, sdfResolution.x, sdfResolution.y, sdfResolution.z);
   auto p = make_double3((i + 0.5) * h, (j + 0.5) * h, (k + 0.5) * h);
@@ -97,7 +97,7 @@ static void CUDA_GLOBAL kernelReconstructSdf(int3 sdfResolution,
   int y_max = min(resolution - 1, static_cast<int>(ceil((p.y + r) / spacing.y)));
   int z_min = max(0, static_cast<int>(floor((p.z - r) / spacing.z)));
   int z_max = min(resolution - 1, static_cast<int>(ceil((p.z + r) / spacing.z)));
-  Real val = 1e9;
+  float val = 1e9;
   bool flag = false;
   for (int x = x_min; x <= x_max; x++) {
     for (int y = y_min; y <= y_max; y++) {
@@ -106,7 +106,7 @@ static void CUDA_GLOBAL kernelReconstructSdf(int3 sdfResolution,
         if (cell_begin_idx[cell_idx] == -1) continue;
         for (int idx = cell_begin_idx[cell_idx]; idx < cell_end_idx[cell_idx]; idx++) {
           int particle_idx = particle_idx_mapping[idx];
-          Real dis = distance(p, positions.read(particle_idx));
+          float dis = distance(p, positions.read(particle_idx));
           val = min(val, dis - r);
           flag |= dis < r;
         }
@@ -118,11 +118,11 @@ static void CUDA_GLOBAL kernelReconstructSdf(int3 sdfResolution,
 }
 
 void NaiveReconstructor::reconstruct(const fluid::cuda::ParticleSystem &particles,
-                                     core::Real radius,
-                                     CudaSurface<core::Real> &sdf,
+                                     float radius,
+                                     CudaSurface<float> &sdf,
                                      CudaSurface<uint8_t> &sdf_valid,
                                      int3 sdfResolution,
-                                     core::Real h) {
+                                     float h) {
   ns->update(particles);
   kernelReconstructSdf<<<LAUNCH_THREADS_3D(sdfResolution.x, sdfResolution.y, sdfResolution.z)>>>(
       sdfResolution,

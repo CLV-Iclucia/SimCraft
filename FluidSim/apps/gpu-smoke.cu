@@ -1,16 +1,13 @@
 #include <Core/core.h>
 #include <Core/animation.h>
-#include <Core/mesh.h>
 #include <ogl-render/ogl-ctx.h>
 #include <ogl-render/camera.h>
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
-#include <imgui/imgui_impl_opengl3.h>
 #include <iostream>
 #include <memory>
 #include <FluidSim/cuda/smoke-simulator.cuh>
 using namespace opengl;
-ImVec4 kClearColor = ImVec4(0.0f, 1.0f, 1.0f, 1.00f);
 bool initGLFW(GLFWwindow*& window) {
   if (!glfwInit()) {
     std::cerr << "Failed to initialize GLFW" << std::endl;
@@ -141,6 +138,7 @@ int main(int argc, char** argv) {
       std::cout << "exporting frame " << frame.idx << " to directory " << opt.outputDir << std::endl;
       return 0;
     }
+    std::cout << "frame " << frame.idx << std::endl;
     glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, opt.resolution, opt.resolution,
                     opt.resolution, GL_RED,
                     GL_FLOAT, buffer.data());

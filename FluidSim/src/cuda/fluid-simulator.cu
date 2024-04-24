@@ -5,12 +5,11 @@
 #include <FluidSim/cuda/project-solver.h>
 #include <FluidSim/cuda/utils.h>
 #include <FluidSim/cuda/vec-op.cuh>
-#include <cassert>
 
 namespace fluid::cuda {
-static CUDA_GLOBAL void kernelApplyForce(CudaSurfaceAccessor<Real> u,
-                                         CudaSurfaceAccessor<Real> v,
-                                         CudaSurfaceAccessor<Real> w,
+static CUDA_GLOBAL void kernelApplyForce(CudaSurfaceAccessor<float> u,
+                                         CudaSurfaceAccessor<float> v,
+                                         CudaSurfaceAccessor<float> w,
                                          double3 acceleration,
                                          int3 resolution,
                                          Real dt) {
@@ -48,15 +47,15 @@ void FluidSimulator::clear() const {
   p->zero();
 }
 
-static CUDA_GLOBAL void kernelSmooth(CudaSurfaceAccessor<Real> grid,
-                                     CudaSurfaceAccessor<Real> buf,
+static CUDA_GLOBAL void kernelSmooth(CudaSurfaceAccessor<float> grid,
+                                     CudaSurfaceAccessor<float> buf,
                                      CudaSurfaceAccessor<uint8_t> valid,
                                      CudaSurfaceAccessor<uint8_t> validBuf,
                                      int3 resolution) {
   get_and_restrict_tid_3d(i, j, k, resolution.x, resolution.y, resolution.z);
   if (valid.read(i, j, k))
     return;
-  Real sum = 0;
+  float sum = 0;
   int count = 0;
   if (i > 0) {
     sum += grid.read(i - 1, j, k);
@@ -82,7 +81,7 @@ static CUDA_GLOBAL void kernelSmooth(CudaSurfaceAccessor<Real> grid,
     sum += grid.read(i, j, k + 1);
     count++;
   }
-  Real val = fmin(grid.read(i, j, k), sum / count);
+  float val = fmin(grid.read(i, j, k), sum / count);
   buf.write(val, i, j, k);
 }
 
@@ -94,12 +93,12 @@ void FluidSimulator::smoothFluidSurface(int iters) {
     std::swap(fluidSurface, fluidSurfaceBuf);
   }
 }
-static CUDA_GLOBAL void kernelApplyCollider(CudaSurfaceAccessor<Real> ug,
-                                            CudaSurfaceAccessor<Real> vg,
-                                            CudaSurfaceAccessor<Real> wg,
-                                            CudaTextureAccessor<Real> colliderSdf,
+static CUDA_GLOBAL void kernelApplyCollider(CudaSurfaceAccessor<float> ug,
+                                            CudaSurfaceAccessor<float> vg,
+                                            CudaSurfaceAccessor<float> wg,
+                                            CudaTextureAccessor<float> colliderSdf,
                                             int3 resolution,
-                                            Real h) {
+                                            float h) {
   get_and_restrict_tid_3d(i, j, k, resolution.x, resolution.y, resolution.z);
   if (i == 0 || i == resolution.x) {
     ug.write(0.0, i, j, k);
@@ -110,7 +109,7 @@ static CUDA_GLOBAL void kernelApplyCollider(CudaSurfaceAccessor<Real> ug,
   double3 normal{normalize(grad(colliderSdf, pos, resolution, h))};
   if (colliderSdf.sample(pos) < 0.0) {
     // calc the normal, and project out the x component
-    Real val = ug.read(i, j, k);
+    float val = ug.read(i, j, k);
     ug.write(val - val * normal.x, i, j, k);
   }
   if (j == 0 || j == resolution.y) {
@@ -119,7 +118,7 @@ static CUDA_GLOBAL void kernelApplyCollider(CudaSurfaceAccessor<Real> ug,
   }
   pos = make_float3(static_cast<float>((i + 0.5) * h), static_cast<float>(j * h), static_cast<float>((k + 0.5) * h));
   if (colliderSdf.sample(pos) < 0.0) {
-    Real val = vg.read(i, j, k);
+    float val = vg.read(i, j, k);
     vg.write(val - val * normal.y, i, j, k);
   }
   if (k == 0 || k == resolution.z) {
@@ -128,7 +127,7 @@ static CUDA_GLOBAL void kernelApplyCollider(CudaSurfaceAccessor<Real> ug,
   }
   pos = make_float3(static_cast<float>((i + 0.5) * h), static_cast<float>((j + 0.5) * h), static_cast<float>(k * h));
   if (colliderSdf.sample(pos) < 0.0) {
-    Real val = wg.read(i, j, k);
+    float val = wg.read(i, j, k);
     wg.write(val - val * normal.z, i, j, k);
   }
 }
@@ -142,19 +141,19 @@ void FluidSimulator::applyDirichletBoundary() const {
 
 // here, resolution is the resolution of the grid
 // resolution is not necceasarily the same as the resolution of the fluid surface
-static void extrapolate(std::unique_ptr<CudaSurface<Real>> &grid,
-                        std::unique_ptr<CudaSurface<Real>> &buf,
+static void extrapolate(std::unique_ptr<CudaSurface<float>> &grid,
+                        std::unique_ptr<CudaSurface<float>> &buf,
                         std::unique_ptr<CudaSurface<uint8_t>> &valid,
                         std::unique_ptr<CudaSurface<uint8_t>> &validBuf,
                         int3 resolution,
                         int iters) {
-  for (int iter = 0; iter < iters; iter++) {
-    cudaSafeCheck(kernelExtrapolate<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
-        grid->surfaceAccessor(), buf->surfaceAccessor(), valid->surfaceAccessor(),
-        validBuf->surfaceAccessor(), resolution));
-    std::swap(grid, buf);
-    std::swap(valid, validBuf);
-  }
+//  for (int iter = 0; iter < iters; iter++) {
+//    cudaSafeCheck(kernelExtrapolate<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
+//        grid->surfaceAccessor(), buf->surfaceAccessor(), valid->surfaceAccessor(),
+//        validBuf->surfaceAccessor(), resolution));
+//    std::swap(grid, buf);
+//    std::swap(valid, validBuf);
+//  }
 }
 
 void FluidSimulator::extrapolateFluidSdf(int iters) {
@@ -180,20 +179,20 @@ void FluidSimulator::substep(Real dt) {
   std::cout << "Done." << std::endl;
   std::cout << "Solving P2G... ";
   advectionSolver->solveP2G(*particles, *u, *v, *w,
-                            *colliderSdf, uw, vw, ww, *uValid, *vValid, *wValid, dt);
+                            *colliderSdf, *uw, *vw, *ww, *uValid, *vValid, *wValid, resolution, h, dt);
   applyDirichletBoundary();
   std::cout << "Done." << std::endl;
   std::cout << "Extrapolating velocities... ";
-  extrapolate(u, uBuf, uValid, uValidBuf, resolution, 5);
-  extrapolate(v, vBuf, vValid, vValidBuf, resolution, 5);
-  extrapolate(w, wBuf, wValid, wValidBuf, resolution, 5);
+//  extrapolate(u, uBuf, uValid, uValidBuf, resolution, 5);
+//  extrapolate(v, vBuf, vValid, vValidBuf, resolution, 5);
+//  extrapolate(w, wBuf, wValid, wValidBuf, resolution, 5);
   std::cout << "Done." << std::endl;
   applyForce(dt);
   std::cout << "Building linear system... ";
   projectionSolver->buildSystem(*u, *v, *w, *fluidSurface, *colliderSdf, resolution, h, dt);
   std::cout << "Done." << std::endl;
   std::cout << "Solving linear system... ";
-  if (Real residual{projectionSolver->solvePressure(*fluidSurface, *p, resolution, h, dt)};
+  if (float residual{projectionSolver->solvePressure(*fluidSurface, *p, resolution, h, dt)};
       residual > 1e-4)
     std::cerr << "Warning: projection residual is " << residual << std::endl;
   else std::cout << "Projection residual is " << residual << std::endl;

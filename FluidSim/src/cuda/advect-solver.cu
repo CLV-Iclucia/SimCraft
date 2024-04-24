@@ -10,12 +10,12 @@ namespace fluid::cuda {
 static CUDA_GLOBAL void kernelPicAdvect(int nParticles,
                                         VelAccessor vel,
                                         PosAccessor pos,
-                                        CudaTextureAccessor<Real> u,
-                                        CudaTextureAccessor<Real> v,
-                                        CudaTextureAccessor<Real> w,
+                                        CudaTextureAccessor<float> u,
+                                        CudaTextureAccessor<float> v,
+                                        CudaTextureAccessor<float> w,
                                         int3 resolution,
                                         double h,
-                                        Real dt) {
+                                        float dt) {
   get_and_restrict_tid(tid, nParticles);
   const double3 &velocity = vel.read(tid);
   double3 p = pos.read(tid);
@@ -40,7 +40,7 @@ static CUDA_GLOBAL void kernelPicG2P(int nParticles,
                                      CudaTextureAccessor<float> v,
                                      CudaTextureAccessor<float> w,
                                      int3 resolution,
-                                     Real h, Real dt) {
+                                     float h, float dt) {
   get_and_restrict_tid(tid, nParticles);
   double3 p = pos.read(tid);
   double3 cur_vel = make_double3(u.sample(p.x / h, p.y / h, p.z / h),
@@ -52,22 +52,22 @@ static CUDA_GLOBAL void kernelPicG2P(int nParticles,
 static CUDA_GLOBAL void kernelPicP2G(int nParticles,
                                      VelAccessor vel,
                                      PosAccessor pos,
-                                     CudaTextureAccessor<double> u,
-                                     CudaTextureAccessor<double> v,
-                                     CudaTextureAccessor<double> w,
-                                     Real h, Real dt) {
+                                     CudaTextureAccessor<float> u,
+                                     CudaTextureAccessor<float> v,
+                                     CudaTextureAccessor<float> w,
+                                     float h, float dt) {
   get_and_restrict_tid(tid, nParticles);
   double3 p = pos.read(tid);
 
 }
 
 void PicSolver::advect(ParticleSystem &particles,
-                       const CudaTexture<Real> &u,
-                       const CudaTexture<Real> &v,
-                       const CudaTexture<Real> &w,
+                       const CudaTexture<float> &u,
+                       const CudaTexture<float> &v,
+                       const CudaTexture<float> &w,
                        int3 resolution,
-                       Real h,
-                       Real dt) {
+                       float h,
+                       float dt) {
   kernelPicAdvect<<<LAUNCH_THREADS(particles.size())>>>(
       particles.size(),
       particles.velAccessor(),
@@ -79,11 +79,11 @@ void PicSolver::advect(ParticleSystem &particles,
 }
 
 void PicSolver::solveG2P(const ParticleSystem &particles,
-                         const CudaTexture<Real> &u,
-                         const CudaTexture<Real> &v,
-                         const CudaTexture<Real> &w,
+                         const CudaTexture<float> &u,
+                         const CudaTexture<float> &v,
+                         const CudaTexture<float> &w,
                          int3 resolution,
-                         Real h, Real dt) {
+                         float h, float dt) {
   kernelPicG2P<<<LAUNCH_THREADS(particles.size())>>>(
       particles.size(),
       particles.velAccessor(),
@@ -92,15 +92,15 @@ void PicSolver::solveG2P(const ParticleSystem &particles,
       resolution, h, dt);
 }
 
-void PicSolver::solveP2G(const ParticleSystem &particles, const CudaTexture<Real> &u,
-                         const CudaTexture<Real> &v, const CudaTexture<Real> &w,
-                         const CudaTexture<Real> &collider_sdf,
-                         const CudaSurface<Real> &uw, const CudaSurface<Real> &vw,
-                         const CudaSurface<Real> &ww, const CudaSurface<int> &uValid,
-                         const CudaSurface<int> &vValid,
-                         const CudaSurface<int> &wValid,
+void PicSolver::solveP2G(const ParticleSystem &particles, const CudaTexture<float> &u,
+                         const CudaTexture<float> &v, const CudaTexture<float> &w,
+                         const CudaTexture<float> &collider_sdf,
+                         const CudaSurface<float> &uw, const CudaSurface<float> &vw,
+                         const CudaSurface<float> &ww, const CudaSurface<uint8_t> &uValid,
+                         const CudaSurface<uint8_t> &vValid,
+                         const CudaSurface<uint8_t> &wValid,
                          int3 resolution,
-                         Real h, Real dt) {
+                         float h, float dt) {
   kernelPicP2G<<<LAUNCH_THREADS(particles.size())>>>(
       particles.size(),
       particles.velAccessor(),

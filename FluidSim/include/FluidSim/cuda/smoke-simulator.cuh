@@ -6,7 +6,6 @@
 #include <Core/animation.h>
 #include <FluidSim/cuda/kernels.cuh>
 #include <FluidSim/cuda/gpu-arrays.cuh>
-#include <Spatify/arrays.h>
 #include <vector_types.h>
 #include <memory>
 
@@ -68,12 +67,12 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
         T->surfaceAccessor(), 0.f, n);
   }
 
-  void setCollider(const spatify::Array3D<uint8_t>& host_collider) {
-    collider[0]->copyFrom(host_collider.data());
-    for (int i = 1; i < kVcycleLevel; i++) {
-      // perform coarsening
-    }
-  }
+//  void setCollider(const spatify::Array3D<uint8_t>& host_collider) {
+//    collider[0]->copyFrom(host_collider.data());
+//    for (int i = 1; i < kVcycleLevel; i++) {
+//       perform coarsening
+//    }
+//  }
   void advection(float dt) {
     uint nthreads_dim = 8;
     uint nblocks = (n + nthreads_dim - 1) / 8;
@@ -164,7 +163,7 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
   void substep(float dt) {
     advection(dt);
     cool(dt);
-    smooth(dt);
+//    smooth(dt);
     applyForce(dt);
     projection(dt);
   }

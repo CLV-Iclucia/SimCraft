@@ -12,14 +12,14 @@ namespace fluid::cuda {
 struct ParticleSystemReconstructor {
   ParticleSystemReconstructor() = default;
   virtual ~ParticleSystemReconstructor() = default;
-  virtual void reconstruct(const ParticleSystem &partiles, Real radius,
-                           CudaSurface<Real> &sdf, CudaSurface<uint8_t> &sdf_valid, int3 resolution, Real h) = 0;
+  virtual void reconstruct(const ParticleSystem &partiles, float radius,
+                           CudaSurface<float> &sdf, CudaSurface<uint8_t> &sdf_valid, int3 resolution, float h) = 0;
 };
 
 struct NeighbourSearcher {
   NeighbourSearcher(int n, int level, const double3 &size)
-      : resolution(1 << level),
-        spacing(size.x / resolution, size.y / resolution, size.z / resolution) {
+      : resolution(1 << level) {
+    spacing = make_double3(size.x / resolution, size.y / resolution, size.z / resolution);
     particle_idx_mapping->resize(n);
     cell_begin_idx->resize(resolution * resolution * resolution);
     cell_end_idx->resize(resolution * resolution * resolution);
@@ -36,8 +36,8 @@ struct NeighbourSearcher {
 };
 
 struct NaiveReconstructor : ParticleSystemReconstructor {
-  void reconstruct(const ParticleSystem &particles, Real radius,
-                   CudaSurface<Real> &sdf, CudaSurface<uint8_t> &sdf_valid, int3 resolution, Real h) override;
+  void reconstruct(const ParticleSystem &particles, float radius,
+                   CudaSurface<float> &sdf, CudaSurface<uint8_t> &sdf_valid, int3 resolution, float h) override;
   std::unique_ptr<NeighbourSearcher> ns;
 };
 }
