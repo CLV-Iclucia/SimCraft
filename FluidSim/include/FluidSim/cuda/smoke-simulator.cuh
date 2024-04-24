@@ -26,9 +26,8 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
   std::unique_ptr<CudaSurface<float>> div;
   std::unique_ptr<CudaSurface<float4>> vort;
   std::unique_ptr<CudaSurface<float4>> normal;
-  std::unique_ptr<CudaSurface<float>> p;
-  std::unique_ptr<CudaSurface<float>> pBuf;
-
+  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> p{};
+  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> pBuf{};
   std::vector<std::unique_ptr<CudaSurface<float>>> res;
   std::vector<std::unique_ptr<CudaSurface<float>>> res2;
   std::vector<std::unique_ptr<CudaSurface<float>>> err2;
@@ -49,9 +48,13 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
       , TBuf(std::make_unique<CudaTexture<float>>(uint3{n, n, n}))
       , div(std::make_unique<CudaSurface<float>>(uint3{n, n, n}))
       , vort(std::make_unique<CudaSurface<float4>>(uint3{n, n, n}))
-      , normal(std::make_unique<CudaSurface<float4>>(uint3{n, n, n}))
-      , p(std::make_unique<CudaSurface<float>>(uint3{n, n, n}))
-      , pBuf(std::make_unique<CudaSurface<float>>(uint3{n, n, n})) {
+      , normal(std::make_unique<CudaSurface<float4>>(uint3{n, n, n})) {
+    for (int i = 0; i < kVcycleLevel; i++) {
+      p[i] = std::make_unique<CudaSurface<float>>(uint3{n >> i, n >> i, n >> i});
+      pBuf[i] = std::make_unique<CudaSurface<float>>(uint3{n >> i, n >> i, n >> i});
+    }
+    for (int i = 0; i < kVcycleLevel; i++)
+      collider[i] = std::make_unique<CudaSurface<uint8_t>>(uint3{n >> i, n >> i, n >> i});
     int nthreads_dim = 8;
     int nblocks = (n + nthreads_dim - 1) / 8;
     FillKernel<<<dim3(nblocks, nblocks, nblocks),
@@ -65,8 +68,11 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
         T->surfaceAccessor(), 0.f, n);
   }
 
-  void setCollider(const spatify::Array3D<uint8_t>& collider) {
-
+  void setCollider(const spatify::Array3D<uint8_t>& host_collider) {
+    collider[0]->copyFrom(host_collider.data());
+    for (int i = 1; i < kVcycleLevel; i++) {
+      // perform coarsening
+    }
   }
   void advection(float dt) {
     uint nthreads_dim = 8;
@@ -134,13 +140,13 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
     for (int i = 0; i < 400; i++) {
       JacobiKernel<<<dim3(nblocks, nblocks, nblocks),
           dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
-          div->surfaceAccessor(), p->surfaceAccessor(), pBuf->surfaceAccessor(), n);
+          div->surfaceAccessor(), p[0]->surfaceAccessor(), pBuf[0]->surfaceAccessor(), n);
       checkCUDAErrorWithLine("Jacobi iteration failed!");
       std::swap(p, pBuf);
     }
     SubgradientKernel<<<dim3(nblocks, nblocks, nblocks),
         dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
-        p->surfaceAccessor(), vel->surfaceAccessor(),
+        p[0]->surfaceAccessor(), vel->surfaceAccessor(),
         make_float4(0.f, 0.0f, 0.f, 0.f), n);
     checkCUDAErrorWithLine("Subgradient failed!");
   }
@@ -158,7 +164,7 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
   void substep(float dt) {
     advection(dt);
     cool(dt);
-    // smooth(dt);
+    smooth(dt);
     applyForce(dt);
     projection(dt);
   }
