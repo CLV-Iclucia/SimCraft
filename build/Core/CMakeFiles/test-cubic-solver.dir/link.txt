@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG "CMakeFiles/test-cubic-solver.dir/tests/test-cubic-solver.cc.o" -o test-cubic-solver   -L/usr/lib/gcc/x86_64-linux-gnu/13  libCore.a -lgtest -lgtest_main -lOpenGL ../external/glad/libGLAD.a

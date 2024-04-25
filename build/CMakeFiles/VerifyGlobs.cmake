@@ -33,6 +33,58 @@ if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
   file(TOUCH_NOCREATE "/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles/cmake.verify_globs")
 endif()
 
+# srcs at Core/CMakeLists.txt:2 (file)
+file(GLOB_RECURSE NEW_GLOB LIST_DIRECTORIES false "/home/atopos/cs184/prj/final project/SimCraft/Core/include/*.h")
+set(OLD_GLOB
+  "/home/atopos/cs184/prj/final project/SimCraft/Core/include/Core/aabb.h"
+  "/home/atopos/cs184/prj/final project/SimCraft/Core/include/Core/animation.h"
+  "/home/atopos/cs184/prj/final project/SimCraft/Core/include/Core/core.h"
+  "/home/atopos/cs184/prj/final project/SimCraft/Core/include/Core/debug.h"
+  "/home/atopos/cs184/prj/final project/SimCraft/Core/include/Core/mesh.h"
+  "/home/atopos/cs184/prj/final project/SimCraft/Core/include/Core/properties.h"
+  "/home/atopos/cs184/prj/final project/SimCraft/Core/include/Core/rand-gen.h"
+  "/home/atopos/cs184/prj/final project/SimCraft/Core/include/Core/range-for.h"
+  "/home/atopos/cs184/prj/final project/SimCraft/Core/include/Core/tensor.h"
+  "/home/atopos/cs184/prj/final project/SimCraft/Core/include/Core/timer.h"
+  "/home/atopos/cs184/prj/final project/SimCraft/Core/include/Core/transfer-stencil.h"
+  "/home/atopos/cs184/prj/final project/SimCraft/Core/include/Core/utils.h"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles/cmake.verify_globs")
+endif()
+
+# srcs at Core/CMakeLists.txt:2 (file)
+file(GLOB_RECURSE NEW_GLOB LIST_DIRECTORIES false "/home/atopos/cs184/prj/final project/SimCraft/Core/src/*.cc")
+set(OLD_GLOB
+  "/home/atopos/cs184/prj/final project/SimCraft/Core/src/obj-io.cc"
+  "/home/atopos/cs184/prj/final project/SimCraft/Core/src/rand-gen.cc"
+  "/home/atopos/cs184/prj/final project/SimCraft/Core/src/utils.cc"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles/cmake.verify_globs")
+endif()
+
+# srcs at Core/CMakeLists.txt:2 (file)
+file(GLOB_RECURSE NEW_GLOB LIST_DIRECTORIES false "/home/atopos/cs184/prj/final project/SimCraft/Core/src/*.cpp")
+set(OLD_GLOB
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles/cmake.verify_globs")
+endif()
+
+# test_srcs at Core/CMakeLists.txt:11 (file)
+file(GLOB_RECURSE NEW_GLOB LIST_DIRECTORIES false "/home/atopos/cs184/prj/final project/SimCraft/Core/tests/*.cc")
+set(OLD_GLOB
+  "/home/atopos/cs184/prj/final project/SimCraft/Core/tests/test-cubic-solver.cc"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles/cmake.verify_globs")
+endif()
+
 # cpu_headers at FluidSim/CMakeLists.txt:4 (file)
 file(GLOB_RECURSE NEW_GLOB LIST_DIRECTORIES false "/home/atopos/cs184/prj/final project/SimCraft/FluidSim/include/FluidSim/cpu/*.h")
 set(OLD_GLOB

@@ -1,0 +1,2 @@
+/usr/bin/ar qc libogl-render.a "CMakeFiles/ogl-render.dir/src/camera.cc.o" "CMakeFiles/ogl-render.dir/src/ogl-ctx.cc.o" "CMakeFiles/ogl-render.dir/src/shader-prog.cc.o"
+/usr/bin/ranlib libogl-render.a

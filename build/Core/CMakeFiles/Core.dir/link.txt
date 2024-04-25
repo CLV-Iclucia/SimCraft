@@ -1,0 +1,2 @@
+/usr/bin/ar qc libCore.a "CMakeFiles/Core.dir/src/obj-io.cc.o" "CMakeFiles/Core.dir/src/rand-gen.cc.o" CMakeFiles/Core.dir/src/utils.cc.o
+/usr/bin/ranlib libCore.a

@@ -22,13 +22,10 @@ CMAKE_AR:FILEPATH=/usr/bin/ar
 
 //Choose the type of build, options are: None Debug Release RelWithDebInfo
 // MinSizeRel ...
-CMAKE_BUILD_TYPE:STRING=
+CMAKE_BUILD_TYPE:STRING=release
 
 //Enable/Disable color output during build.
 CMAKE_COLOR_MAKEFILE:BOOL=ON
-
-//CUDA compiler
-CMAKE_CUDA_COMPILER:FILEPATH=CMAKE_CUDA_COMPILER-NOTFOUND
 
 //CXX compiler
 CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++
@@ -57,7 +54,7 @@ CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG
 CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING=-O2 -g -DNDEBUG
 
 //C compiler
-CMAKE_C_COMPILER:FILEPATH=/usr/bin/cc
+CMAKE_C_COMPILER:STRING=/usr/bin/gcc-13
 
 //A wrapper around 'ar' adding the appropriate '--plugin' option
 // for the GCC compiler
@@ -224,11 +221,14 @@ Core_BINARY_DIR:STATIC=/home/atopos/cs184/prj/final project/SimCraft/build/Core
 //Value Computed by CMake
 Core_IS_TOP_LEVEL:STATIC=OFF
 
+//Dependencies for the target
+Core_LIB_DEPENDS:STATIC=general;OpenGL;general;GLAD;
+
 //Value Computed by CMake
 Core_SOURCE_DIR:STATIC=/home/atopos/cs184/prj/final project/SimCraft/Core
 
 //Dependencies for the target
-CpuFluid_LIB_DEPENDS:STATIC=general;Core;general;Spatify;general;TBB::tbb;
+CpuFluid_LIB_DEPENDS:STATIC=general;Core;general;TBB::tbb;
 
 //Value Computed by CMake
 Fluid_BINARY_DIR:STATIC=/home/atopos/cs184/prj/final project/SimCraft/build/FluidSim
@@ -308,6 +308,15 @@ SimCraft_IS_TOP_LEVEL:STATIC=ON
 //Value Computed by CMake
 SimCraft_SOURCE_DIR:STATIC=/home/atopos/cs184/prj/final project/SimCraft
 
+//Value Computed by CMake
+Spatify_BINARY_DIR:STATIC=/home/atopos/cs184/prj/final project/SimCraft/build/Spatify
+
+//Value Computed by CMake
+Spatify_IS_TOP_LEVEL:STATIC=OFF
+
+//Value Computed by CMake
+Spatify_SOURCE_DIR:STATIC=/home/atopos/cs184/prj/final project/SimCraft/Spatify
+
 //The directory containing a CMake configuration file for TBB.
 TBB_DIR:PATH=/usr/lib/x86_64-linux-gnu/cmake/TBB
 
@@ -351,8 +360,6 @@ CMAKE_COMMAND:INTERNAL=/opt/cmake-3.29.0/bin/cmake
 CMAKE_CPACK_COMMAND:INTERNAL=/opt/cmake-3.29.0/bin/cpack
 //Path to ctest program executable.
 CMAKE_CTEST_COMMAND:INTERNAL=/opt/cmake-3.29.0/bin/ctest
-//ADVANCED property for variable: CMAKE_CUDA_COMPILER
-CMAKE_CUDA_COMPILER-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_CXX_COMPILER
 CMAKE_CXX_COMPILER-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_CXX_COMPILER_AR
@@ -435,7 +442,7 @@ CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_NM
 CMAKE_NM-ADVANCED:INTERNAL=1
 //number of local generators
-CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=4
+CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=7
 //ADVANCED property for variable: CMAKE_OBJCOPY
 CMAKE_OBJCOPY-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_OBJDUMP

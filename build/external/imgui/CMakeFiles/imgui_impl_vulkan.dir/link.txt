@@ -1,0 +1,2 @@
+/usr/bin/ar qc libimgui_impl_vulkan.a CMakeFiles/imgui_impl_vulkan.dir/imgui/imgui_impl_vulkan.cpp.o
+/usr/bin/ranlib libimgui_impl_vulkan.a

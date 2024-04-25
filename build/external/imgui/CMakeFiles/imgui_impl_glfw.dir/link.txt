@@ -1,0 +1,2 @@
+/usr/bin/ar qc libimgui_impl_glfw.a CMakeFiles/imgui_impl_glfw.dir/imgui/imgui_impl_glfw.cpp.o
+/usr/bin/ranlib libimgui_impl_glfw.a
