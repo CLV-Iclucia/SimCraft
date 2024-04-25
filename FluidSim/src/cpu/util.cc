@@ -409,4 +409,22 @@ void scaleAndAdd(spatify::Array3D<Real>& c, const spatify::Array3D<Real>& a,
     assert(!std::isnan(c(i, j, k)));
   });
 }
+std::optional<SDF<3>> loadSDF(const std::string& filename) {
+  std::fstream file(filename);
+  if (!file.is_open()) {
+    std::cerr << "Failed to open file " << filename << std::endl;
+    return std::nullopt;
+  }
+  Vector<int, 3> size;
+  Vector<Real, 3> origin, spacing;
+  file >> origin.x >> origin.y >> origin.z;
+  file >> size.x >> size.y >> size.z;
+  file >> spacing.x >> spacing.y >> spacing.z;
+  auto sdf = std::make_optional<SDF<3>>(size, Vec3d(spacing.x * size.x, spacing.y * size.y, spacing.z * size.z), origin);
+  for (int i = 0; i < size.x; i++)
+    for (int j = 0; j < size.y; j++)
+      for (int k = 0; k < size.z; k++)
+        file >> (*sdf)(i, j, k);
+  return std::move(sdf);
+}
 } // namespace fluid
