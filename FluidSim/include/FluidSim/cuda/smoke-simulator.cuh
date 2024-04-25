@@ -5,13 +5,13 @@
 #include <Core/properties.h>
 #include <Core/animation.h>
 #include <FluidSim/cuda/kernels.cuh>
+#include <FluidSim/cuda/mgpcg.cuh>
 #include <FluidSim/cuda/gpu-arrays.cuh>
 #include <vector_types.h>
 #include <memory>
 #include <array>
 
 namespace fluid::cuda {
-constexpr int kVcycleLevel = 5;
 struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
   uint n;
   std::unique_ptr<CudaSurface<float4>> loc;
@@ -22,7 +22,7 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
   std::unique_ptr<CudaTexture<float>> rhoBuf;
   std::unique_ptr<CudaTexture<float>> T;
   std::unique_ptr<CudaTexture<float>> TBuf;
-  std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel> collider{};
+  std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel> fluidRegion{};
   std::unique_ptr<CudaSurface<float>> div;
   std::unique_ptr<CudaSurface<float4>> vort;
   std::unique_ptr<CudaSurface<float4>> normal;
@@ -31,6 +31,7 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
   std::vector<std::unique_ptr<CudaSurface<float>>> res;
   std::vector<std::unique_ptr<CudaSurface<float>>> res2;
   std::vector<std::unique_ptr<CudaSurface<float>>> err2;
+
   std::vector<uint> sizes;
   float alpha = 1.f;
   float beta = 1.f;
@@ -49,12 +50,13 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
       , div(std::make_unique<CudaSurface<float>>(uint3{n, n, n}))
       , vort(std::make_unique<CudaSurface<float4>>(uint3{n, n, n}))
       , normal(std::make_unique<CudaSurface<float4>>(uint3{n, n, n})) {
+    prepareWeights();
     for (int i = 0; i < kVcycleLevel; i++) {
       p[i] = std::make_unique<CudaSurface<float>>(uint3{n >> i, n >> i, n >> i});
       pBuf[i] = std::make_unique<CudaSurface<float>>(uint3{n >> i, n >> i, n >> i});
     }
     for (int i = 0; i < kVcycleLevel; i++)
-      collider[i] = std::make_unique<CudaSurface<uint8_t>>(uint3{n >> i, n >> i, n >> i});
+      fluidRegion[i] = std::make_unique<CudaSurface<uint8_t>>(uint3{n >> i, n >> i, n >> i});
     int nthreads_dim = 8;
     int nblocks = (n + nthreads_dim - 1) / 8;
     FillKernel<<<dim3(nblocks, nblocks, nblocks),
@@ -68,12 +70,19 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
         T->surfaceAccessor(), 0.f, n);
   }
 
-//  void setCollider(const spatify::Array3D<uint8_t>& host_collider) {
-//    collider[0]->copyFrom(host_collider.data());
-//    for (int i = 1; i < kVcycleLevel; i++) {
-//       perform coarsening
-//    }
-//  }
+  void setCollider(const std::vector<uint8_t>& region_marker) {
+    std::unique_ptr<DeviceArray<uint8_t>> region_marker_dev =
+        std::make_unique<DeviceArray<uint8_t>>(region_marker);
+    kernelSetupFluidRegion<<<dim3(n / 8, n / 8, n / 8),
+        dim3(8, 8, 8)>>>(fluidRegion[0]->surfaceAccessor(), region_marker_dev->accessor(), n);
+    for (int i = 1; i < kVcycleLevel; i++) {
+      int nthreads_dim = 8;
+      int nblocks = (n >> i) + nthreads_dim - 1 / nthreads_dim;
+      PrecomputeDownSampleKernel<<<dim3(nblocks, nblocks, nblocks),
+          dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
+          fluidRegion[i - 1]->surfaceAccessor(), fluidRegion[i]->surfaceAccessor(), n >> i);
+    }
+  }
   void advection(float dt) {
     uint nthreads_dim = 8;
     uint nblocks = (n + nthreads_dim - 1) / 8;

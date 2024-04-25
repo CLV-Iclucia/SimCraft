@@ -173,4 +173,9 @@ __global__ void SmoothingKernel(CudaSurfaceAccessor<float> surf_rho,
   float result = (rxp + rxn + ryp + ryn + rzp + rzn + 6.f * rel) / 12.f;
   surf_rho_nxt.write(result, x, y, z);
 }
+__global__ void DownSampleKernel(CudaSurfaceAccessor<uint8_t> collider,
+                                 CudaSurfaceAccessor<uint8_t> collider_nxt,
+                                 uint n) {
+
+}
 }

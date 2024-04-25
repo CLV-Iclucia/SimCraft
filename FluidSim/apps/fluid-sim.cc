@@ -127,7 +127,7 @@ std::tuple<std::unique_ptr<OpenGLContext>, std::unique_ptr<ShaderProg>>
 initColliderRender(const core::Mesh& mesh) {
   auto shader = std::make_unique<ShaderProg>(
       std::format("{}/perspective-mesh.vs", FLUIDSIM_SHADER_DIR).c_str(),
-      std::format("{}/collider.fs", FLUIDSIM_SHADER_DIR).c_str());
+      std::format("{}/fluidRegion.fs", FLUIDSIM_SHADER_DIR).c_str());
   auto ctx = std::make_unique<OpenGLContext>();
   ctx->vao.bind();
   ctx->newAttribute("aPos", mesh.vertices, 3, 3 * sizeof(double),

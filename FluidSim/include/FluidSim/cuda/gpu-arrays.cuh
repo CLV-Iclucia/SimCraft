@@ -15,10 +15,8 @@
 namespace fluid::cuda {
 template<typename T>
 struct DeviceArray;
-}
-namespace core {
 template<typename T>
-struct Accessor<fluid::cuda::DeviceArray<T>> {
+struct DeviceArrayAccessor {
   T *ptr;
 
   CUDA_DEVICE CUDA_FORCEINLINE const T &operator[](size_t idx) const {
@@ -29,7 +27,7 @@ struct Accessor<fluid::cuda::DeviceArray<T>> {
 };
 
 template<typename T>
-struct ConstAccessor<fluid::cuda::DeviceArray<T>> {
+struct ConstDeviceArrayAccessor {
   T *ptr;
 
   CUDA_DEVICE CUDA_FORCEINLINE const T &operator[](size_t idx) const {
@@ -185,7 +183,7 @@ struct DeviceArray;
 using core::Accessor;
 using core::ConstAccessor;
 template<typename T>
-struct DeviceArray : core::DeviceMemoryAccessible<DeviceArray<T>> {
+struct DeviceArray {
   DeviceArray() = default;
 
   CUDA_CALLABLE DeviceArray &operator=(DeviceArray &&other) noexcept {
@@ -257,11 +255,11 @@ struct DeviceArray : core::DeviceMemoryAccessible<DeviceArray<T>> {
     cudaMalloc(&ptr, m_size * sizeof(T));
   }
 
-  CUDA_HOST CUDA_FORCEINLINE Accessor<DeviceArray<T>> accessor() const {
+  CUDA_HOST CUDA_FORCEINLINE DeviceArrayAccessor<T> accessor() const {
     return {ptr};
   }
 
-  CUDA_HOST CUDA_FORCEINLINE ConstAccessor<DeviceArray<T>> constAccessor() const {
+  CUDA_HOST CUDA_FORCEINLINE ConstDeviceArrayAccessor<T> constAccessor() const {
     return {ptr};
   }
 

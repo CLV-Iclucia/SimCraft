@@ -100,8 +100,9 @@ static CUDA_GLOBAL void kernelApplyCollider(CudaSurfaceAccessor<float> ug,
                                             int3 resolution,
                                             float h) {
   get_and_restrict_tid_3d(i, j, k, resolution.x, resolution.y, resolution.z);
-  if (i == 0 || i == resolution.x) {
+  if (i == 0) {
     ug.write(0.0, i, j, k);
+    ug.write(0.0, resolution.x, j, k);
     return;
   }
   auto pos =
@@ -114,6 +115,7 @@ static CUDA_GLOBAL void kernelApplyCollider(CudaSurfaceAccessor<float> ug,
   }
   if (j == 0 || j == resolution.y) {
     vg.write(0.0, i, j, k);
+    vg.write(0.0, i, resolution.y, k);
     return;
   }
   pos = make_float3(static_cast<float>((i + 0.5) * h), static_cast<float>(j * h), static_cast<float>((k + 0.5) * h));
@@ -123,6 +125,7 @@ static CUDA_GLOBAL void kernelApplyCollider(CudaSurfaceAccessor<float> ug,
   }
   if (k == 0 || k == resolution.z) {
     wg.write(0.0, i, j, k);
+    wg.write(0.0, i, j, resolution.z);
     return;
   }
   pos = make_float3(static_cast<float>((i + 0.5) * h), static_cast<float>((j + 0.5) * h), static_cast<float>(k * h));
@@ -168,8 +171,10 @@ void FluidSimulator::extrapolateFluidSdf(int iters) {
 void FluidSimulator::substep(Real dt) {
   clear();
   std::cout << "Solving advection... ";
+
   advectionSolver->advect(*particles, *u, *v, *w, resolution, h, dt);
   std::cout << "Done." << std::endl;
+  advectionSolver->moveParticles(*particles, *u, *v, *w, resolution, h, dt);
   std::cout << "Reconstructing surface... ";
 
   std::cout << "Done." << std::endl;
@@ -178,8 +183,6 @@ void FluidSimulator::substep(Real dt) {
   smoothFluidSurface(5);
   std::cout << "Done." << std::endl;
   std::cout << "Solving P2G... ";
-  advectionSolver->solveP2G(*particles, *u, *v, *w,
-                            *colliderSdf, *uw, *vw, *ww, *uValid, *vValid, *wValid, resolution, h, dt);
   applyDirichletBoundary();
   std::cout << "Done." << std::endl;
   std::cout << "Extrapolating velocities... ";
@@ -197,12 +200,12 @@ void FluidSimulator::substep(Real dt) {
     std::cerr << "Warning: projection residual is " << residual << std::endl;
   else std::cout << "Projection residual is " << residual << std::endl;
   std::cout << "Done." << std::endl;
-  std::cout << "Doing projection and applying collider... ";
+  std::cout << "Doing projection and applying fluidRegion... ";
   projectionSolver->project(*u, *v, *w, *fluidSurface, *colliderSdf, *p, resolution, h, dt);
   applyCollider();
   std::cout << "Done." << std::endl;
   std::cout << "Solving G2P... ";
-  advectionSolver->solveG2P(*particles, *u, *v, *w, resolution, h, dt);
+  advectionSolver->moveParticles(*particles, *u, *v, *w, resolution, h, dt);
   std::cout << "Done" << std::endl;
 }
 

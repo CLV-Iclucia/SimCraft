@@ -169,7 +169,7 @@ void FluidSimulator::substep(Real dt) {
     std::cerr << "Warning: projection residual is " << residual << std::endl;
   else std::cout << "Projection residual is " << residual << std::endl;
   std::cout << "Done." << std::endl;
-  std::cout << "Doing projection and applying collider... ";
+  std::cout << "Doing projection and applying fluidRegion... ";
   projector->project(*ug, *vg, *wg, pg, *fluidSurface, *colliderSdf, dt);
   applyCollider();
   std::cout << "Done." << std::endl;

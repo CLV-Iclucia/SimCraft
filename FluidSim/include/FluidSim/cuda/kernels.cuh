@@ -93,6 +93,9 @@ __global__ void ApplyForceKernel(CudaSurfaceAccessor<float4> surf_vel,
                                  CudaSurfaceAccessor<float4> surf_vel_nxt,
                                  CudaSurfaceAccessor<float4> surf_force,
                                  uint n, float dt);
+__global__ void kernelSetupFluidRegion(CudaSurfaceAccessor<uint8_t> surf,
+                                       DeviceArrayAccessor<uint8_t> region,
+                                       uint n);
 }
 
 #endif //KERNELS_CUH

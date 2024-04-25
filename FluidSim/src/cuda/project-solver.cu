@@ -134,7 +134,7 @@ static void scaleAndAdd(CudaSurface<float> &x,
 static CUDA_GLOBAL void kernelDotProduct(CudaSurfaceAccessor<float> surfaceA,
                                          CudaSurfaceAccessor<float> surfaceB,
                                          CudaSurfaceAccessor<uint8_t> active,
-                                         Accessor<DeviceArray<float>> result,
+                                         DeviceArrayAccessor<float> result,
                                          int3 dimensions) {
   get_and_restrict_tid_3d(x, y, z, dimensions.x, dimensions.y, dimensions.z);
   auto block_idx = blockIdx.x + blockIdx.y * gridDim.x + blockIdx.z * gridDim.x * gridDim.y;
@@ -155,7 +155,7 @@ static CUDA_GLOBAL void kernelDotProduct(CudaSurfaceAccessor<float> surfaceA,
 
 static CUDA_GLOBAL void kernelL1Norm(CudaSurfaceAccessor<float> surface,
                                      CudaSurfaceAccessor<uint8_t> active,
-                                     Accessor<DeviceArray<float>> result,
+                                     DeviceArrayAccessor<float> result,
                                      int3 dimensions) {
   get_and_restrict_tid_3d(x, y, z, dimensions.x, dimensions.y, dimensions.z);
   uint32_t block_idx = blockIdx.x + blockIdx.y * gridDim.x + blockIdx.z * gridDim.x * gridDim.y;

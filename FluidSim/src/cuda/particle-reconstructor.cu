@@ -29,8 +29,8 @@ static void CUDA_GLOBAL kernelInitParticleMapping(int n,
                                                   int resolution,
                                                   double3 spacing,
                                                   PosAccessor positions,
-                                                  Accessor<DeviceArray<int>> particle_idx_mapping,
-                                                  Accessor<DeviceArray<uint32_t>> particle_cell_mapping) {
+                                                  DeviceArrayAccessor<int> particle_idx_mapping,
+                                                  DeviceArrayAccessor<uint32_t> particle_cell_mapping) {
   get_and_restrict_tid(idx, n);
   particle_idx_mapping[idx] = idx;
   int idx_x = floor(positions.px[idx] / spacing.x);
@@ -44,9 +44,9 @@ static void CUDA_GLOBAL kernelInitParticleMapping(int n,
 }
 
 static void CUDA_GLOBAL kernelMarkCellBeginEnd(int n,
-                                               Accessor<DeviceArray<uint32_t>> particle_cell_mapping,
-                                               Accessor<DeviceArray<int>> cell_begin_idx,
-                                               Accessor<DeviceArray<int>> cell_end_idx) {
+                                               DeviceArrayAccessor<uint32_t> particle_cell_mapping,
+                                               DeviceArrayAccessor<int> cell_begin_idx,
+                                               DeviceArrayAccessor<int> cell_end_idx) {
   get_and_restrict_tid(idx, n);
   uint32_t grid_idx = particle_cell_mapping[idx];
   if (idx == 0 || particle_cell_mapping[idx] != grid_idx)
@@ -84,9 +84,9 @@ static void CUDA_GLOBAL kernelReconstructSdf(int3 sdfResolution,
                                              float h,
                                              float r,
                                              PosAccessor positions,
-                                             Accessor<DeviceArray<int>> particle_idx_mapping,
-                                             Accessor<DeviceArray<int>> cell_begin_idx,
-                                             Accessor<DeviceArray<int>> cell_end_idx,
+                                             DeviceArrayAccessor<int> particle_idx_mapping,
+                                             DeviceArrayAccessor<int> cell_begin_idx,
+                                             DeviceArrayAccessor<int> cell_end_idx,
                                              CudaSurfaceAccessor<float> sdf,
                                              CudaSurfaceAccessor<uint8_t> sdf_valid) {
   get_and_restrict_tid_3d(i, j, k, sdfResolution.x, sdfResolution.y, sdfResolution.z);

@@ -9,7 +9,8 @@ file(GLOB_RECURSE gpu_headers CONFIGURE_DEPENDS include/FluidSim/cuda/*.h includ
 file(GLOB common_headers CONFIGURE_DEPENDS include/FluidSim/*.h)
 file(GLOB common_srcs CONFIGURE_DEPENDS src/*.cc src/*.cpp)
 
-add_library(CpuFluid STATIC ${cpu_srcs} ${cpu_headers} ${common_headers} ${common_srcs})
+add_library(CpuFluid STATIC ${cpu_srcs} ${cpu_headers} ${common_headers} ${common_srcs}
+        include/FluidSim/cuda/cuda-linalg.cuh)
 add_library(GpuFluid STATIC ${gpu_srcs} ${gpu_headers})
 
 target_include_directories(CpuFluid PUBLIC include/)
@@ -23,7 +24,8 @@ target_compile_options(GpuFluid PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:--extended-lam
 add_definitions(-DFLUIDSIM_SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders")
 add_definitions(-DSIMCRAFT_ASSETS_DIR="${ASSETS_PATH}")
 
-add_executable(fluid-sim apps/fluid-sim.cc)
+add_executable(fluid-sim apps/fluid-sim.cc
+        apps/gpu-free-surface.cu)
 target_include_directories(fluid-sim PUBLIC ${EXTERNAL_PATH}/imgui)
 target_include_directories(fluid-sim PUBLIC ${GLAD_INCLUDE_DIR})
 target_link_libraries(fluid-sim PUBLIC ogl-render imgui imgui_impl_glfw imgui_impl_opengl3 CpuFluid glfw)
@@ -31,3 +33,7 @@ target_link_libraries(fluid-sim PUBLIC ogl-render imgui imgui_impl_glfw imgui_im
 add_executable(gpu-smoke apps/gpu-smoke.cu)
 target_include_directories(gpu-smoke PUBLIC ${GLAD_INCLUDE_DIR})
 target_link_libraries(gpu-smoke PUBLIC ogl-render GpuFluid glfw)
+
+add_executable(gpu-free-surface apps/gpu-free-surface.cu)
+target_include_directories(gpu-free-surface PUBLIC ${GLAD_INCLUDE_DIR})
+target_link_libraries(gpu-free-surface PUBLIC ogl-render GpuFluid glfw)

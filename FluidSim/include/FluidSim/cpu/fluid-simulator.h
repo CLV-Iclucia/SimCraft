@@ -54,7 +54,7 @@ class FluidSimulator final : public FluidComputeBackend {
   }
 
   void setCollider(const Mesh &colliderMesh) const override {
-    std::cout << "Building collider SDF..." << std::endl;
+    std::cout << "Building fluidRegion SDF..." << std::endl;
     Array3D<int> closest(colliderSdf->width(), colliderSdf->height(),
                          colliderSdf->depth());
     Array3D<int> intersection_cnt(colliderSdf->width(), colliderSdf->height(),
