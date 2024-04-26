@@ -256,15 +256,15 @@ int main(int argc, char** argv) {
     simulator->step(frame);
     drawFluid(fluidCtx.get(), fluidShader.get(), camera, simulator->positions(),
               display_w, display_h);
-    for (int i = 0; i <= 350; ++i) {
+    if(frame.idx <= 350){
         simulator->reconstruct();
         simulator->smoothFluidSurface(5);
         core::Mesh fluidMesh;
         fluid::cpu::rebuildSurface(fluidMesh, simulator->exportFluidSurface());
         std::ostringstream filename;
-        filename << "obj_file/fluid_" << std::setfill('0') << std::setw(3) << i << ".obj";
+        filename << "obj_file/fluid_" << std::setfill('0') << std::setw(3) << frame.idx << ".obj";
         if (!core::exportObj(filename.str(), fluidMesh)) {
-            std::cerr << "Failed to export fluid mesh for frame " << i << std::endl;
+            std::cerr << "Failed to export fluid mesh for frame " << frame.idx << std::endl;
             exit(-1);
         }
     }
