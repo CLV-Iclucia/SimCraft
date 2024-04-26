@@ -112,6 +112,7 @@ Core/clean: Core/CMakeFiles/test-cubic-solver.dir/clean
 # Recursive "all" directory target.
 FluidSim/all: FluidSim/CMakeFiles/CpuFluid.dir/all
 FluidSim/all: FluidSim/CMakeFiles/fluid-sim.dir/all
+FluidSim/all: FluidSim/CMakeFiles/bug.dir/all
 .PHONY : FluidSim/all
 
 # Recursive "preinstall" directory target.
@@ -121,6 +122,7 @@ FluidSim/preinstall:
 # Recursive "clean" directory target.
 FluidSim/clean: FluidSim/CMakeFiles/CpuFluid.dir/clean
 FluidSim/clean: FluidSim/CMakeFiles/fluid-sim.dir/clean
+FluidSim/clean: FluidSim/CMakeFiles/bug.dir/clean
 .PHONY : FluidSim/clean
 
 #=============================================================================
@@ -224,7 +226,7 @@ external/glad/CMakeFiles/GLAD.dir/clean:
 external/imgui/CMakeFiles/imgui.dir/all:
 	$(MAKE) $(MAKESILENT) -f external/imgui/CMakeFiles/imgui.dir/build.make external/imgui/CMakeFiles/imgui.dir/depend
 	$(MAKE) $(MAKESILENT) -f external/imgui/CMakeFiles/imgui.dir/build.make external/imgui/CMakeFiles/imgui.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" --progress-num=18,19,20,21,22,23 "Built target imgui"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" --progress-num=20,21,22,23,24,25 "Built target imgui"
 .PHONY : external/imgui/CMakeFiles/imgui.dir/all
 
 # Build rule for subdir invocation for target.
@@ -250,7 +252,7 @@ external/imgui/CMakeFiles/imgui.dir/clean:
 external/imgui/CMakeFiles/imgui_impl_glfw.dir/all: external/imgui/CMakeFiles/imgui.dir/all
 	$(MAKE) $(MAKESILENT) -f external/imgui/CMakeFiles/imgui_impl_glfw.dir/build.make external/imgui/CMakeFiles/imgui_impl_glfw.dir/depend
 	$(MAKE) $(MAKESILENT) -f external/imgui/CMakeFiles/imgui_impl_glfw.dir/build.make external/imgui/CMakeFiles/imgui_impl_glfw.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" --progress-num=24,25 "Built target imgui_impl_glfw"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" --progress-num=26,27 "Built target imgui_impl_glfw"
 .PHONY : external/imgui/CMakeFiles/imgui_impl_glfw.dir/all
 
 # Build rule for subdir invocation for target.
@@ -276,7 +278,7 @@ external/imgui/CMakeFiles/imgui_impl_glfw.dir/clean:
 external/imgui/CMakeFiles/imgui_impl_opengl3.dir/all: external/imgui/CMakeFiles/imgui.dir/all
 	$(MAKE) $(MAKESILENT) -f external/imgui/CMakeFiles/imgui_impl_opengl3.dir/build.make external/imgui/CMakeFiles/imgui_impl_opengl3.dir/depend
 	$(MAKE) $(MAKESILENT) -f external/imgui/CMakeFiles/imgui_impl_opengl3.dir/build.make external/imgui/CMakeFiles/imgui_impl_opengl3.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" --progress-num=26,27 "Built target imgui_impl_opengl3"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" --progress-num=28,29 "Built target imgui_impl_opengl3"
 .PHONY : external/imgui/CMakeFiles/imgui_impl_opengl3.dir/all
 
 # Build rule for subdir invocation for target.
@@ -302,7 +304,7 @@ external/imgui/CMakeFiles/imgui_impl_opengl3.dir/clean:
 external/imgui/CMakeFiles/imgui_impl_vulkan.dir/all: external/imgui/CMakeFiles/imgui.dir/all
 	$(MAKE) $(MAKESILENT) -f external/imgui/CMakeFiles/imgui_impl_vulkan.dir/build.make external/imgui/CMakeFiles/imgui_impl_vulkan.dir/depend
 	$(MAKE) $(MAKESILENT) -f external/imgui/CMakeFiles/imgui_impl_vulkan.dir/build.make external/imgui/CMakeFiles/imgui_impl_vulkan.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" --progress-num=28,29 "Built target imgui_impl_vulkan"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" --progress-num=30,31 "Built target imgui_impl_vulkan"
 .PHONY : external/imgui/CMakeFiles/imgui_impl_vulkan.dir/all
 
 # Build rule for subdir invocation for target.
@@ -355,7 +357,7 @@ Core/CMakeFiles/test-cubic-solver.dir/all: external/glad/CMakeFiles/GLAD.dir/all
 Core/CMakeFiles/test-cubic-solver.dir/all: Core/CMakeFiles/Core.dir/all
 	$(MAKE) $(MAKESILENT) -f Core/CMakeFiles/test-cubic-solver.dir/build.make Core/CMakeFiles/test-cubic-solver.dir/depend
 	$(MAKE) $(MAKESILENT) -f Core/CMakeFiles/test-cubic-solver.dir/build.make Core/CMakeFiles/test-cubic-solver.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" --progress-num=34,35 "Built target test-cubic-solver"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" --progress-num=36,37 "Built target test-cubic-solver"
 .PHONY : Core/CMakeFiles/test-cubic-solver.dir/all
 
 # Build rule for subdir invocation for target.
@@ -381,7 +383,7 @@ Core/CMakeFiles/test-cubic-solver.dir/clean:
 OglRender/CMakeFiles/ogl-render.dir/all: external/glad/CMakeFiles/GLAD.dir/all
 	$(MAKE) $(MAKESILENT) -f OglRender/CMakeFiles/ogl-render.dir/build.make OglRender/CMakeFiles/ogl-render.dir/depend
 	$(MAKE) $(MAKESILENT) -f OglRender/CMakeFiles/ogl-render.dir/build.make OglRender/CMakeFiles/ogl-render.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" --progress-num=30,31,32,33 "Built target ogl-render"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" --progress-num=32,33,34,35 "Built target ogl-render"
 .PHONY : OglRender/CMakeFiles/ogl-render.dir/all
 
 # Build rule for subdir invocation for target.
@@ -411,7 +413,7 @@ OglRender/CMakeFiles/demo.dir/all: external/imgui/CMakeFiles/imgui_impl_opengl3.
 OglRender/CMakeFiles/demo.dir/all: OglRender/CMakeFiles/ogl-render.dir/all
 	$(MAKE) $(MAKESILENT) -f OglRender/CMakeFiles/demo.dir/build.make OglRender/CMakeFiles/demo.dir/depend
 	$(MAKE) $(MAKESILENT) -f OglRender/CMakeFiles/demo.dir/build.make OglRender/CMakeFiles/demo.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" --progress-num=14,15 "Built target demo"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" --progress-num=16,17 "Built target demo"
 .PHONY : OglRender/CMakeFiles/demo.dir/all
 
 # Build rule for subdir invocation for target.
@@ -470,7 +472,7 @@ FluidSim/CMakeFiles/fluid-sim.dir/all: OglRender/CMakeFiles/ogl-render.dir/all
 FluidSim/CMakeFiles/fluid-sim.dir/all: FluidSim/CMakeFiles/CpuFluid.dir/all
 	$(MAKE) $(MAKESILENT) -f FluidSim/CMakeFiles/fluid-sim.dir/build.make FluidSim/CMakeFiles/fluid-sim.dir/depend
 	$(MAKE) $(MAKESILENT) -f FluidSim/CMakeFiles/fluid-sim.dir/build.make FluidSim/CMakeFiles/fluid-sim.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" --progress-num=16,17 "Built target fluid-sim"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" --progress-num=18,19 "Built target fluid-sim"
 .PHONY : FluidSim/CMakeFiles/fluid-sim.dir/all
 
 # Build rule for subdir invocation for target.
@@ -488,6 +490,38 @@ fluid-sim: FluidSim/CMakeFiles/fluid-sim.dir/rule
 FluidSim/CMakeFiles/fluid-sim.dir/clean:
 	$(MAKE) $(MAKESILENT) -f FluidSim/CMakeFiles/fluid-sim.dir/build.make FluidSim/CMakeFiles/fluid-sim.dir/clean
 .PHONY : FluidSim/CMakeFiles/fluid-sim.dir/clean
+
+#=============================================================================
+# Target rules for target FluidSim/CMakeFiles/bug.dir
+
+# All Build rule for target.
+FluidSim/CMakeFiles/bug.dir/all: external/glad/CMakeFiles/GLAD.dir/all
+FluidSim/CMakeFiles/bug.dir/all: external/imgui/CMakeFiles/imgui.dir/all
+FluidSim/CMakeFiles/bug.dir/all: external/imgui/CMakeFiles/imgui_impl_glfw.dir/all
+FluidSim/CMakeFiles/bug.dir/all: external/imgui/CMakeFiles/imgui_impl_opengl3.dir/all
+FluidSim/CMakeFiles/bug.dir/all: Core/CMakeFiles/Core.dir/all
+FluidSim/CMakeFiles/bug.dir/all: OglRender/CMakeFiles/ogl-render.dir/all
+FluidSim/CMakeFiles/bug.dir/all: FluidSim/CMakeFiles/CpuFluid.dir/all
+	$(MAKE) $(MAKESILENT) -f FluidSim/CMakeFiles/bug.dir/build.make FluidSim/CMakeFiles/bug.dir/depend
+	$(MAKE) $(MAKESILENT) -f FluidSim/CMakeFiles/bug.dir/build.make FluidSim/CMakeFiles/bug.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" --progress-num=14,15 "Built target bug"
+.PHONY : FluidSim/CMakeFiles/bug.dir/all
+
+# Build rule for subdir invocation for target.
+FluidSim/CMakeFiles/bug.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start "/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" 29
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 FluidSim/CMakeFiles/bug.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start "/home/atopos/cs184/prj/final project/SimCraft/build/CMakeFiles" 0
+.PHONY : FluidSim/CMakeFiles/bug.dir/rule
+
+# Convenience name for target.
+bug: FluidSim/CMakeFiles/bug.dir/rule
+.PHONY : bug
+
+# clean rule for target.
+FluidSim/CMakeFiles/bug.dir/clean:
+	$(MAKE) $(MAKESILENT) -f FluidSim/CMakeFiles/bug.dir/build.make FluidSim/CMakeFiles/bug.dir/clean
+.PHONY : FluidSim/CMakeFiles/bug.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.

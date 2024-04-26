@@ -648,7 +648,7 @@ static int globalVertexIdx(int x, int y, int z, int height, int depth,
   };
   assert(localIdx >= 0 && localIdx < 12);
   return (2 * (y + 1) + vertexOffset3D[localIdx][1] + (
-            2 * (x + 1) + vertexOffset3D[localIdx][0]) * (height + 2)) * (depth + 2)
+            2 * (x + 1) + vertexOffset3D[localIdx][0]) * (2 * height + 3)) * (2 * depth + 3)
          + 2 * (z + 1) + vertexOffset3D[localIdx][2];
 }
 

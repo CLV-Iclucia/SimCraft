@@ -145,12 +145,27 @@ fluid-sim/fast:
 	cd "/home/atopos/cs184/prj/final project/SimCraft/build" && $(MAKE) $(MAKESILENT) -f FluidSim/CMakeFiles/fluid-sim.dir/build.make FluidSim/CMakeFiles/fluid-sim.dir/build
 .PHONY : fluid-sim/fast
 
+# Convenience name for target.
+FluidSim/CMakeFiles/bug.dir/rule:
+	cd "/home/atopos/cs184/prj/final project/SimCraft/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 FluidSim/CMakeFiles/bug.dir/rule
+.PHONY : FluidSim/CMakeFiles/bug.dir/rule
+
+# Convenience name for target.
+bug: FluidSim/CMakeFiles/bug.dir/rule
+.PHONY : bug
+
+# fast build rule for target.
+bug/fast:
+	cd "/home/atopos/cs184/prj/final project/SimCraft/build" && $(MAKE) $(MAKESILENT) -f FluidSim/CMakeFiles/bug.dir/build.make FluidSim/CMakeFiles/bug.dir/build
+.PHONY : bug/fast
+
 apps/fluid-sim.o: apps/fluid-sim.cc.o
 .PHONY : apps/fluid-sim.o
 
 # target to build an object file
 apps/fluid-sim.cc.o:
 	cd "/home/atopos/cs184/prj/final project/SimCraft/build" && $(MAKE) $(MAKESILENT) -f FluidSim/CMakeFiles/fluid-sim.dir/build.make FluidSim/CMakeFiles/fluid-sim.dir/apps/fluid-sim.cc.o
+	cd "/home/atopos/cs184/prj/final project/SimCraft/build" && $(MAKE) $(MAKESILENT) -f FluidSim/CMakeFiles/bug.dir/build.make FluidSim/CMakeFiles/bug.dir/apps/fluid-sim.cc.o
 .PHONY : apps/fluid-sim.cc.o
 
 apps/fluid-sim.i: apps/fluid-sim.cc.i
@@ -159,6 +174,7 @@ apps/fluid-sim.i: apps/fluid-sim.cc.i
 # target to preprocess a source file
 apps/fluid-sim.cc.i:
 	cd "/home/atopos/cs184/prj/final project/SimCraft/build" && $(MAKE) $(MAKESILENT) -f FluidSim/CMakeFiles/fluid-sim.dir/build.make FluidSim/CMakeFiles/fluid-sim.dir/apps/fluid-sim.cc.i
+	cd "/home/atopos/cs184/prj/final project/SimCraft/build" && $(MAKE) $(MAKESILENT) -f FluidSim/CMakeFiles/bug.dir/build.make FluidSim/CMakeFiles/bug.dir/apps/fluid-sim.cc.i
 .PHONY : apps/fluid-sim.cc.i
 
 apps/fluid-sim.s: apps/fluid-sim.cc.s
@@ -167,6 +183,7 @@ apps/fluid-sim.s: apps/fluid-sim.cc.s
 # target to generate assembly for a file
 apps/fluid-sim.cc.s:
 	cd "/home/atopos/cs184/prj/final project/SimCraft/build" && $(MAKE) $(MAKESILENT) -f FluidSim/CMakeFiles/fluid-sim.dir/build.make FluidSim/CMakeFiles/fluid-sim.dir/apps/fluid-sim.cc.s
+	cd "/home/atopos/cs184/prj/final project/SimCraft/build" && $(MAKE) $(MAKESILENT) -f FluidSim/CMakeFiles/bug.dir/build.make FluidSim/CMakeFiles/bug.dir/apps/fluid-sim.cc.s
 .PHONY : apps/fluid-sim.cc.s
 
 src/cpu/advect-solver.o: src/cpu/advect-solver.cc.o
@@ -322,6 +339,7 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... CpuFluid"
+	@echo "... bug"
 	@echo "... fluid-sim"
 	@echo "... apps/fluid-sim.o"
 	@echo "... apps/fluid-sim.i"

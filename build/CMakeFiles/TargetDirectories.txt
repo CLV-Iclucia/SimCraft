@@ -21,5 +21,6 @@
 /home/atopos/cs184/prj/final project/SimCraft/build/Spatify/CMakeFiles/rebuild_cache.dir
 /home/atopos/cs184/prj/final project/SimCraft/build/FluidSim/CMakeFiles/CpuFluid.dir
 /home/atopos/cs184/prj/final project/SimCraft/build/FluidSim/CMakeFiles/fluid-sim.dir
+/home/atopos/cs184/prj/final project/SimCraft/build/FluidSim/CMakeFiles/bug.dir
 /home/atopos/cs184/prj/final project/SimCraft/build/FluidSim/CMakeFiles/edit_cache.dir
 /home/atopos/cs184/prj/final project/SimCraft/build/FluidSim/CMakeFiles/rebuild_cache.dir

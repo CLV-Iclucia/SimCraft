@@ -261,7 +261,7 @@ int main(int argc, char** argv) {
       const auto& surface = simulator->exportFluidSurface();
       auto sdf_samples = surface.fieldSamples();
       fluid::cpu::rebuildSurface(fluidMesh, simulator->exportFluidSurface());
-      simulator->exportFluidSurface().saveSDF("the place to save your SDF file");
+      simulator->exportFluidSurface().saveSDF("fluid.sdf");
       if (!core::exportObj("fluid.obj", fluidMesh)) {
         std::cerr << "Failed to export fluid mesh" << std::endl;
         exit(-1);

@@ -158,7 +158,7 @@ struct SDF : NonCopyable {
     return field;
   }
   void saveSDF(const std::string& filename) const {
-    std::fstream file(filename);
+    std::ofstream file(filename, std::ios::out);
     if (!file.is_open()) {
       std::cerr << "Failed to open file " << filename << std::endl;
       return;

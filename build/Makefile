@@ -260,6 +260,19 @@ fluid-sim/fast:
 	$(MAKE) $(MAKESILENT) -f FluidSim/CMakeFiles/fluid-sim.dir/build.make FluidSim/CMakeFiles/fluid-sim.dir/build
 .PHONY : fluid-sim/fast
 
+#=============================================================================
+# Target rules for targets named bug
+
+# Build rule for target.
+bug: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 bug
+.PHONY : bug
+
+# fast build rule for target.
+bug/fast:
+	$(MAKE) $(MAKESILENT) -f FluidSim/CMakeFiles/bug.dir/build.make FluidSim/CMakeFiles/bug.dir/build
+.PHONY : bug/fast
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -271,6 +284,7 @@ help:
 	@echo "... Core"
 	@echo "... CpuFluid"
 	@echo "... GLAD"
+	@echo "... bug"
 	@echo "... demo"
 	@echo "... fluid-sim"
 	@echo "... imgui"

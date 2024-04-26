@@ -7,7 +7,7 @@
 #include <FluidSim/cpu/sdf.h>
 
 int main() {
-  auto sdf = fluid::loadSDF("the place where you saved your SDF file");
+  auto sdf = fluid::loadSDF("fluid.sdf");
   core::Mesh mesh;
   fluid::cpu::rebuildSurface(mesh, *sdf);
   if (!core::exportObj("fluid.obj", mesh)) {

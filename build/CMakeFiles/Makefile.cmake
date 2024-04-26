@@ -82,4 +82,5 @@ set(CMAKE_DEPEND_INFO_FILES
   "OglRender/CMakeFiles/demo.dir/DependInfo.cmake"
   "FluidSim/CMakeFiles/CpuFluid.dir/DependInfo.cmake"
   "FluidSim/CMakeFiles/fluid-sim.dir/DependInfo.cmake"
+  "FluidSim/CMakeFiles/bug.dir/DependInfo.cmake"
   )
