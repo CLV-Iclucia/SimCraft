@@ -655,7 +655,7 @@ static int globalVertexIdx(int x, int y, int z, int height, int depth,
 static Real evalSdf(const SDF<3>& sdf, int x, int y, int z) {
   if (x < 0 || x >= sdf.width() || y < 0 || y >= sdf.height() || z < 0 ||
       z >= sdf.depth())
-    return 0.5 * sdf.grid.gridSpacing().x;
+    return 1000;
   return sdf.grid(x, y, z);
 }
 
