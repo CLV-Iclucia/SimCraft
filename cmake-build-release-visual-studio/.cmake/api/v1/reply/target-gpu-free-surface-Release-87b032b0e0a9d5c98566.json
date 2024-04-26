@@ -2,10 +2,10 @@
 	"artifacts" : 
 	[
 		{
-			"path" : "FluidSim/gpu-smoke.exe"
+			"path" : "FluidSim/gpu-free-surface.exe"
 		},
 		{
-			"path" : "FluidSim/gpu-smoke.pdb"
+			"path" : "FluidSim/gpu-free-surface.pdb"
 		}
 	],
 	"backtrace" : 2,
@@ -24,8 +24,7 @@
 			"C:/vcpkg/scripts/buildsystems/vcpkg.cmake",
 			"FluidSim/CMakeLists.txt",
 			"OglRender/CMakeLists.txt",
-			"Core/CMakeLists.txt",
-			"Spatify/CMakeLists.txt"
+			"Core/CMakeLists.txt"
 		],
 		"nodes" : 
 		[
@@ -35,7 +34,7 @@
 			{
 				"command" : 1,
 				"file" : 1,
-				"line" : 34,
+				"line" : 36,
 				"parent" : 0
 			},
 			{
@@ -47,13 +46,13 @@
 			{
 				"command" : 2,
 				"file" : 1,
-				"line" : 37,
+				"line" : 38,
 				"parent" : 0
 			},
 			{
 				"command" : 2,
 				"file" : 1,
-				"line" : 21,
+				"line" : 20,
 				"parent" : 0
 			},
 			{
@@ -75,13 +74,10 @@
 				"parent" : 7
 			},
 			{
-				"file" : 4
-			},
-			{
-				"command" : 2,
-				"file" : 4,
-				"line" : 6,
-				"parent" : 9
+				"command" : 3,
+				"file" : 1,
+				"line" : 24,
+				"parent" : 0
 			},
 			{
 				"command" : 3,
@@ -90,21 +86,9 @@
 				"parent" : 0
 			},
 			{
-				"command" : 3,
-				"file" : 1,
-				"line" : 26,
-				"parent" : 0
-			},
-			{
 				"command" : 4,
 				"file" : 1,
-				"line" : 35,
-				"parent" : 0
-			},
-			{
-				"command" : 4,
-				"file" : 1,
-				"line" : 36,
+				"line" : 37,
 				"parent" : 0
 			}
 		]
@@ -115,7 +99,7 @@
 			"compileCommandFragments" : 
 			[
 				{
-					"fragment" : "-D_WINDOWS -Xcompiler=\"/W3 /GR /EHsc\" -Xcompiler=\"-MDd  -Zi -Ob0 -Od /RTC1\" -std=c++20 \"--generate-code=arch=compute_52,code=[compute_52,sm_52]\" \"--generate-code=arch=compute_70,code=[compute_70,sm_70]\" \"--generate-code=arch=compute_75,code=[compute_75,sm_75]\" \"--generate-code=arch=compute_86,code=[compute_86,sm_86]\""
+					"fragment" : "-D_WINDOWS -Xcompiler=\"/W3 /GR /EHsc\" -Xcompiler=\"-MD -O2 -Ob2\" -DNDEBUG -std=c++20 \"--generate-code=arch=compute_52,code=[compute_52,sm_52]\" \"--generate-code=arch=compute_70,code=[compute_70,sm_70]\" \"--generate-code=arch=compute_75,code=[compute_75,sm_75]\" \"--generate-code=arch=compute_86,code=[compute_86,sm_86]\""
 				},
 				{
 					"backtrace" : 3,
@@ -125,7 +109,7 @@
 			"defines" : 
 			[
 				{
-					"backtrace" : 11,
+					"backtrace" : 9,
 					"define" : "FLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\""
 				},
 				{
@@ -133,26 +117,14 @@
 					"define" : "GLFW_DLL"
 				},
 				{
-					"backtrace" : 12,
+					"backtrace" : 10,
 					"define" : "SIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\""
-				},
-				{
-					"backtrace" : 3,
-					"define" : "TBB_USE_DEBUG"
-				},
-				{
-					"backtrace" : 3,
-					"define" : "USE_TBB"
 				}
 			],
 			"includes" : 
 			[
 				{
-					"backtrace" : 13,
-					"path" : "C:/Users/79105/source/repos/SimCraft/external/imgui"
-				},
-				{
-					"backtrace" : 14,
+					"backtrace" : 11,
 					"path" : "C:/Users/79105/source/repos/SimCraft/external/glad/include"
 				},
 				{
@@ -178,10 +150,6 @@
 				{
 					"backtrace" : 3,
 					"path" : "C:/Users/79105/source/repos/SimCraft/Core/include"
-				},
-				{
-					"backtrace" : 3,
-					"path" : "C:/Users/79105/source/repos/SimCraft/Spatify/include"
 				},
 				{
 					"backtrace" : 3,
@@ -212,7 +180,7 @@
 		},
 		{
 			"backtrace" : 3,
-			"id" : "ogl-render::@81d7a7436324b23b6d5e"
+			"id" : "Core::@94795ff35dabbbd3a8ca"
 		},
 		{
 			"backtrace" : 3,
@@ -220,20 +188,20 @@
 		},
 		{
 			"backtrace" : 3,
-			"id" : "Core::@94795ff35dabbbd3a8ca"
+			"id" : "ogl-render::@81d7a7436324b23b6d5e"
 		}
 	],
-	"id" : "gpu-smoke::@3366da4e958440a3d013",
+	"id" : "gpu-free-surface::@3366da4e958440a3d013",
 	"link" : 
 	{
 		"commandFragments" : 
 		[
 			{
-				"fragment" : "/DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1",
+				"fragment" : "/DWIN32 /D_WINDOWS /W3 /GR /EHsc /MD /O2 /Ob2 /DNDEBUG",
 				"role" : "flags"
 			},
 			{
-				"fragment" : "/machine:x64 /debug /INCREMENTAL /subsystem:console",
+				"fragment" : "/machine:x64 /INCREMENTAL:NO /subsystem:console",
 				"role" : "flags"
 			},
 			{
@@ -252,7 +220,7 @@
 			},
 			{
 				"backtrace" : 3,
-				"fragment" : "C:\\vcpkg\\installed\\x64-windows\\debug\\lib\\glfw3dll.lib",
+				"fragment" : "C:\\vcpkg\\installed\\x64-windows\\lib\\glfw3dll.lib",
 				"role" : "libraries"
 			},
 			{
@@ -271,11 +239,6 @@
 				"role" : "libraries"
 			},
 			{
-				"backtrace" : 10,
-				"fragment" : "C:\\vcpkg\\installed\\x64-windows\\debug\\lib\\tbb12_debug.lib",
-				"role" : "libraries"
-			},
-			{
 				"fragment" : "cudadevrt.lib",
 				"role" : "libraries"
 			},
@@ -290,8 +253,8 @@
 		],
 		"language" : "CXX"
 	},
-	"name" : "gpu-smoke",
-	"nameOnDisk" : "gpu-smoke.exe",
+	"name" : "gpu-free-surface",
+	"nameOnDisk" : "gpu-free-surface.exe",
 	"paths" : 
 	{
 		"build" : "FluidSim",
@@ -312,7 +275,7 @@
 		{
 			"backtrace" : 2,
 			"compileGroupIndex" : 0,
-			"path" : "FluidSim/apps/gpu-smoke.cu",
+			"path" : "FluidSim/apps/gpu-free-surface.cu",
 			"sourceGroupIndex" : 0
 		}
 	],

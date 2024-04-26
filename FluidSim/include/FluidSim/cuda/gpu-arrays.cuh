@@ -8,16 +8,15 @@
 #include <Core/properties.h>
 #include <Core/cuda-utils.h>
 #include <Core/properties.h>
+#include <Core/core.h>
 #include <cuda_runtime.h>
 #include <cstdint>
 
 namespace fluid::cuda {
 template<typename T>
 struct DeviceArray;
-}
-namespace core {
 template<typename T>
-struct Accessor<fluid::cuda::DeviceArray<T>> {
+struct DeviceArrayAccessor {
   T *ptr;
 
   CUDA_DEVICE CUDA_FORCEINLINE const T &operator[](size_t idx) const {
@@ -28,7 +27,7 @@ struct Accessor<fluid::cuda::DeviceArray<T>> {
 };
 
 template<typename T>
-struct ConstAccessor<fluid::cuda::DeviceArray<T>> {
+struct ConstDeviceArrayAccessor {
   T *ptr;
 
   CUDA_DEVICE CUDA_FORCEINLINE const T &operator[](size_t idx) const {
@@ -39,7 +38,7 @@ struct ConstAccessor<fluid::cuda::DeviceArray<T>> {
 namespace fluid::cuda {
 
 template<typename T>
-struct CudaArray3D : NonCopyable {
+struct CudaArray3D : core::NonCopyable {
   cudaArray *cuda_array{};
   uint3 dim;
 
@@ -50,12 +49,22 @@ struct CudaArray3D : NonCopyable {
     cudaMalloc3DArray(&cuda_array, &channel_desc, extent,
                       cudaArraySurfaceLoadStore);
   }
-
+  CudaArray3D(CudaArray3D &&other) noexcept
+      : cuda_array(other.cuda_array), dim(other.dim) {
+    other.cuda_array = nullptr;
+  }
+  CudaArray3D& operator=(CudaArray3D &&other) noexcept {
+    if (this != &other) {
+      cuda_array = other.cuda_array;
+      dim = other.dim;
+      other.cuda_array = nullptr;
+    }
+    return *this;
+  }
   void copyFrom(const T *data) {
     cudaMemcpy3DParms copy3DParams{};
     copy3DParams.srcPtr =
-        make_cudaPitchedPtr(static_cast<void *>(data), dim.x * sizeof(T), dim.x,
-                            dim.y);
+        make_cudaPitchedPtr(static_cast<void*>(data), dim.x * sizeof(T), dim.x, dim.y);
     copy3DParams.dstArray = cuda_array;
     copy3DParams.extent = make_cudaExtent(dim.x, dim.y, dim.z);
     copy3DParams.kind = cudaMemcpyHostToDevice;
@@ -185,7 +194,7 @@ struct DeviceArray;
 using core::Accessor;
 using core::ConstAccessor;
 template<typename T>
-struct DeviceArray : core::DeviceMemoryAccessible<DeviceArray<T>> {
+struct DeviceArray {
   DeviceArray() = default;
 
   CUDA_CALLABLE DeviceArray &operator=(DeviceArray &&other) noexcept {
@@ -257,11 +266,11 @@ struct DeviceArray : core::DeviceMemoryAccessible<DeviceArray<T>> {
     cudaMalloc(&ptr, m_size * sizeof(T));
   }
 
-  CUDA_HOST CUDA_FORCEINLINE Accessor<DeviceArray<T>> accessor() const {
+  CUDA_HOST CUDA_FORCEINLINE DeviceArrayAccessor<T> accessor() const {
     return {ptr};
   }
 
-  CUDA_HOST CUDA_FORCEINLINE ConstAccessor<DeviceArray<T>> constAccessor() const {
+  CUDA_HOST CUDA_FORCEINLINE ConstDeviceArrayAccessor<T> constAccessor() const {
     return {ptr};
   }
 

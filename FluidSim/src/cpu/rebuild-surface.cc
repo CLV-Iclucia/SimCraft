@@ -648,14 +648,14 @@ static int globalVertexIdx(int x, int y, int z, int height, int depth,
   };
   assert(localIdx >= 0 && localIdx < 12);
   return (2 * (y + 1) + vertexOffset3D[localIdx][1] + (
-            2 * (x + 1) + vertexOffset3D[localIdx][0]) * (height + 2)) * (depth + 2)
+            2 * (x + 1) + vertexOffset3D[localIdx][0]) * (2 * height + 3)) * (2 * depth + 3)
          + 2 * (z + 1) + vertexOffset3D[localIdx][2];
 }
 
 static Real evalSdf(const SDF<3>& sdf, int x, int y, int z) {
   if (x < 0 || x >= sdf.width() || y < 0 || y >= sdf.height() || z < 0 ||
       z >= sdf.depth())
-    return 0.5 * sdf.grid.gridSpacing().x;
+    return 1000.0;
   return sdf.grid(x, y, z);
 }
 

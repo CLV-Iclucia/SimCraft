@@ -5,48 +5,32 @@
 #ifndef SIM_CRAFT_CUDA_FLUID_SIMULATOR_H
 #define SIM_CRAFT_CUDA_FLUID_SIMULATOR_H
 
-#include <FluidSim/fluid-simulator.h>
-#include <FluidSim/cuda/gpu-arrays.h>
+//#include <FluidSim/fluid-simulator.h>
+#include <FluidSim/cuda/gpu-arrays.cuh>
 #include <FluidSim/cuda/project-solver.h>
 #include <FluidSim/cuda/advect-solver.h>
 #include <format>
 namespace fluid::cuda {
-class FluidSimulator final : public FluidComputeBackend {
+class FluidSimulator {
  public:
   FluidSimulator(int nParticles_, const Vec3d &size, const Vec3i &resolution) {
 
   }
-  void setCollider(const Mesh &collider_mesh) const override {
+  void setCollider(const Mesh &collider_mesh) const {
   }
 
-  void setInitialFluid(const Mesh &fluid_mesh) override;
+  void setInitialFluid(const Mesh &fluid_mesh);
 
-  void setAdvector(AdvectionMethod advection_method) override {
-    if (advection_method == AdvectionMethod::PIC) {
-    }
-  }
-
-  void setProjector(ProjectSolver project_solver) override {
-    if (project_solver == ProjectSolver::FVM) {
-      projectionSolver = std::make_unique<FvmSolver>(resolution.x, resolution.y,
-                                                     resolution.z);
-    } else {
-      ERROR("Invalid project solver");
-    }
-  }
-  void setCompressedSolver(CompressedSolverMethod solver_method,
-                           PreconditionerMethod preconditioner_method) override {
-    projectionSolver->setCompressedSolver(solver_method, preconditioner_method);
-  }
   int3 resolution;
   Real h;
-  std::unique_ptr<CudaTexture<double>> fluidSurface, fluidSurfaceBuf;
-  std::unique_ptr<CudaTexture<double>> colliderSdf;
-  std::unique_ptr<CudaTexture<double>> u, v, w, uBuf, vBuf, wBuf;
-  std::unique_ptr<CudaSurface<double>> uw, vw, ww, p;
-  std::unique_ptr<CudaSurface<uint8_t>> uValid, vValid, wValid, uValidBuf, vValidBuf, wValidBuf, sdfValid, sdfValidBuf;
+  std::unique_ptr<CudaTexture<float>> fluidSurface{}, fluidSurfaceBuf{};
+  std::unique_ptr<CudaTexture<float>> colliderSdf{};
+  std::unique_ptr<CudaTexture<float>> u{}, v{}, w{}, uBuf{}, vBuf{}, wBuf{};
+  std::unique_ptr<CudaSurface<float>> uw{}, vw{}, ww{}, p{};
+  std::unique_ptr<CudaSurface<uint8_t>> uValid{}, vValid{}, wValid{}, uValidBuf{}, vValidBuf{}, wValidBuf{}, sdfValid{},
+      sdfValidBuf{};
   std::unique_ptr<ProjectionSolver> projectionSolver{};
-  std::unique_ptr<AdvectionSolver> advectionSolver{};
+  std::unique_ptr<ParticleLevelSetSolver> advectionSolver{};
   std::unique_ptr<ParticleSystem> particles{};
   void substep(Real dt);
   double CFL() const;
@@ -67,12 +51,18 @@ class FluidSimulator final : public FluidComputeBackend {
     frame.onAdvance();
   }
 
-  ~FluidSimulator() override = default;
+  ~FluidSimulator() = default;
   void clear() const;
   void smoothFluidSurface(int iters);
   void applyCollider() const;
   void applyForce(Real dt) const;
   void applyDirichletBoundary() const;
+  void extrapolate(std::unique_ptr<CudaSurface<float>> &grid,
+                   std::unique_ptr<CudaSurface<float>> &buf,
+                   std::unique_ptr<CudaSurface<uint8_t>> &valid,
+                   std::unique_ptr<CudaSurface<uint8_t>> &validBuf,
+                   int3 resolution,
+                   int iters);
   void extrapolateFluidSdf(int iters);
 };
 }

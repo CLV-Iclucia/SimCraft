@@ -6,7 +6,7 @@
 #define KERNELS_CUH
 
 #include <cuda_runtime.h>
-#include <FluidSim/cuda/gpu-arrays.h>
+#include <FluidSim/cuda/gpu-arrays.cuh>
 
 inline void checkCUDAError(const char* msg, int line = -1) {
   cudaError_t err = cudaGetLastError();
@@ -21,6 +21,7 @@ inline void checkCUDAError(const char* msg, int line = -1) {
 #define checkCUDAErrorWithLine(msg) checkCUDAError(msg, __LINE__)
 
 namespace fluid::cuda {
+    using core::uint;
 __device__ __forceinline__ bool withinSource(float x, float y, float z,
                                              int n) {
   float centre = static_cast<float>(n) * 0.5f;
@@ -92,6 +93,9 @@ __global__ void ApplyForceKernel(CudaSurfaceAccessor<float4> surf_vel,
                                  CudaSurfaceAccessor<float4> surf_vel_nxt,
                                  CudaSurfaceAccessor<float4> surf_force,
                                  uint n, float dt);
+__global__ void kernelSetupFluidRegion(CudaSurfaceAccessor<uint8_t> surf,
+                                       DeviceArrayAccessor<uint8_t> region,
+                                       uint n);
 }
 
 #endif //KERNELS_CUH

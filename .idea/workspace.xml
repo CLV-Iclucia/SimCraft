@@ -13,7 +13,6 @@
     <generated>
       <config projectName="SimCraft" targetName="CpuFluid" />
       <config projectName="SimCraft" targetName="GLAD" />
-      <config projectName="SimCraft" targetName="gpu-free-surface" />
       <config projectName="SimCraft" targetName="imgui_impl_glfw" />
       <config projectName="SimCraft" targetName="GpuFluid" />
       <config projectName="SimCraft" targetName="Core" />
@@ -34,7 +33,51 @@
     </configurations>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ef612d8e-bab6-4d8d-a036-e6484aa344ac" name="Changes" comment="" />
+    <list default="true" id="ef612d8e-bab6-4d8d-a036-e6484aa344ac" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/FluidSim/apps/gpu-free-surface.cu" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/mgpcg.cuh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/FluidSim/src/cuda/mgpcg.cu" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/FluidSim/src/cuda/utils.cu" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/CMakeLists.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/CMakeLists.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/apps/fluid-sim.cc" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/apps/fluid-sim.cc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/apps/gpu-smoke.cu" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/apps/gpu-smoke.cu" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cpu/fluid-simulator.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cpu/fluid-simulator.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/advect-solver.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/advect-solver.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/fluid-simulator.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/fluid-simulator.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/gpu-arrays.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/gpu-arrays.cuh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/kernels.cuh" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/kernels.cuh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/particle-reconstructor.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/particle-reconstructor.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/particle-system.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/particle-system.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/project-solver.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/project-solver.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/smoke-simulator.cuh" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/smoke-simulator.cuh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/utils.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/utils.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/fluid-sim.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/fluid-sim.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/fluid-simulator.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/fluid-simulator.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/utils.h" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/src/cpu/fluid-simulator.cc" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/src/cpu/fluid-simulator.cc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/src/cpu/rebuild-surface.cc" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/src/cpu/rebuild-surface.cc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/src/cuda/advect-solver.cu" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/src/cuda/advect-solver.cu" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/src/cuda/fluid-simulator.cu" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/src/cuda/fluid-simulator.cu" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/src/cuda/kernels.cu" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/src/cuda/kernels.cu" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/src/cuda/particle-reconstructor.cu" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/src/cuda/particle-reconstructor.cu" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/src/cuda/project-solver.cu" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/src/cuda/project-solver.cu" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/src/fluid-simulator.cc" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/src/fluid-simulator.cc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeCache.txt" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeCache.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/clion-Debug-Visual Studio-log.txt" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/clion-Debug-Visual Studio-log.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeCache.txt" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeCache.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeFiles/clion-Release-Visual Studio-log.txt" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeFiles/clion-Release-Visual Studio-log.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/Testing/Temporary/LastTest.log" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/Testing/Temporary/LastTest.log" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/backends/imgui_impl_vulkan.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/backends/imgui_impl_vulkan.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/backends/imgui_impl_vulkan.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/backends/imgui_impl_vulkan.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/backends/vulkan/generate_spv.sh" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/backends/vulkan/generate_spv.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/imgui.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/imgui.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/imgui_demo.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/imgui_demo.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/imgui_impl_vulkan.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/imgui_impl_vulkan.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/imgui_impl_vulkan.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/imgui_impl_vulkan.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/imgui_widgets.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/imgui_widgets.cpp" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -72,7 +115,7 @@
     &quot;RunOnceActivity.readMode.enableVisualFormatting&quot;: &quot;true&quot;,
     &quot;cf.first.check.clang-format&quot;: &quot;false&quot;,
     &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;test&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;Merging test&quot;,
     &quot;last_opened_file_path&quot;: &quot;C:/Users/79105/source/repos/SimCraft&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
@@ -190,7 +233,7 @@
       <workItem from="1714000096999" duration="1327000" />
       <workItem from="1714001566223" duration="2219000" />
       <workItem from="1714072364801" duration="15830000" />
-      <workItem from="1714169551763" duration="2813000" />
+      <workItem from="1714169551763" duration="3166000" />
     </task>
     <servers />
   </component>

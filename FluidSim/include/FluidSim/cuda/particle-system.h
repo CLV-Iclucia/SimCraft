@@ -5,13 +5,13 @@
 #ifndef SIM_CRAFT_PARTICLE_SYSTEM_H
 #define SIM_CRAFT_PARTICLE_SYSTEM_H
 #include <memory>
-#include <FluidSim/cuda/gpu-arrays.h>
+#include <FluidSim/cuda/gpu-arrays.cuh>
 #include <FluidSim/fluid-sim.h>
 namespace fluid::cuda {
 struct VelAccessor {
-  Accessor<DeviceArray<Real>> vx;
-  Accessor<DeviceArray<Real>> vy;
-  Accessor<DeviceArray<Real>> vz;
+  DeviceArrayAccessor<Real> vx;
+  DeviceArrayAccessor<Real> vy;
+  DeviceArrayAccessor<Real> vz;
 
   CUDA_DEVICE CUDA_FORCEINLINE
   double3 read(int idx) const {
@@ -27,9 +27,9 @@ struct VelAccessor {
 };
 
 struct PosAccessor {
-  Accessor<DeviceArray<Real>> px;
-  Accessor<DeviceArray<Real>> py;
-  Accessor<DeviceArray<Real>> pz;
+  DeviceArrayAccessor<Real> px;
+  DeviceArrayAccessor<Real> py;
+  DeviceArrayAccessor<Real> pz;
 
   CUDA_DEVICE CUDA_FORCEINLINE
   double3 read(int idx) const {

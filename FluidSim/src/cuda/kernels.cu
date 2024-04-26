@@ -1,5 +1,5 @@
 #include <FluidSim/cuda/kernels.cuh>
-#include <FluidSim/cuda/gpu-arrays.h>
+#include <FluidSim/cuda/gpu-arrays.cuh>
 #include <FluidSim/cuda/vec-op.cuh>
 
 namespace fluid::cuda{
@@ -172,5 +172,10 @@ __global__ void SmoothingKernel(CudaSurfaceAccessor<float> surf_rho,
   float rel = surf_rho.read(x, y, z);
   float result = (rxp + rxn + ryp + ryn + rzp + rzn + 6.f * rel) / 12.f;
   surf_rho_nxt.write(result, x, y, z);
+}
+__global__ void DownSampleKernel(CudaSurfaceAccessor<uint8_t> collider,
+                                 CudaSurfaceAccessor<uint8_t> collider_nxt,
+                                 uint n) {
+
 }
 }

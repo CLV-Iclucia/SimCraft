@@ -127,7 +127,7 @@ std::tuple<std::unique_ptr<OpenGLContext>, std::unique_ptr<ShaderProg>>
 initColliderRender(const core::Mesh& mesh) {
   auto shader = std::make_unique<ShaderProg>(
       std::format("{}/perspective-mesh.vs", FLUIDSIM_SHADER_DIR).c_str(),
-      std::format("{}/collider.fs", FLUIDSIM_SHADER_DIR).c_str());
+      std::format("{}/fluidRegion.fs", FLUIDSIM_SHADER_DIR).c_str());
   auto ctx = std::make_unique<OpenGLContext>();
   ctx->vao.bind();
   ctx->newAttribute("aPos", mesh.vertices, 3, 3 * sizeof(double),
@@ -254,7 +254,7 @@ int main(int argc, char** argv) {
     simulator->step(frame);
     drawFluid(fluidCtx.get(), fluidShader.get(), camera, simulator->positions(),
               display_w, display_h);
-    if (frame.idx == 50) {
+    if (frame.idx == 52) {
       simulator->reconstruct();
       simulator->smoothFluidSurface(5);
       core::Mesh fluidMesh;

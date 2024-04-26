@@ -687,71 +687,82 @@ build FluidSim\CpuFluid.lib: CXX_STATIC_LIBRARY_LINKER__CpuFluid_Debug FluidSim\
 build cmake_object_order_depends_target_GpuFluid: phony || cmake_object_order_depends_target_Core cmake_object_order_depends_target_GLAD
 
 build FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\advect-solver.cu.obj: CUDA_COMPILER__GpuFluid_unscanned_Debug C$:\Users\79105\source\repos\SimCraft\FluidSim\src\cuda\advect-solver.cu || cmake_object_order_depends_target_GpuFluid
-  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\" -DTBB_USE_DEBUG -DUSE_TBB
+  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\"
   DEP_FILE = FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\advect-solver.cu.obj.d
   FLAGS = -D_WINDOWS -Xcompiler="/W3 /GR /EHsc" -Xcompiler="-MDd  -Zi -Ob0 -Od /RTC1" -std=c++20 "--generate-code=arch=compute_52,code=[compute_52,sm_52]" "--generate-code=arch=compute_70,code=[compute_70,sm_70]" "--generate-code=arch=compute_75,code=[compute_75,sm_75]" "--generate-code=arch=compute_86,code=[compute_86,sm_86]" --extended-lambda
-  INCLUDES = -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\external\glad\include -IC:\Users\79105\source\repos\SimCraft\Spatify\include -isystem C:\vcpkg\installed\x64-windows\include
+  INCLUDES = -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\external\glad\include
   OBJECT_DIR = FluidSim\CMakeFiles\GpuFluid.dir
   OBJECT_FILE_DIR = FluidSim\CMakeFiles\GpuFluid.dir\src\cuda
   TARGET_COMPILE_PDB = FluidSim\CMakeFiles\GpuFluid.dir\GpuFluid.pdb
   TARGET_PDB = FluidSim\GpuFluid.pdb
 
 build FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\fluid-simulator.cu.obj: CUDA_COMPILER__GpuFluid_unscanned_Debug C$:\Users\79105\source\repos\SimCraft\FluidSim\src\cuda\fluid-simulator.cu || cmake_object_order_depends_target_GpuFluid
-  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\" -DTBB_USE_DEBUG -DUSE_TBB
+  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\"
   DEP_FILE = FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\fluid-simulator.cu.obj.d
   FLAGS = -D_WINDOWS -Xcompiler="/W3 /GR /EHsc" -Xcompiler="-MDd  -Zi -Ob0 -Od /RTC1" -std=c++20 "--generate-code=arch=compute_52,code=[compute_52,sm_52]" "--generate-code=arch=compute_70,code=[compute_70,sm_70]" "--generate-code=arch=compute_75,code=[compute_75,sm_75]" "--generate-code=arch=compute_86,code=[compute_86,sm_86]" --extended-lambda
-  INCLUDES = -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\external\glad\include -IC:\Users\79105\source\repos\SimCraft\Spatify\include -isystem C:\vcpkg\installed\x64-windows\include
+  INCLUDES = -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\external\glad\include
   OBJECT_DIR = FluidSim\CMakeFiles\GpuFluid.dir
   OBJECT_FILE_DIR = FluidSim\CMakeFiles\GpuFluid.dir\src\cuda
   TARGET_COMPILE_PDB = FluidSim\CMakeFiles\GpuFluid.dir\GpuFluid.pdb
   TARGET_PDB = FluidSim\GpuFluid.pdb
 
 build FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\kernels.cu.obj: CUDA_COMPILER__GpuFluid_unscanned_Debug C$:\Users\79105\source\repos\SimCraft\FluidSim\src\cuda\kernels.cu || cmake_object_order_depends_target_GpuFluid
-  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\" -DTBB_USE_DEBUG -DUSE_TBB
+  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\"
   DEP_FILE = FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\kernels.cu.obj.d
   FLAGS = -D_WINDOWS -Xcompiler="/W3 /GR /EHsc" -Xcompiler="-MDd  -Zi -Ob0 -Od /RTC1" -std=c++20 "--generate-code=arch=compute_52,code=[compute_52,sm_52]" "--generate-code=arch=compute_70,code=[compute_70,sm_70]" "--generate-code=arch=compute_75,code=[compute_75,sm_75]" "--generate-code=arch=compute_86,code=[compute_86,sm_86]" --extended-lambda
-  INCLUDES = -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\external\glad\include -IC:\Users\79105\source\repos\SimCraft\Spatify\include -isystem C:\vcpkg\installed\x64-windows\include
+  INCLUDES = -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\external\glad\include
+  OBJECT_DIR = FluidSim\CMakeFiles\GpuFluid.dir
+  OBJECT_FILE_DIR = FluidSim\CMakeFiles\GpuFluid.dir\src\cuda
+  TARGET_COMPILE_PDB = FluidSim\CMakeFiles\GpuFluid.dir\GpuFluid.pdb
+  TARGET_PDB = FluidSim\GpuFluid.pdb
+
+build FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\mgpcg.cu.obj: CUDA_COMPILER__GpuFluid_unscanned_Debug C$:\Users\79105\source\repos\SimCraft\FluidSim\src\cuda\mgpcg.cu || cmake_object_order_depends_target_GpuFluid
+  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\"
+  DEP_FILE = FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\mgpcg.cu.obj.d
+  FLAGS = -D_WINDOWS -Xcompiler="/W3 /GR /EHsc" -Xcompiler="-MDd  -Zi -Ob0 -Od /RTC1" -std=c++20 "--generate-code=arch=compute_52,code=[compute_52,sm_52]" "--generate-code=arch=compute_70,code=[compute_70,sm_70]" "--generate-code=arch=compute_75,code=[compute_75,sm_75]" "--generate-code=arch=compute_86,code=[compute_86,sm_86]" --extended-lambda
+  INCLUDES = -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\external\glad\include
   OBJECT_DIR = FluidSim\CMakeFiles\GpuFluid.dir
   OBJECT_FILE_DIR = FluidSim\CMakeFiles\GpuFluid.dir\src\cuda
   TARGET_COMPILE_PDB = FluidSim\CMakeFiles\GpuFluid.dir\GpuFluid.pdb
   TARGET_PDB = FluidSim\GpuFluid.pdb
 
 build FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\particle-reconstructor.cu.obj: CUDA_COMPILER__GpuFluid_unscanned_Debug C$:\Users\79105\source\repos\SimCraft\FluidSim\src\cuda\particle-reconstructor.cu || cmake_object_order_depends_target_GpuFluid
-  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\" -DTBB_USE_DEBUG -DUSE_TBB
+  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\"
   DEP_FILE = FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\particle-reconstructor.cu.obj.d
   FLAGS = -D_WINDOWS -Xcompiler="/W3 /GR /EHsc" -Xcompiler="-MDd  -Zi -Ob0 -Od /RTC1" -std=c++20 "--generate-code=arch=compute_52,code=[compute_52,sm_52]" "--generate-code=arch=compute_70,code=[compute_70,sm_70]" "--generate-code=arch=compute_75,code=[compute_75,sm_75]" "--generate-code=arch=compute_86,code=[compute_86,sm_86]" --extended-lambda
-  INCLUDES = -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\external\glad\include -IC:\Users\79105\source\repos\SimCraft\Spatify\include -isystem C:\vcpkg\installed\x64-windows\include
+  INCLUDES = -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\external\glad\include
   OBJECT_DIR = FluidSim\CMakeFiles\GpuFluid.dir
   OBJECT_FILE_DIR = FluidSim\CMakeFiles\GpuFluid.dir\src\cuda
   TARGET_COMPILE_PDB = FluidSim\CMakeFiles\GpuFluid.dir\GpuFluid.pdb
   TARGET_PDB = FluidSim\GpuFluid.pdb
 
 build FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\project-solver.cu.obj: CUDA_COMPILER__GpuFluid_unscanned_Debug C$:\Users\79105\source\repos\SimCraft\FluidSim\src\cuda\project-solver.cu || cmake_object_order_depends_target_GpuFluid
-  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\" -DTBB_USE_DEBUG -DUSE_TBB
+  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\"
   DEP_FILE = FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\project-solver.cu.obj.d
   FLAGS = -D_WINDOWS -Xcompiler="/W3 /GR /EHsc" -Xcompiler="-MDd  -Zi -Ob0 -Od /RTC1" -std=c++20 "--generate-code=arch=compute_52,code=[compute_52,sm_52]" "--generate-code=arch=compute_70,code=[compute_70,sm_70]" "--generate-code=arch=compute_75,code=[compute_75,sm_75]" "--generate-code=arch=compute_86,code=[compute_86,sm_86]" --extended-lambda
-  INCLUDES = -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\external\glad\include -IC:\Users\79105\source\repos\SimCraft\Spatify\include -isystem C:\vcpkg\installed\x64-windows\include
+  INCLUDES = -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\external\glad\include
   OBJECT_DIR = FluidSim\CMakeFiles\GpuFluid.dir
   OBJECT_FILE_DIR = FluidSim\CMakeFiles\GpuFluid.dir\src\cuda
   TARGET_COMPILE_PDB = FluidSim\CMakeFiles\GpuFluid.dir\GpuFluid.pdb
   TARGET_PDB = FluidSim\GpuFluid.pdb
 
 build FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\rebuild-surface.cu.obj: CUDA_COMPILER__GpuFluid_unscanned_Debug C$:\Users\79105\source\repos\SimCraft\FluidSim\src\cuda\rebuild-surface.cu || cmake_object_order_depends_target_GpuFluid
-  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\" -DTBB_USE_DEBUG -DUSE_TBB
+  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\"
   DEP_FILE = FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\rebuild-surface.cu.obj.d
   FLAGS = -D_WINDOWS -Xcompiler="/W3 /GR /EHsc" -Xcompiler="-MDd  -Zi -Ob0 -Od /RTC1" -std=c++20 "--generate-code=arch=compute_52,code=[compute_52,sm_52]" "--generate-code=arch=compute_70,code=[compute_70,sm_70]" "--generate-code=arch=compute_75,code=[compute_75,sm_75]" "--generate-code=arch=compute_86,code=[compute_86,sm_86]" --extended-lambda
-  INCLUDES = -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\external\glad\include -IC:\Users\79105\source\repos\SimCraft\Spatify\include -isystem C:\vcpkg\installed\x64-windows\include
+  INCLUDES = -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\external\glad\include
   OBJECT_DIR = FluidSim\CMakeFiles\GpuFluid.dir
   OBJECT_FILE_DIR = FluidSim\CMakeFiles\GpuFluid.dir\src\cuda
   TARGET_COMPILE_PDB = FluidSim\CMakeFiles\GpuFluid.dir\GpuFluid.pdb
   TARGET_PDB = FluidSim\GpuFluid.pdb
 
-build FluidSim\CMakeFiles\GpuFluid.dir\src\fluid-simulator.cc.obj: CXX_COMPILER__GpuFluid_unscanned_Debug C$:\Users\79105\source\repos\SimCraft\FluidSim\src\fluid-simulator.cc || cmake_object_order_depends_target_GpuFluid
-  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\" -DTBB_USE_DEBUG -DUSE_TBB
-  FLAGS = /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++20
-  INCLUDES = -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\external\glad\include -IC:\Users\79105\source\repos\SimCraft\Spatify\include -external:IC:\vcpkg\installed\x64-windows\include -external:W0
+build FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\utils.cu.obj: CUDA_COMPILER__GpuFluid_unscanned_Debug C$:\Users\79105\source\repos\SimCraft\FluidSim\src\cuda\utils.cu || cmake_object_order_depends_target_GpuFluid
+  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\"
+  DEP_FILE = FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\utils.cu.obj.d
+  FLAGS = -D_WINDOWS -Xcompiler="/W3 /GR /EHsc" -Xcompiler="-MDd  -Zi -Ob0 -Od /RTC1" -std=c++20 "--generate-code=arch=compute_52,code=[compute_52,sm_52]" "--generate-code=arch=compute_70,code=[compute_70,sm_70]" "--generate-code=arch=compute_75,code=[compute_75,sm_75]" "--generate-code=arch=compute_86,code=[compute_86,sm_86]" --extended-lambda
+  INCLUDES = -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\external\glad\include
   OBJECT_DIR = FluidSim\CMakeFiles\GpuFluid.dir
-  OBJECT_FILE_DIR = FluidSim\CMakeFiles\GpuFluid.dir\src
+  OBJECT_FILE_DIR = FluidSim\CMakeFiles\GpuFluid.dir\src\cuda
   TARGET_COMPILE_PDB = FluidSim\CMakeFiles\GpuFluid.dir\GpuFluid.pdb
   TARGET_PDB = FluidSim\GpuFluid.pdb
 
@@ -763,7 +774,7 @@ build FluidSim\CMakeFiles\GpuFluid.dir\src\fluid-simulator.cc.obj: CXX_COMPILER_
 #############################################
 # Link the static library FluidSim\GpuFluid.lib
 
-build FluidSim\GpuFluid.lib: CXX_STATIC_LIBRARY_LINKER__GpuFluid_Debug FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\advect-solver.cu.obj FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\fluid-simulator.cu.obj FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\kernels.cu.obj FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\particle-reconstructor.cu.obj FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\project-solver.cu.obj FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\rebuild-surface.cu.obj FluidSim\CMakeFiles\GpuFluid.dir\src\fluid-simulator.cc.obj || Core\Core.lib external\glad\GLAD.lib
+build FluidSim\GpuFluid.lib: CXX_STATIC_LIBRARY_LINKER__GpuFluid_Debug FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\advect-solver.cu.obj FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\fluid-simulator.cu.obj FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\kernels.cu.obj FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\mgpcg.cu.obj FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\particle-reconstructor.cu.obj FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\project-solver.cu.obj FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\rebuild-surface.cu.obj FluidSim\CMakeFiles\GpuFluid.dir\src\cuda\utils.cu.obj || Core\Core.lib external\glad\GLAD.lib
   LANGUAGE_COMPILE_FLAGS = /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1
   LINK_FLAGS = /machine:x64
   OBJECT_DIR = FluidSim\CMakeFiles\GpuFluid.dir
@@ -821,10 +832,10 @@ build FluidSim\fluid-sim.exe: CXX_EXECUTABLE_LINKER__fluid-sim_Debug FluidSim\CM
 build cmake_object_order_depends_target_gpu-smoke: phony || cmake_object_order_depends_target_Core cmake_object_order_depends_target_GLAD cmake_object_order_depends_target_GpuFluid cmake_object_order_depends_target_ogl-render
 
 build FluidSim\CMakeFiles\gpu-smoke.dir\apps\gpu-smoke.cu.obj: CUDA_COMPILER__gpu-smoke_unscanned_Debug C$:\Users\79105\source\repos\SimCraft\FluidSim\apps\gpu-smoke.cu || cmake_object_order_depends_target_gpu-smoke
-  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DGLFW_DLL -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\" -DTBB_USE_DEBUG -DUSE_TBB
+  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DGLFW_DLL -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\"
   DEP_FILE = FluidSim\CMakeFiles\gpu-smoke.dir\apps\gpu-smoke.cu.obj.d
   FLAGS = -D_WINDOWS -Xcompiler="/W3 /GR /EHsc" -Xcompiler="-MDd  -Zi -Ob0 -Od /RTC1" -std=c++20 "--generate-code=arch=compute_52,code=[compute_52,sm_52]" "--generate-code=arch=compute_70,code=[compute_70,sm_70]" "--generate-code=arch=compute_75,code=[compute_75,sm_75]" "--generate-code=arch=compute_86,code=[compute_86,sm_86]" --extended-lambda
-  INCLUDES = -IC:\Users\79105\source\repos\SimCraft\external\imgui -IC:\Users\79105\source\repos\SimCraft\external\glad\include -IC:\Users\79105\source\repos\SimCraft\OglRender\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\OglRender\OpenGL::GL -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -IC:\Users\79105\source\repos\SimCraft\Spatify\include -isystem C:\vcpkg\installed\x64-windows\include
+  INCLUDES = -IC:\Users\79105\source\repos\SimCraft\external\glad\include -IC:\Users\79105\source\repos\SimCraft\OglRender\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\OglRender\OpenGL::GL -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -isystem C:\vcpkg\installed\x64-windows\include
   OBJECT_DIR = FluidSim\CMakeFiles\gpu-smoke.dir
   OBJECT_FILE_DIR = FluidSim\CMakeFiles\gpu-smoke.dir\apps
   TARGET_COMPILE_PDB = FluidSim\CMakeFiles\gpu-smoke.dir\
@@ -838,10 +849,10 @@ build FluidSim\CMakeFiles\gpu-smoke.dir\apps\gpu-smoke.cu.obj: CUDA_COMPILER__gp
 #############################################
 # Link the executable FluidSim\gpu-smoke.exe
 
-build FluidSim\gpu-smoke.exe: CXX_EXECUTABLE_LINKER__gpu-smoke_Debug FluidSim\CMakeFiles\gpu-smoke.dir\apps\gpu-smoke.cu.obj | OglRender\ogl-render.lib FluidSim\GpuFluid.lib C$:\vcpkg\installed\x64-windows\debug\lib\glfw3dll.lib Core\Core.lib external\glad\GLAD.lib C$:\vcpkg\installed\x64-windows\debug\lib\tbb12_debug.lib || Core\Core.lib FluidSim\GpuFluid.lib OglRender\ogl-render.lib external\glad\GLAD.lib
+build FluidSim\gpu-smoke.exe: CXX_EXECUTABLE_LINKER__gpu-smoke_Debug FluidSim\CMakeFiles\gpu-smoke.dir\apps\gpu-smoke.cu.obj | OglRender\ogl-render.lib FluidSim\GpuFluid.lib C$:\vcpkg\installed\x64-windows\debug\lib\glfw3dll.lib Core\Core.lib external\glad\GLAD.lib || Core\Core.lib FluidSim\GpuFluid.lib OglRender\ogl-render.lib external\glad\GLAD.lib
   FLAGS = /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1
   LINK_FLAGS = /machine:x64 /debug /INCREMENTAL /subsystem:console
-  LINK_LIBRARIES = OglRender\ogl-render.lib  FluidSim\GpuFluid.lib  C:\vcpkg\installed\x64-windows\debug\lib\glfw3dll.lib  Core\Core.lib  external\glad\GLAD.lib  OpenGL.lib  C:\vcpkg\installed\x64-windows\debug\lib\tbb12_debug.lib  cudadevrt.lib  cudart_static.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib
+  LINK_LIBRARIES = OglRender\ogl-render.lib  FluidSim\GpuFluid.lib  C:\vcpkg\installed\x64-windows\debug\lib\glfw3dll.lib  Core\Core.lib  external\glad\GLAD.lib  OpenGL.lib  cudadevrt.lib  cudart_static.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib
   LINK_PATH = -LIBPATH:"C:\PROGRA~1\NVIDIA GPU Computing Toolkit\CUDA\v12.1\lib\x64"
   OBJECT_DIR = FluidSim\CMakeFiles\gpu-smoke.dir
   POST_BUILD = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\79105\source\repos\SimCraft\cmake-build-debug-visual-studio\FluidSim && C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -noprofile -executionpolicy Bypass -file C:/vcpkg/scripts/buildsystems/msbuild/applocal.ps1 -targetBinary C:/Users/79105/source/repos/SimCraft/cmake-build-debug-visual-studio/FluidSim/gpu-smoke.exe -installedDir C:/vcpkg/installed/x64-windows/debug/bin -OutVariable out"
@@ -850,6 +861,46 @@ build FluidSim\gpu-smoke.exe: CXX_EXECUTABLE_LINKER__gpu-smoke_Debug FluidSim\CM
   TARGET_FILE = FluidSim\gpu-smoke.exe
   TARGET_IMPLIB = FluidSim\gpu-smoke.lib
   TARGET_PDB = FluidSim\gpu-smoke.pdb
+
+# =============================================================================
+# Object build statements for EXECUTABLE target gpu-free-surface
+
+
+#############################################
+# Order-only phony target for gpu-free-surface
+
+build cmake_object_order_depends_target_gpu-free-surface: phony || cmake_object_order_depends_target_Core cmake_object_order_depends_target_GLAD cmake_object_order_depends_target_GpuFluid cmake_object_order_depends_target_ogl-render
+
+build FluidSim\CMakeFiles\gpu-free-surface.dir\apps\gpu-free-surface.cu.obj: CUDA_COMPILER__gpu-free-surface_unscanned_Debug C$:\Users\79105\source\repos\SimCraft\FluidSim\apps\gpu-free-surface.cu || cmake_object_order_depends_target_gpu-free-surface
+  DEFINES = -DFLUIDSIM_SHADER_DIR=\"C:/Users/79105/source/repos/SimCraft/FluidSim/shaders\" -DGLFW_DLL -DSIMCRAFT_ASSETS_DIR=\"C:/Users/79105/source/repos/SimCraft/assets\"
+  DEP_FILE = FluidSim\CMakeFiles\gpu-free-surface.dir\apps\gpu-free-surface.cu.obj.d
+  FLAGS = -D_WINDOWS -Xcompiler="/W3 /GR /EHsc" -Xcompiler="-MDd  -Zi -Ob0 -Od /RTC1" -std=c++20 "--generate-code=arch=compute_52,code=[compute_52,sm_52]" "--generate-code=arch=compute_70,code=[compute_70,sm_70]" "--generate-code=arch=compute_75,code=[compute_75,sm_75]" "--generate-code=arch=compute_86,code=[compute_86,sm_86]" --extended-lambda
+  INCLUDES = -IC:\Users\79105\source\repos\SimCraft\external\glad\include -IC:\Users\79105\source\repos\SimCraft\OglRender\include -IC:\Users\79105\source\repos\SimCraft\external\glm -IC:\Users\79105\source\repos\SimCraft\OglRender\OpenGL::GL -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include" -IC:\Users\79105\source\repos\SimCraft\FluidSim\include -IC:\Users\79105\source\repos\SimCraft\Core\include -isystem C:\vcpkg\installed\x64-windows\include
+  OBJECT_DIR = FluidSim\CMakeFiles\gpu-free-surface.dir
+  OBJECT_FILE_DIR = FluidSim\CMakeFiles\gpu-free-surface.dir\apps
+  TARGET_COMPILE_PDB = FluidSim\CMakeFiles\gpu-free-surface.dir\
+  TARGET_PDB = FluidSim\gpu-free-surface.pdb
+
+
+# =============================================================================
+# Link build statements for EXECUTABLE target gpu-free-surface
+
+
+#############################################
+# Link the executable FluidSim\gpu-free-surface.exe
+
+build FluidSim\gpu-free-surface.exe: CXX_EXECUTABLE_LINKER__gpu-free-surface_Debug FluidSim\CMakeFiles\gpu-free-surface.dir\apps\gpu-free-surface.cu.obj | OglRender\ogl-render.lib FluidSim\GpuFluid.lib C$:\vcpkg\installed\x64-windows\debug\lib\glfw3dll.lib Core\Core.lib external\glad\GLAD.lib || Core\Core.lib FluidSim\GpuFluid.lib OglRender\ogl-render.lib external\glad\GLAD.lib
+  FLAGS = /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1
+  LINK_FLAGS = /machine:x64 /debug /INCREMENTAL /subsystem:console
+  LINK_LIBRARIES = OglRender\ogl-render.lib  FluidSim\GpuFluid.lib  C:\vcpkg\installed\x64-windows\debug\lib\glfw3dll.lib  Core\Core.lib  external\glad\GLAD.lib  OpenGL.lib  cudadevrt.lib  cudart_static.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib
+  LINK_PATH = -LIBPATH:"C:\PROGRA~1\NVIDIA GPU Computing Toolkit\CUDA\v12.1\lib\x64"
+  OBJECT_DIR = FluidSim\CMakeFiles\gpu-free-surface.dir
+  POST_BUILD = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\79105\source\repos\SimCraft\cmake-build-debug-visual-studio\FluidSim && C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -noprofile -executionpolicy Bypass -file C:/vcpkg/scripts/buildsystems/msbuild/applocal.ps1 -targetBinary C:/Users/79105/source/repos/SimCraft/cmake-build-debug-visual-studio/FluidSim/gpu-free-surface.exe -installedDir C:/vcpkg/installed/x64-windows/debug/bin -OutVariable out"
+  PRE_LINK = cd .
+  TARGET_COMPILE_PDB = FluidSim\CMakeFiles\gpu-free-surface.dir\
+  TARGET_FILE = FluidSim\gpu-free-surface.exe
+  TARGET_IMPLIB = FluidSim\gpu-free-surface.lib
+  TARGET_PDB = FluidSim\gpu-free-surface.pdb
 
 
 #############################################
@@ -901,6 +952,10 @@ build fluid-sim: phony FluidSim\fluid-sim.exe
 
 build fluid-sim.exe: phony FluidSim\fluid-sim.exe
 
+build gpu-free-surface: phony FluidSim\gpu-free-surface.exe
+
+build gpu-free-surface.exe: phony FluidSim\gpu-free-surface.exe
+
 build gpu-smoke: phony FluidSim\gpu-smoke.exe
 
 build gpu-smoke.exe: phony FluidSim\gpu-smoke.exe
@@ -951,7 +1006,7 @@ build Core\all: phony Core\Core.lib Core\test-cubic-solver.exe
 #############################################
 # Folder: C:/Users/79105/source/repos/SimCraft/cmake-build-debug-visual-studio/FluidSim
 
-build FluidSim\all: phony FluidSim\CpuFluid.lib FluidSim\GpuFluid.lib FluidSim\fluid-sim.exe FluidSim\gpu-smoke.exe
+build FluidSim\all: phony FluidSim\CpuFluid.lib FluidSim\GpuFluid.lib FluidSim\fluid-sim.exe FluidSim\gpu-smoke.exe FluidSim\gpu-free-surface.exe
 
 # =============================================================================
 

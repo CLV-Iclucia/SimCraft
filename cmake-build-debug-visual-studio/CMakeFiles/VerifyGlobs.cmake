@@ -7,7 +7,6 @@ file(GLOB NEW_GLOB LIST_DIRECTORIES true "C:/Users/79105/source/repos/SimCraft/F
 set(OLD_GLOB
   "C:/Users/79105/source/repos/SimCraft/FluidSim/include/FluidSim/fluid-sim.h"
   "C:/Users/79105/source/repos/SimCraft/FluidSim/include/FluidSim/fluid-simulator.h"
-  "C:/Users/79105/source/repos/SimCraft/FluidSim/include/FluidSim/utils.h"
   )
 if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
   message("-- GLOB mismatch!")
@@ -104,7 +103,9 @@ endif()
 # gpu_headers at FluidSim/CMakeLists.txt:7 (file)
 file(GLOB_RECURSE NEW_GLOB LIST_DIRECTORIES false "C:/Users/79105/source/repos/SimCraft/FluidSim/include/FluidSim/cuda/*.cuh")
 set(OLD_GLOB
+  "C:/Users/79105/source/repos/SimCraft/FluidSim/include/FluidSim/cuda/gpu-arrays.cuh"
   "C:/Users/79105/source/repos/SimCraft/FluidSim/include/FluidSim/cuda/kernels.cuh"
+  "C:/Users/79105/source/repos/SimCraft/FluidSim/include/FluidSim/cuda/mgpcg.cuh"
   "C:/Users/79105/source/repos/SimCraft/FluidSim/include/FluidSim/cuda/smoke-simulator.cuh"
   "C:/Users/79105/source/repos/SimCraft/FluidSim/include/FluidSim/cuda/vec-op.cuh"
   )
@@ -118,7 +119,6 @@ file(GLOB_RECURSE NEW_GLOB LIST_DIRECTORIES false "C:/Users/79105/source/repos/S
 set(OLD_GLOB
   "C:/Users/79105/source/repos/SimCraft/FluidSim/include/FluidSim/cuda/advect-solver.h"
   "C:/Users/79105/source/repos/SimCraft/FluidSim/include/FluidSim/cuda/fluid-simulator.h"
-  "C:/Users/79105/source/repos/SimCraft/FluidSim/include/FluidSim/cuda/gpu-arrays.h"
   "C:/Users/79105/source/repos/SimCraft/FluidSim/include/FluidSim/cuda/particle-reconstructor.h"
   "C:/Users/79105/source/repos/SimCraft/FluidSim/include/FluidSim/cuda/particle-system.h"
   "C:/Users/79105/source/repos/SimCraft/FluidSim/include/FluidSim/cuda/project-solver.h"
@@ -178,9 +178,11 @@ set(OLD_GLOB
   "C:/Users/79105/source/repos/SimCraft/FluidSim/src/cuda/advect-solver.cu"
   "C:/Users/79105/source/repos/SimCraft/FluidSim/src/cuda/fluid-simulator.cu"
   "C:/Users/79105/source/repos/SimCraft/FluidSim/src/cuda/kernels.cu"
+  "C:/Users/79105/source/repos/SimCraft/FluidSim/src/cuda/mgpcg.cu"
   "C:/Users/79105/source/repos/SimCraft/FluidSim/src/cuda/particle-reconstructor.cu"
   "C:/Users/79105/source/repos/SimCraft/FluidSim/src/cuda/project-solver.cu"
   "C:/Users/79105/source/repos/SimCraft/FluidSim/src/cuda/rebuild-surface.cu"
+  "C:/Users/79105/source/repos/SimCraft/FluidSim/src/cuda/utils.cu"
   )
 if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
   message("-- GLOB mismatch!")
