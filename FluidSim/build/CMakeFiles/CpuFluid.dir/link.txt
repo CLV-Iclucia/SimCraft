@@ -1,2 +1,0 @@
-/usr/bin/ar qc libCpuFluid.a "CMakeFiles/CpuFluid.dir/src/cpu/advect-solver.o" "CMakeFiles/CpuFluid.dir/src/cpu/fluid-simulator.o" "CMakeFiles/CpuFluid.dir/src/cpu/project-solver.o" "CMakeFiles/CpuFluid.dir/src/cpu/rebuild-surface.o" CMakeFiles/CpuFluid.dir/src/cpu/util.o "CMakeFiles/CpuFluid.dir/src/fluid-simulator.o"
-/usr/bin/ranlib libCpuFluid.a

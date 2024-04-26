@@ -1,4 +1,0 @@
-/home/atopos/cs184/prj/final project/SimCraft/FluidSim/build/CMakeFiles/CpuFluid.dir
-/home/atopos/cs184/prj/final project/SimCraft/FluidSim/build/CMakeFiles/fluid-sim.dir
-/home/atopos/cs184/prj/final project/SimCraft/FluidSim/build/CMakeFiles/edit_cache.dir
-/home/atopos/cs184/prj/final project/SimCraft/FluidSim/build/CMakeFiles/rebuild_cache.dir

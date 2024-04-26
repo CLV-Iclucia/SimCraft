@@ -79,11 +79,22 @@ class FluidSimulator final : public FluidComputeBackend {
 
   void setAdvector(AdvectionMethod advection_method) override {
     if (advection_method == AdvectionMethod::PIC) {
-      advector = std::make_unique<PicAdvector3D>(nParticles, pg.width(),
-                                                 pg.height(), pg.depth());
-      return;
-    }
-    ERROR("Unknown advection solver");
+      advector = std::make_unique<PicAdvector3D>(nParticles, Vec3i(pg.width(),
+                                                                   pg.height(),
+                                                                   pg.depth()),
+                                                 pg.width() * ug->gridSpacing().x,
+                                                 pg.height() * ug->gridSpacing().y,
+                                                 pg.depth() * ug->gridSpacing().z);
+    } else if (advection_method == AdvectionMethod::FLIP) {
+      advector = std::make_unique<FlipAdvectionSolver3D>(nParticles,
+                                                         Vec3i(pg.width(),
+                                                               pg.height(),
+                                                               pg.depth()),
+                                                         pg.width() * ug->gridSpacing().x,
+                                                         pg.height() * ug->gridSpacing().y,
+                                                         pg.depth() * ug->gridSpacing().z);
+    } else
+      ERROR("Unknown advection solver");
   }
 
   void setProjector(ProjectSolver project_solver) override {

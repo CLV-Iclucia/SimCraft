@@ -216,7 +216,7 @@ class NaiveReconstructor<T, 3> final : public ParticleSystemReconstructor<T, 3> 
       sdfValid.fill(false);
       sdf.grid.parallelForEach([&](int i, int j, int k) {
         Vector<T, 3> p = sdf.grid.indexToCoord(i, j, k);
-        ns.forNeighbours(p, particles, 4 * radius, [&](int idx) {
+        ns.forNeighbours(p, particles, 2 * radius, [&](int idx) {
           Real dis = glm::distance(p, particles[idx]);
           sdf(i, j, k) = std::min(sdf(i, j, k), dis - radius);
           sdfValid(i, j, k) = true;

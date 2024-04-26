@@ -144,7 +144,7 @@ void FluidSimulator::substep(Real dt) {
   std::cout << "Done." << std::endl;
   std::cout << "Reconstructing surface... ";
   fluidSurfaceReconstructor->reconstruct(
-      m_particles.positions, 1.2 * ug->gridSpacing().x / std::sqrt(2.0),
+      m_particles.positions, 0.6 * ug->gridSpacing().x / std::sqrt(2.0),
       *fluidSurface, *sdfValid);
   std::cout << "Done." << std::endl;
   std::cout << "Smoothing surface... ";
@@ -187,19 +187,20 @@ Real FluidSimulator::CFL() const {
   ug->forEach([&cfl, h, this](int x, int y, int z) {
     assert(notNan(ug->at(x, y ,z)));
     if (ug->at(x, y, z) != 0.0)
-      cfl = std::max(cfl, h / abs(ug->at(x, y, z)));
+      cfl = std::min(cfl, h / abs(ug->at(x, y, z)));
   });
   vg->forEach([&cfl, h, this](int x, int y, int z) {
     assert(notNan(vg->at(x, y, z)));
     if (vg->at(x, y, z) != 0.0)
-      cfl = std::max(cfl, h / abs(vg->at(x, y, z)));
+      cfl = std::min(cfl, h / abs(vg->at(x, y, z)));
   });
   wg->forEach([&cfl, h, this](int x, int y, int z) {
     assert(notNan(wg->at(x, y, z)));
     if (wg->at(x, y, z) != 0.0)
-      cfl = std::max(cfl, h / abs(wg->at(x, y, z)));
+      cfl = std::min(cfl, h / abs(wg->at(x, y, z)));
   });
-  return cfl;
+//  return 10.0 * std::max(1e-4, cfl);
+return 1.0;
 }
 
 void FluidSimulator::step(core::Frame& frame) {
