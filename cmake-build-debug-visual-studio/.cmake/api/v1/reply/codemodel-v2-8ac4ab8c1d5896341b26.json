@@ -1,0 +1,324 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1,
+						2,
+						3,
+						4,
+						5,
+						6
+					],
+					"jsonFile" : "directory-.-Debug-d0094a50bb2071803777.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.10"
+					},
+					"projectIndex" : 0,
+					"source" : "."
+				},
+				{
+					"build" : "external/glad",
+					"jsonFile" : "directory-external.glad-Debug-fe552af5a86a4942293e.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.10"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 1,
+					"source" : "external/glad",
+					"targetIndexes" : 
+					[
+						2
+					]
+				},
+				{
+					"build" : "external/imgui",
+					"jsonFile" : "directory-external.imgui-Debug-8f2cd0809e5890c8092e.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.20"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 2,
+					"source" : "external/imgui",
+					"targetIndexes" : 
+					[
+						7,
+						8,
+						9,
+						10
+					]
+				},
+				{
+					"build" : "Core",
+					"jsonFile" : "directory-Core-Debug-b3854b2db255c35a81c1.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.10"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 3,
+					"source" : "Core",
+					"targetIndexes" : 
+					[
+						0,
+						12
+					]
+				},
+				{
+					"build" : "OglRender",
+					"jsonFile" : "directory-OglRender-Debug-4de11a2df461b0b08439.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.10"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 4,
+					"source" : "OglRender",
+					"targetIndexes" : 
+					[
+						4,
+						11
+					]
+				},
+				{
+					"build" : "Spatify",
+					"jsonFile" : "directory-Spatify-Debug-55a4c904b3642c16dbe6.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.10"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 5,
+					"source" : "Spatify"
+				},
+				{
+					"build" : "FluidSim",
+					"jsonFile" : "directory-FluidSim-Debug-0d57ba680f73a95512bf.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.10"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 6,
+					"source" : "FluidSim",
+					"targetIndexes" : 
+					[
+						1,
+						3,
+						5,
+						6
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"childIndexes" : 
+					[
+						1,
+						2,
+						3,
+						4,
+						5,
+						6
+					],
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "SimCraft"
+				},
+				{
+					"directoryIndexes" : 
+					[
+						1
+					],
+					"name" : "GLAD",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						2
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						2
+					],
+					"name" : "imgui",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						7,
+						8,
+						9,
+						10
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						3
+					],
+					"name" : "Core",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						0,
+						12
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						4
+					],
+					"name" : "OglRender",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						4,
+						11
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						5
+					],
+					"name" : "Spatify",
+					"parentIndex" : 0
+				},
+				{
+					"directoryIndexes" : 
+					[
+						6
+					],
+					"name" : "Fluid",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						1,
+						3,
+						5,
+						6
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 3,
+					"id" : "Core::@94795ff35dabbbd3a8ca",
+					"jsonFile" : "target-Core-Debug-978b3c78ac1e09a0e3b0.json",
+					"name" : "Core",
+					"projectIndex" : 3
+				},
+				{
+					"directoryIndex" : 6,
+					"id" : "CpuFluid::@3366da4e958440a3d013",
+					"jsonFile" : "target-CpuFluid-Debug-60298a43cbc2c633a9c6.json",
+					"name" : "CpuFluid",
+					"projectIndex" : 6
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "GLAD::@55512df44c152ef9a2ca",
+					"jsonFile" : "target-GLAD-Debug-5e656d8f2ab100db73cf.json",
+					"name" : "GLAD",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 6,
+					"id" : "GpuFluid::@3366da4e958440a3d013",
+					"jsonFile" : "target-GpuFluid-Debug-2f2f2d36e101fc32d873.json",
+					"name" : "GpuFluid",
+					"projectIndex" : 6
+				},
+				{
+					"directoryIndex" : 4,
+					"id" : "demo::@81d7a7436324b23b6d5e",
+					"jsonFile" : "target-demo-Debug-e18e493d0a9c26b04b2d.json",
+					"name" : "demo",
+					"projectIndex" : 4
+				},
+				{
+					"directoryIndex" : 6,
+					"id" : "fluid-sim::@3366da4e958440a3d013",
+					"jsonFile" : "target-fluid-sim-Debug-c43d60ce4dc9283303e9.json",
+					"name" : "fluid-sim",
+					"projectIndex" : 6
+				},
+				{
+					"directoryIndex" : 6,
+					"id" : "gpu-smoke::@3366da4e958440a3d013",
+					"jsonFile" : "target-gpu-smoke-Debug-393e919b637d66325216.json",
+					"name" : "gpu-smoke",
+					"projectIndex" : 6
+				},
+				{
+					"directoryIndex" : 2,
+					"id" : "imgui::@408438dda4a3eccc02b1",
+					"jsonFile" : "target-imgui-Debug-4c26d9d8f542e901dc5d.json",
+					"name" : "imgui",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 2,
+					"id" : "imgui_impl_glfw::@408438dda4a3eccc02b1",
+					"jsonFile" : "target-imgui_impl_glfw-Debug-5afc71b2f7c7488b617b.json",
+					"name" : "imgui_impl_glfw",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 2,
+					"id" : "imgui_impl_opengl3::@408438dda4a3eccc02b1",
+					"jsonFile" : "target-imgui_impl_opengl3-Debug-8909d49741798b8be471.json",
+					"name" : "imgui_impl_opengl3",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 2,
+					"id" : "imgui_impl_vulkan::@408438dda4a3eccc02b1",
+					"jsonFile" : "target-imgui_impl_vulkan-Debug-e7a74572a038711970ab.json",
+					"name" : "imgui_impl_vulkan",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 4,
+					"id" : "ogl-render::@81d7a7436324b23b6d5e",
+					"jsonFile" : "target-ogl-render-Debug-84df20fed14a6f04a817.json",
+					"name" : "ogl-render",
+					"projectIndex" : 4
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "test-cubic-solver::@94795ff35dabbbd3a8ca",
+					"jsonFile" : "target-test-cubic-solver-Debug-3496a64c9eb3462a0bd8.json",
+					"name" : "test-cubic-solver",
+					"projectIndex" : 3
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "C:/Users/79105/source/repos/SimCraft/cmake-build-debug-visual-studio",
+		"source" : "C:/Users/79105/source/repos/SimCraft"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 6
+	}
+}
