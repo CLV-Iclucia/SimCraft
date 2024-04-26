@@ -71,9 +71,9 @@ static CUDA_GLOBAL void kernelDotProduct(CudaSurfaceAccessor<float> surfaceA,
 }
 
 CUDA_GLOBAL void kernelNorm(CudaSurfaceAccessor<float> surface,
-                                   CudaSurfaceAccessor<uint8_t> active,
-                                   DeviceArrayAccessor<float> result,
-                                   int3 dimensions) {
+                            CudaSurfaceAccessor<uint8_t> active,
+                            DeviceArrayAccessor<float> result,
+                            int3 dimensions) {
   get_and_restrict_tid_3d(x, y, z, dimensions.x, dimensions.y, dimensions.z);
   uint32_t block_idx = blockIdx.x + blockIdx.y * gridDim.x + blockIdx.z * gridDim.x * gridDim.y;
   float local_result = fabs(surface.read(x, y, z)) * active.read(x, y, z);
@@ -89,10 +89,10 @@ CUDA_GLOBAL void kernelNorm(CudaSurfaceAccessor<float> surface,
 }
 
 void saxpy(CudaSurface<float> &x,
-                  const CudaSurface<float> &y,
-                  float alpha,
-                  const CudaSurface<uint8_t> &active,
-                  int3 resolution) {
+           const CudaSurface<float> &y,
+           float alpha,
+           const CudaSurface<uint8_t> &active,
+           int3 resolution) {
   cudaSafeCheck(kernelSaxpy<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
       x.surfaceAccessor(), y.surfaceAccessor(), alpha, active.surfaceAccessor(), resolution));
 }

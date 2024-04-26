@@ -36,17 +36,37 @@ __global__ void ProlongateKernel(CudaSurfaceAccessor<float> uc,
   if (!active.read(x, y, z)) return;
   double sum = u.read(x, y, z);
   // use trilinear interpolation
-
+  int
 }
 __global__ void DampedJacobiKernel(CudaSurfaceAccessor<float> u,
+                                   CudaSurfaceAccessor<float> u_buf,
                                    CudaSurfaceAccessor<uint8_t> active,
                                    CudaSurfaceAccessor<float> f, uint n, float alpha) {
   get_and_restrict_tid_3d(x, y, z, n, n, n);
-  double delta = 0.0;
-
+  float u_old = u.read(x, y, z);
+  uint8_t axp = active.read<cudaBoundaryModeZero>(x - 1, y, z);
+  uint8_t axn = active.read<cudaBoundaryModeZero>(x + 1, y, z);
+  uint8_t ayp = active.read<cudaBoundaryModeZero>(x, y - 1, z);
+  uint8_t ayn = active.read<cudaBoundaryModeZero>(x, y + 1, z);
+  uint8_t azp = active.read<cudaBoundaryModeZero>(x, y, z - 1);
+  uint8_t azn = active.read<cudaBoundaryModeZero>(x, y, z + 1);
+  auto cnt = static_cast<double>(axp + axn + ayp + ayn + azp + azn);
+  float pxp = static_cast<float>(axp) * u.read<cudaBoundaryModeClamp>(x - 1, y, z);
+  float pxn = static_cast<float>(axn) * u.read<cudaBoundaryModeClamp>(x + 1, y, z);
+  float pyp = static_cast<float>(ayp) * u.read<cudaBoundaryModeClamp>(x, y - 1, z);
+  float pyn = static_cast<float>(ayn) * u.read<cudaBoundaryModeClamp>(x, y + 1, z);
+  float pzp = static_cast<float>(azp) * u.read<cudaBoundaryModeClamp>(x, y, z - 1);
+  float pzn = static_cast<float>(azn) * u.read<cudaBoundaryModeClamp>(x, y, z + 1);
+  float div = f.read(x, y, z);
+  u_buf.write(
+      (1.0 - kDampedJacobiOmega) * static_cast<double>(u_old) +
+      kDampedJacobiOmega * static_cast<double>((pxp + pxn + pyp + pyn + pzp + pzn - div) / cnt),
+      x, y, z);
 }
 
-void bottomSolve
+void bottomSolve() {
+
+}
 
 void prepareWeights() {
   double weights[4][4][4];
