@@ -11,8 +11,6 @@
 #include <imgui/imgui_impl_opengl3.h>
 #include <iostream>
 #include <memory>
-#include <iomanip> 
-#include <sstream> 
 using namespace opengl;
 ImVec4 kClearColor = ImVec4(1.0f, 1.0f, 1.0f, 1.00f);
 
@@ -256,17 +254,18 @@ int main(int argc, char** argv) {
     simulator->step(frame);
     drawFluid(fluidCtx.get(), fluidShader.get(), camera, simulator->positions(),
               display_w, display_h);
-    if(frame.idx <= 350){
-        simulator->reconstruct();
-        simulator->smoothFluidSurface(5);
-        core::Mesh fluidMesh;
-        fluid::cpu::rebuildSurface(fluidMesh, simulator->exportFluidSurface());
-        std::ostringstream filename;
-        filename << "obj_file/fluid_" << std::setfill('0') << std::setw(3) << frame.idx << ".obj";
-        if (!core::exportObj(filename.str(), fluidMesh)) {
-            std::cerr << "Failed to export fluid mesh for frame " << frame.idx << std::endl;
-            exit(-1);
-        }
+    if (frame.idx == 52) {
+      simulator->reconstruct();
+      simulator->smoothFluidSurface(5);
+      core::Mesh fluidMesh;
+      const auto& surface = simulator->exportFluidSurface();
+      auto sdf_samples = surface.fieldSamples();
+      fluid::cpu::rebuildSurface(fluidMesh, simulator->exportFluidSurface());
+      simulator->exportFluidSurface().saveSDF("the place to save your SDF file");
+      if (!core::exportObj("fluid.obj", fluidMesh)) {
+        std::cerr << "Failed to export fluid mesh" << std::endl;
+        exit(-1);
+      }
     }
     drawCollider(colliderCtx.get(), meshShader.get(), camera, colliderMesh,
                  display_w, display_h);
