@@ -49,7 +49,18 @@ struct CudaArray3D : core::NonCopyable {
     cudaMalloc3DArray(&cuda_array, &channel_desc, extent,
                       cudaArraySurfaceLoadStore);
   }
-
+  CudaArray3D(CudaArray3D &&other) noexcept
+      : cuda_array(other.cuda_array), dim(other.dim) {
+    other.cuda_array = nullptr;
+  }
+  CudaArray3D& operator=(CudaArray3D &&other) noexcept {
+    if (this != &other) {
+      cuda_array = other.cuda_array;
+      dim = other.dim;
+      other.cuda_array = nullptr;
+    }
+    return *this;
+  }
   void copyFrom(const T *data) {
     cudaMemcpy3DParms copy3DParams{};
     copy3DParams.srcPtr =

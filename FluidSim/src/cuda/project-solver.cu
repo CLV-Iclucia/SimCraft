@@ -4,7 +4,7 @@
 #include <FluidSim/cuda/project-solver.h>
 #include <FluidSim/cuda/gpu-arrays.cuh>
 #include <FluidSim/cuda/vec-op.cuh>
-#include <cub/cub.cuh>
+#include <FluidSim/cuda/utils.h>
 #include <format>
 
 namespace fluid::cuda {
@@ -99,102 +99,6 @@ static void applyCompressedMatrix(const CompressedSystem &sys,
                                   int3 resolution) {
   cudaSafeCheck(kernrelApplyCompressedMatrix<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
       sys.constAccessor(), x.surfaceAccessor(), active.surfaceAccessor(), b.surfaceAccessor(), resolution));
-}
-
-static CUDA_GLOBAL void kernelSaxpy(CudaSurfaceAccessor<float> x,
-                                    CudaSurfaceAccessor<float> y,
-                                    float alpha,
-                                    CudaSurfaceAccessor<uint8_t> active,
-                                    int3 resolution) {
-  get_and_restrict_tid_3d(i, j, k, resolution.x, resolution.y, resolution.z);
-  if (!active.read(i, j, k)) return;
-  float val = x.read(i, j, k) + alpha * y.read(i, j, k);
-  x.write(val, i, j, k);
-}
-
-static CUDA_GLOBAL void kernelScaleAndAdd(CudaSurfaceAccessor<float> x,
-                                          CudaSurfaceAccessor<float> y,
-                                          float alpha,
-                                          CudaSurfaceAccessor<uint8_t> active,
-                                          int3 resolution) {
-  get_and_restrict_tid_3d(i, j, k, resolution.x, resolution.y, resolution.z);
-  if (!active.read(i, j, k)) return;
-  x.write(x.read(i, j, k) + alpha * y.read(i, j, k), i, j, k);
-}
-
-static void scaleAndAdd(CudaSurface<float> &x,
-                        const CudaSurface<float> &y,
-                        float alpha,
-                        const CudaSurface<uint8_t> &active,
-                        int3 resolution) {
-  cudaSafeCheck(kernelScaleAndAdd<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
-      x.surfaceAccessor(), y.surfaceAccessor(), alpha, active.surfaceAccessor(), resolution));
-}
-
-static CUDA_GLOBAL void kernelDotProduct(CudaSurfaceAccessor<float> surfaceA,
-                                         CudaSurfaceAccessor<float> surfaceB,
-                                         CudaSurfaceAccessor<uint8_t> active,
-                                         DeviceArrayAccessor<float> result,
-                                         int3 dimensions) {
-  get_and_restrict_tid_3d(x, y, z, dimensions.x, dimensions.y, dimensions.z);
-  auto block_idx = blockIdx.x + blockIdx.y * gridDim.x + blockIdx.z * gridDim.x * gridDim.y;
-  float valueA = surfaceA.read(x, y, z);
-  float valueB = surfaceB.read(x, y, z);
-  float local_result = valueA * valueB * active.read(x, y, z);
-  using BlockReduce = cub::BlockReduce<float, kThreadBlockSize3D,
-                                       cub::BLOCK_REDUCE_WARP_REDUCTIONS,
-                                       kThreadBlockSize3D,
-                                       kThreadBlockSize3D>;
-  CUDA_SHARED
-  BlockReduce::TempStorage temp_storage;
-  float block_result = BlockReduce(temp_storage).Sum(local_result,
-                                                    blockDim.x * blockDim.y * blockDim.z);
-  if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0)
-    result[block_idx] = block_result;
-}
-
-static CUDA_GLOBAL void kernelL1Norm(CudaSurfaceAccessor<float> surface,
-                                     CudaSurfaceAccessor<uint8_t> active,
-                                     DeviceArrayAccessor<float> result,
-                                     int3 dimensions) {
-  get_and_restrict_tid_3d(x, y, z, dimensions.x, dimensions.y, dimensions.z);
-  uint32_t block_idx = blockIdx.x + blockIdx.y * gridDim.x + blockIdx.z * gridDim.x * gridDim.y;
-  float local_result = fabs(surface.read(x, y, z)) * active.read(x, y, z);
-  using BlockReduce = cub::BlockReduce<float, kThreadBlockSize3D,
-                                       cub::BLOCK_REDUCE_WARP_REDUCTIONS,
-                                       kThreadBlockSize3D,
-                                       kThreadBlockSize3D>;
-  CUDA_SHARED BlockReduce::TempStorage temp_storage;
-  auto block_result = BlockReduce(temp_storage).Sum(local_result,
-                                                    blockDim.x * blockDim.y * blockDim.z);
-  if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0)
-    result[block_idx] = block_result;
-}
-
-static void saxpy(CudaSurface<float> &x,
-                  const CudaSurface<float> &y,
-                  float alpha,
-                  const CudaSurface<uint8_t> &active,
-                  int3 resolution) {
-  cudaSafeCheck(kernelSaxpy<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
-      x.surfaceAccessor(), y.surfaceAccessor(), alpha, active.surfaceAccessor(), resolution));
-}
-
-float CgSolver::dotProduct(const CudaSurface<float> &surfaceA,
-                       const CudaSurface<float> &surfaceB,
-                       const CudaSurface<uint8_t> &active,
-                       int3 resolution) const {
-  int block_num = (resolution.x + kThreadBlockSize3D - 1) / kThreadBlockSize3D
-      * (resolution.y + kThreadBlockSize3D - 1) / kThreadBlockSize3D
-      * (resolution.z + kThreadBlockSize3D - 1) / kThreadBlockSize3D;
-  cudaSafeCheck(kernelDotProduct<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
-      surfaceA.surfaceAccessor(), surfaceB.surfaceAccessor(),
-      active.surfaceAccessor(), device_reduce_buffer->accessor(), resolution));
-  device_reduce_buffer->copyTo(host_reduce_buffer);
-  float sum = 0.0;
-  for (int i = 0; i < block_num; i++)
-    sum += host_reduce_buffer[i];
-  return sum;
 }
 
 static CUDA_GLOBAL void kernelComputeAreaWeights(
@@ -374,7 +278,7 @@ float CgSolver::L1Norm(const CudaSurface<float> &surface,
   int block_num = (resolution.x + kThreadBlockSize3D - 1) / kThreadBlockSize3D
       * (resolution.y + kThreadBlockSize3D - 1) / kThreadBlockSize3D
       * (resolution.z + kThreadBlockSize3D - 1) / kThreadBlockSize3D;
-  cudaSafeCheck(kernelL1Norm<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
+  cudaSafeCheck(kernelNorm<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
       surface.surfaceAccessor(), active.surfaceAccessor(), device_reduce_buffer->accessor(), resolution));
   device_reduce_buffer->copyTo(host_reduce_buffer);
   float sum = 0.0;
@@ -531,5 +435,20 @@ float CgSolver::solve(const CompressedSystem &sys,
   std::cout << std::format("PCG iterations: {}", iter) << std::endl;
   return residual;
 }
-
+float CgSolver::dotProduct(const CudaSurface<float> &surfaceA,
+                           const CudaSurface<float> &surfaceB,
+                           const CudaSurface<uint8_t> &active,
+                           int3 resolution) const {
+  int block_num = (resolution.x + kThreadBlockSize3D - 1) / kThreadBlockSize3D
+      * (resolution.y + kThreadBlockSize3D - 1) / kThreadBlockSize3D
+      * (resolution.z + kThreadBlockSize3D - 1) / kThreadBlockSize3D;
+  cudaSafeCheck(kernelDotProduct<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
+      surfaceA.surfaceAccessor(), surfaceB.surfaceAccessor(),
+      active.surfaceAccessor(), device_reduce_buffer->accessor(), resolution));
+  device_reduce_buffer->copyTo(host_reduce_buffer);
+  float sum = 0.0;
+  for (int i = 0; i < block_num; i++)
+    sum += host_reduce_buffer[i];
+  return sum;
+}
 }
