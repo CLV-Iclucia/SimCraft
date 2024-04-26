@@ -57,6 +57,12 @@ class FluidSimulator {
   void applyCollider() const;
   void applyForce(Real dt) const;
   void applyDirichletBoundary() const;
+  void extrapolate(std::unique_ptr<CudaSurface<float>> &grid,
+                   std::unique_ptr<CudaSurface<float>> &buf,
+                   std::unique_ptr<CudaSurface<uint8_t>> &valid,
+                   std::unique_ptr<CudaSurface<uint8_t>> &validBuf,
+                   int3 resolution,
+                   int iters);
   void extrapolateFluidSdf(int iters);
 };
 }

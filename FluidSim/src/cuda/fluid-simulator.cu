@@ -135,28 +135,108 @@ static CUDA_GLOBAL void kernelApplyCollider(CudaSurfaceAccessor<float> ug,
   }
 }
 void FluidSimulator::applyCollider() const {
-
+  cudaSafeCheck(kernelApplyCollider<<<
+  LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(u->surfaceAccessor(),
+                                                                 v->surfaceAccessor(),
+                                                                 w->surfaceAccessor(),
+                                                                 colliderSdf->texAccessor(),
+                                                                 resolution,
+                                                                 h));
 }
 
+static CUDA_GLOBAL void kernelApplyDirichletBoundary(CudaSurfaceAccessor<float> ug,
+                                                     CudaSurfaceAccessor<float> vg,
+                                                     CudaSurfaceAccessor<float> wg,
+                                                     CudaSurfaceAccessor<uint8_t> uValid,
+                                                     CudaSurfaceAccessor<uint8_t> vValid,
+                                                     CudaSurfaceAccessor<uint8_t> wValid,
+                                                     int3 resolution) {
+  get_and_restrict_tid_3d(i, j, k, resolution.x, resolution.y, resolution.z);
+  if (i == 0 || i == resolution.x - 1) {
+    ug.write(0.0, i, j, k);
+    uValid.write(1, i, j, k);
+  }
+  if (j == 0 || j == resolution.y - 1) {
+    vg.write(0.0, i, j, k);
+    vValid.write(1, i, j, k);
+  }
+  if (k == 0 || k == resolution.z - 1) {
+    wg.write(0.0, i, j, k);
+    wValid.write(1, i, j, k);
+  }
+}
 void FluidSimulator::applyDirichletBoundary() const {
-
+  cudaSafeCheck(kernelApplyDirichletBoundary<<<
+  LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(u->surfaceAccessor(),
+                                                                 v->surfaceAccessor(),
+                                                                 w->surfaceAccessor(),
+                                                                 uValid->surfaceAccessor(),
+                                                                 vValid->surfaceAccessor(),
+                                                                 wValid->surfaceAccessor(),
+                                                                 resolution));
 }
 
+static CUDA_GLOBAL void kernelExtrapolate(CudaSurfaceAccessor<float> grid,
+                                          CudaSurfaceAccessor<float> buf,
+                                          CudaSurfaceAccessor<uint8_t> valid,
+                                          CudaSurfaceAccessor<uint8_t> validBuf,
+                                          int3 resolution) {
+  get_and_restrict_tid_3d(i, j, k, resolution.x, resolution.y, resolution.z);
+  if (valid.read(i, j, k)) {
+    validBuf.write(true, i, j, k);
+    return;
+  }
+  float sum = 0.0;
+  int count = 0;
+  if (i > 0 && valid.read(i - 1, j, k)) {
+    sum += grid.read(i - 1, j, k);
+    count++;
+  }
+  if (i < resolution.x - 1 && valid.read(i + 1, j, k)) {
+    sum += grid.read(i + 1, j, k);
+    count++;
+  }
+  if (j > 0 && valid.read(i, j - 1, k)) {
+    sum += grid.read(i, j - 1, k);
+    count++;
+  }
+  if (j < resolution.y - 1 && valid.read(i, j + 1, k)) {
+    sum += grid.read(i, j + 1, k);
+    count++;
+  }
+  if (k > 0 && valid.read(i, j, k - 1)) {
+    sum += grid.read(i, j, k - 1);
+    count++;
+  }
+  if (k < resolution.z - 1 && valid.read(i, j, k + 1)) {
+    sum += grid.read(i, j, k + 1);
+    count++;
+  }
+
+  if (count > 0) {
+    buf.write(sum / count, i, j, k);
+    validBuf.write(true, i, j, k);
+  } else {
+    buf.write(0.0, i, j, k);
+    validBuf.write(false, i, j, k);
+  }
+
+}
 // here, resolution is the resolution of the grid
 // resolution is not necceasarily the same as the resolution of the fluid surface
-static void extrapolate(std::unique_ptr<CudaSurface<float>> &grid,
+void FluidSimulator::extrapolate(std::unique_ptr<CudaSurface<float>> &grid,
                         std::unique_ptr<CudaSurface<float>> &buf,
                         std::unique_ptr<CudaSurface<uint8_t>> &valid,
                         std::unique_ptr<CudaSurface<uint8_t>> &validBuf,
                         int3 resolution,
                         int iters) {
-//  for (int iter = 0; iter < iters; iter++) {
-//    cudaSafeCheck(kernelExtrapolate<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
-//        grid->surfaceAccessor(), buf->surfaceAccessor(), valid->surfaceAccessor(),
-//        validBuf->surfaceAccessor(), resolution));
-//    std::swap(grid, buf);
-//    std::swap(valid, validBuf);
-//  }
+  for (int iter = 0; iter < iters; iter++) {
+    cudaSafeCheck(kernelExtrapolate<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
+        grid->surfaceAccessor(), buf->surfaceAccessor(), valid->surfaceAccessor(),
+        validBuf->surfaceAccessor(), resolution));
+    std::swap(grid, buf);
+    std::swap(valid, validBuf);
+  }
 }
 
 void FluidSimulator::extrapolateFluidSdf(int iters) {
@@ -186,9 +266,9 @@ void FluidSimulator::substep(Real dt) {
   applyDirichletBoundary();
   std::cout << "Done." << std::endl;
   std::cout << "Extrapolating velocities... ";
-//  extrapolate(u, uBuf, uValid, uValidBuf, resolution, 5);
-//  extrapolate(v, vBuf, vValid, vValidBuf, resolution, 5);
-//  extrapolate(w, wBuf, wValid, wValidBuf, resolution, 5);
+  extrapolate(u, uBuf, uValid, uValidBuf, resolution, 5);
+  extrapolate(v, vBuf, vValid, vValidBuf, resolution, 5);
+  extrapolate(w, wBuf, wValid, wValidBuf, resolution, 5);
   std::cout << "Done." << std::endl;
   applyForce(dt);
   std::cout << "Building linear system... ";
