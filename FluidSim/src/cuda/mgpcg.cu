@@ -146,12 +146,12 @@ static __global__ void BottomSolveKernel(CudaSurfaceAccessor<float> u,
   __syncthreads();
   for (int i = 0; i < kBottomSolveIters; i++) {
     float u_old = u_shared[cur][x][y][z];
-    uint8_t axp = active_shared[max(x - 1, 0)][y][z];
-    uint8_t axn = active_shared[min(x + 1, n - 1)][y][z];
-    uint8_t ayp = active_shared[x][max(y - 1, 0)][z];
-    uint8_t ayn = active_shared[x][min(y + 1, n - 1)][z];
-    uint8_t azp = active_shared[x][y][max(z - 1, 0)];
-    uint8_t azn = active_shared[x][y][min(z + 1, n - 1)];
+    uint8_t axp = x > 0 ? active_shared[x - 1][y][z] : 0;
+    uint8_t axn = x < n - 1 ? active_shared[x + 1][y][z] : 0;
+    uint8_t ayp = y > 0 ? active_shared[x][y - 1][z] : 0;
+    uint8_t ayn = y < n - 1 ? active_shared[x][y + 1][z] : 0;
+    uint8_t azp = z > 0 ? active_shared[x][y][z - 1] : 0;
+    uint8_t azn = z < n - 1 ? active_shared[x][y][z + 1] : 0;
     auto cnt = static_cast<double>(axp + axn + ayp + ayn + azp + azn);
     float pxp = static_cast<float>(axp) * u_shared[cur][max(x - 1, 0)][y][z];
     float pxn = static_cast<float>(axn) * u_shared[cur][min(x + 1, n - 1)][y][z];
@@ -176,7 +176,7 @@ static void bottomSolve(const std::unique_ptr<CudaSurface<uint8_t>> &active,
                         int n) {
   if (n > 8)
     ERROR("bottom solve with n > 8 is not supported yet");
-  BottomSolveKernel<<<1, n * n * n>>>(u->surfaceAccessor(), b->surfaceAccessor(),
+  BottomSolveKernel<<<1, 8 * 8 * 8>>>(u->surfaceAccessor(), b->surfaceAccessor(),
                                       active->surfaceAccessor(), n);
 }
 void vCycle(std::array<std::unique_ptr<CudaSurface<uint8_t >>, kVcycleLevel> &active,
