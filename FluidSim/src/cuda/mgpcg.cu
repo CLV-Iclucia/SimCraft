@@ -145,7 +145,7 @@ static __global__ void BottomSolveKernel(CudaSurfaceAccessor<float> u,
   active_shared[x][y][z] = active.read(x, y, z);
   __syncthreads();
   for (int i = 0; i < kBottomSolveIters; i++) {
-    float u_old = u.read(x, y, z);
+    float u_old = u_shared[cur][x][y][z];
     uint8_t axp = active_shared[max(x - 1, 0)][y][z];
     uint8_t axn = active_shared[min(x + 1, n - 1)][y][z];
     uint8_t ayp = active_shared[x][max(y - 1, 0)][z];
