@@ -36,47 +36,100 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ef612d8e-bab6-4d8d-a036-e6484aa344ac" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/FluidSim/tests/test-fluid-utils.cu" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FluidSim/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/CMakeLists.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/utils.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/utils.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/test/test.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/.cmake/api/v1/reply/cache-v2-1c3a6afc81ac64e15c50.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/.cmake/api/v1/reply/cmakeFiles-v1-bfb4b5037a9c85cd1ffc.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/.cmake/api/v1/reply/codemodel-v2-704a76b572ea8c27e2bf.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/.cmake/api/v1/reply/index-2024-04-26T23-14-50-0800.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/.cmake/api/v1/reply/target-demo-Debug-073cfe2f472a7dcaf7f2.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/.cmake/api/v1/reply/target-fluid-sim-Debug-66540a5382a0bf7f5afe.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/.cmake/api/v1/reply/target-gpu-free-surface-Debug-c272bb30d97d1913507b.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/.cmake/api/v1/reply/target-gpu-smoke-Debug-3fa767625d9829dff0c5.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeCache.txt" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeCache.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/TargetDirectories.txt" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/TargetDirectories.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/VerifyGlobs.cmake" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/VerifyGlobs.cmake" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/clion-Debug-Visual Studio-log.txt" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/clion-Debug-Visual Studio-log.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/rules.ninja" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/rules.ninja" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/build.ninja" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug-visual-studio/build.ninja" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/.cmake/api/v1/reply/cache-v2-6d62d9aca7c6186580ad.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/.cmake/api/v1/reply/cmakeFiles-v1-6d2add7a65b22399047a.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/.cmake/api/v1/reply/codemodel-v2-f4a8430644b1d3352f05.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/.cmake/api/v1/reply/index-2024-04-26T23-14-50-0811.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/.cmake/api/v1/reply/target-demo-Release-2b22d2ce249d10f50eb6.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/.cmake/api/v1/reply/target-fluid-sim-Release-179b506a12fe9efc694b.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/.ninja_deps" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/.ninja_deps" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/.ninja_log" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/.ninja_log" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeCache.txt" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeCache.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeFiles/TargetDirectories.txt" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeFiles/TargetDirectories.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeFiles/VerifyGlobs.cmake" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeFiles/VerifyGlobs.cmake" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeFiles/rules.ninja" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeFiles/rules.ninja" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/Testing/Temporary/LastTest.log" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/Testing/Temporary/LastTest.log" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/build.ninja" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/build.ninja" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/external/imgui/backends/imgui_impl_vulkan.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/backends/imgui_impl_vulkan.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/external/imgui/backends/imgui_impl_vulkan.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/backends/imgui_impl_vulkan.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/external/imgui/backends/vulkan/generate_spv.sh" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/backends/vulkan/generate_spv.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Spatify" beforeDir="false" afterPath="$PROJECT_DIR$/Spatify" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/.github/workflows/build.yml" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/.github/workflows/build.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/.github/workflows/static-analysis.yml" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/.github/workflows/static-analysis.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/LICENSE.txt" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/LICENSE.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_allegro5.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_allegro5.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_allegro5.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_allegro5.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_android.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_android.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_android.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_android.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_dx10.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_dx10.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_dx10.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_dx10.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_dx11.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_dx11.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_dx11.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_dx11.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_dx12.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_dx12.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_dx12.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_dx12.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_dx9.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_dx9.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_dx9.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_dx9.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_glfw.cpp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_glfw.h" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_glut.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_glut.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_glut.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_glut.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_metal.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_metal.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_metal.mm" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_metal.mm" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_opengl2.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_opengl2.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_opengl2.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_opengl2.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_opengl3.cpp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_opengl3.h" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_opengl3_loader.h" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_osx.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_osx.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_osx.mm" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_osx.mm" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_sdl2.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_sdl2.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_sdl2.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_sdl2.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_sdl3.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_sdl3.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_sdl3.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_sdl3.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_sdlrenderer2.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_sdlrenderer2.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_sdlrenderer2.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_sdlrenderer2.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_sdlrenderer3.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_sdlrenderer3.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_sdlrenderer3.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_sdlrenderer3.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_vulkan.cpp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_vulkan.h" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_wgpu.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_wgpu.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_wgpu.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_wgpu.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_win32.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_win32.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_win32.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/imgui_impl_win32.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/backends/vulkan/generate_spv.sh" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/backends/vulkan/generate_spv.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/docs/BACKENDS.md" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/docs/BACKENDS.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/docs/CHANGELOG.txt" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/docs/CHANGELOG.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/docs/CONTRIBUTING.md" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/docs/CONTRIBUTING.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/docs/EXAMPLES.md" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/docs/EXAMPLES.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/docs/FAQ.md" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/docs/FAQ.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/docs/FONTS.md" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/docs/FONTS.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/docs/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/docs/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/docs/TODO.txt" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/docs/TODO.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_allegro5/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_allegro5/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_android_opengl3/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_android_opengl3/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_apple_metal/main.mm" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_apple_metal/main.mm" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_apple_opengl2/main.mm" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_apple_opengl2/main.mm" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_emscripten_wgpu/Makefile" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_emscripten_wgpu/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_emscripten_wgpu/main.cpp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_emscripten_wgpu/web/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_glfw_metal/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_glfw_metal/Makefile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_glfw_metal/main.mm" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_glfw_metal/main.mm" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_glfw_opengl2/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_glfw_opengl2/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_glfw_opengl3/Makefile.emscripten" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_glfw_opengl3/Makefile.emscripten" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_glfw_opengl3/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_glfw_opengl3/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_glfw_vulkan/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_glfw_vulkan/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_glut_opengl2/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_glut_opengl2/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_sdl2_directx11/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_sdl2_directx11/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_sdl2_metal/main.mm" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_sdl2_metal/main.mm" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_sdl2_opengl2/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_sdl2_opengl2/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_sdl2_opengl3/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_sdl2_opengl3/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_sdl2_sdlrenderer2/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_sdl2_sdlrenderer2/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_sdl2_vulkan/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_sdl2_vulkan/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_sdl3_opengl3/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_sdl3_opengl3/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_sdl3_sdlrenderer3/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_sdl3_sdlrenderer3/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_win32_directx10/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_win32_directx10/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_win32_directx11/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_win32_directx11/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_win32_directx12/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_win32_directx12/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_win32_directx9/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_win32_directx9/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/examples/example_win32_opengl3/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/examples/example_win32_opengl3/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/imconfig.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/imconfig.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/imgui.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/imgui.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/external/imgui/imgui/imgui.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/imgui.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/external/imgui/imgui/imgui_demo.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/imgui_demo.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/imgui_impl_vulkan.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/imgui_impl_vulkan.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/imgui_impl_vulkan.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/imgui_impl_vulkan.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/imgui_draw.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/imgui_draw.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/imgui_internal.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/imgui_internal.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/imgui_tables.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/imgui_tables.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/external/imgui/imgui/imgui_widgets.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/imgui_widgets.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/imstb_textedit.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/imstb_textedit.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/misc/freetype/imgui_freetype.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/misc/freetype/imgui_freetype.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/external/imgui/imgui/misc/freetype/imgui_freetype.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/imgui/misc/freetype/imgui_freetype.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -86,7 +139,7 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="CMakeBuildProfile:Debug-Visual Studio" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="CMakeBuildProfile:Release" />
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
     <option name="ROOT_SYNC" value="SYNC" />
@@ -105,39 +158,34 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "C/C++ File.test-kernelSaxpy.cu.executor": "Run",
-    "CMake Application.fluid-sim.executor": "Run",
-    "CMake Application.gpu-free-surface.executor": "Run",
-    "CMake Application.gpu-smoke.executor": "Run",
-    "Google Test.SaxpyTest.RandomEquations.executor": "Debug",
-    "Google Test.test-fluid-utils.executor": "Run",
-    "Google Test.test-kernelSaxpy.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.cidr.known.project.marker": "true",
-    "RunOnceActivity.readMode.enableVisualFormatting": "true",
-    "cf.advertisement.text.has.clang-format": "true",
-    "cf.first.check.clang-format": "false",
-    "cidr.known.project.marker": "true",
-    "git-widget-placeholder": "test",
-    "last_opened_file_path": "C:/Users/79105/source/repos/SimCraft",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "CMakeSettings",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;C/C++ File.test-kernelSaxpy.cu.executor&quot;: &quot;Run&quot;,
+    &quot;CMake Application.fluid-sim.executor&quot;: &quot;Run&quot;,
+    &quot;CMake Application.gpu-free-surface.executor&quot;: &quot;Run&quot;,
+    &quot;CMake Application.gpu-smoke.executor&quot;: &quot;Run&quot;,
+    &quot;Google Test.SaxpyTest.RandomEquations.executor&quot;: &quot;Debug&quot;,
+    &quot;Google Test.test-fluid-utils.executor&quot;: &quot;Run&quot;,
+    &quot;Google Test.test-kernelSaxpy.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.readMode.enableVisualFormatting&quot;: &quot;true&quot;,
+    &quot;cf.advertisement.text.has.clang-format&quot;: &quot;true&quot;,
+    &quot;cf.first.check.clang-format&quot;: &quot;false&quot;,
+    &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;test&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/79105/source/repos/SimCraft&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;CMakeSettings&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RunManager" selected="Google Test.SaxpyTest.RandomEquations">
-    <configuration default="true" type="CLionExternalRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
-      <method v="2">
-        <option name="CLION.EXTERNAL.BUILD" enabled="true" />
-      </method>
-    </configuration>
     <configuration name="SaxpyTest.RandomEquations" type="CMakeGoogleTestRunConfigurationType" factoryName="Google Test" temporary="true" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="SimCraft" TARGET_NAME="test-fluid-utils" RUN_TARGET_PROJECT_NAME="SimCraft" RUN_TARGET_NAME="test-fluid-utils" TEST_CLASS="SaxpyTest" TEST_METHOD="RandomEquations" TEST_MODE="SUITE_TEST">
       <method v="2">
         <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
@@ -275,17 +323,6 @@
     <isAutomaticCheckingOnLaunch value="false" />
     <isAutomaticFoundErrors value="true" />
     <isAutomaticReloadCMake value="true" />
-  </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
-          <url>file://$PROJECT_DIR$/FluidSim/tests/test-fluid-utils.cu</url>
-          <line>44</line>
-          <option name="timeStamp" value="23" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
