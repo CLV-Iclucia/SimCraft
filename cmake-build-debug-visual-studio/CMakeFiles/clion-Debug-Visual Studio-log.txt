@@ -1,5 +1,0 @@
-"C:\Program Files\JetBrains\CLion 2024.1\bin\cmake\win\x64\bin\cmake.exe" -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_MAKE_PROGRAM=C:/Program Files/JetBrains/CLion 2024.1/bin/ninja/win/x64/ninja.exe" -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -G Ninja -S C:\Users\79105\source\repos\SimCraft -B C:\Users\79105\source\repos\SimCraft\cmake-build-debug-visual-studio
--- glfw include dir: 
--- Configuring done (0.2s)
--- Generating done (0.1s)
--- Build files have been written to: C:/Users/79105/source/repos/SimCraft/cmake-build-debug-visual-studio
