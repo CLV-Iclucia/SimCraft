@@ -34,9 +34,40 @@ __global__ void ProlongateKernel(CudaSurfaceAccessor<float> uc,
                                  CudaSurfaceAccessor<float> u, uint n) {
   get_and_restrict_tid_3d(x, y, z, n, n, n);
   if (!active.read(x, y, z)) return;
+  double h = 1.0 / n;
   double sum = u.read(x, y, z);
   // use trilinear interpolation
-  int
+  int x0 = (x - 1) / 2;
+  int y0 = (y - 1) / 2;
+  int z0 = (z - 1) / 2;
+  auto active_000 = active.read<cudaBoundaryModeZero>(x0, y0, z0);
+  auto active_100 = active.read<cudaBoundaryModeZero>(x0 + 1, y0, z0);
+  auto active_010 = active.read<cudaBoundaryModeZero>(x0, y0 + 1, z0);
+  auto active_110 = active.read<cudaBoundaryModeZero>(x0 + 1, y0 + 1, z0);
+  auto active_001 = active.read<cudaBoundaryModeZero>(x0, y0, z0 + 1);
+  auto active_101 = active.read<cudaBoundaryModeZero>(x0 + 1, y0, z0 + 1);
+  auto active_011 = active.read<cudaBoundaryModeZero>(x0, y0 + 1, z0 + 1);
+  auto active_111 = active.read<cudaBoundaryModeZero>(x0 + 1, y0 + 1, z0 + 1);
+  auto tx = (x + 0.5) * h - (x0 + 0.5) * 2.0 * h;
+  auto ty = (y + 0.5) * h - (y0 + 0.5) * 2.0 * h;
+  auto tz = (z + 0.5) * h - (z0 + 0.5) * 2.0 * h;
+  auto w000 = (1.0 - tx) * (1.0 - ty) * (1.0 - tz);
+  auto w100 = tx * (1.0 - ty) * (1.0 - tz);
+  auto w010 = (1.0 - tx) * ty * (1.0 - tz);
+  auto w110 = tx * ty * (1.0 - tz);
+  auto w001 = (1.0 - tx) * (1.0 - ty) * tz;
+  auto w101 = tx * (1.0 - ty) * tz;
+  auto w011 = (1.0 - tx) * ty * tz;
+  auto w111 = tx * ty * tz;
+  sum += w000 * uc.read<cudaBoundaryModeZero>(x0, y0, z0) * active_000;
+  sum += w100 * uc.read<cudaBoundaryModeZero>(x0 + 1, y0, z0) * active_100;
+  sum += w010 * uc.read<cudaBoundaryModeZero>(x0, y0 + 1, z0) * active_010;
+  sum += w110 * uc.read<cudaBoundaryModeZero>(x0 + 1, y0 + 1, z0) * active_110;
+  sum += w001 * uc.read<cudaBoundaryModeZero>(x0, y0, z0 + 1) * active_001;
+  sum += w101 * uc.read<cudaBoundaryModeZero>(x0 + 1, y0, z0 + 1) * active_101;
+  sum += w011 * uc.read<cudaBoundaryModeZero>(x0, y0 + 1, z0 + 1) * active_011;
+  sum += w111 * uc.read<cudaBoundaryModeZero>(x0 + 1, y0 + 1, z0 + 1) * active_111;
+  u.write(static_cast<float>(sum), x, y, z);
 }
 __global__ void DampedJacobiKernel(CudaSurfaceAccessor<float> u,
                                    CudaSurfaceAccessor<float> u_buf,
@@ -60,7 +91,7 @@ __global__ void DampedJacobiKernel(CudaSurfaceAccessor<float> u,
   float div = f.read(x, y, z);
   u_buf.write(
       (1.0 - kDampedJacobiOmega) * static_cast<double>(u_old) +
-      kDampedJacobiOmega * static_cast<double>((pxp + pxn + pyp + pyn + pzp + pzn - div) / cnt),
+          kDampedJacobiOmega * static_cast<double>((pxp + pxn + pyp + pyn + pzp + pzn - div) / cnt),
       x, y, z);
 }
 
