@@ -1,0 +1,2 @@
+#pragma code_page(65001)
+1 /* CREATEPROCESS_MANIFEST_RESOURCE_ID */ 24 /* RT_MANIFEST */ "C:/Users/79105/source/repos/SimCraft/cmake-build-debug-visual-studio/FluidSim/CMakeFiles/test-fluid-utils.dir/embed.manifest"

@@ -13,6 +13,7 @@
     <generated>
       <config projectName="SimCraft" targetName="CpuFluid" />
       <config projectName="SimCraft" targetName="GLAD" />
+      <config projectName="SimCraft" targetName="gpu-free-surface" />
       <config projectName="SimCraft" targetName="imgui_impl_glfw" />
       <config projectName="SimCraft" targetName="GpuFluid" />
       <config projectName="SimCraft" targetName="Core" />
@@ -20,6 +21,7 @@
       <config projectName="SimCraft" targetName="fluid-sim" />
       <config projectName="SimCraft" targetName="imgui_impl_opengl3" />
       <config projectName="SimCraft" targetName="test-cubic-solver" />
+      <config projectName="SimCraft" targetName="test-fluid-utils" />
       <config projectName="SimCraft" targetName="gpu-smoke" />
       <config projectName="SimCraft" targetName="imgui" />
       <config projectName="SimCraft" targetName="ogl-render" />
@@ -34,41 +36,39 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ef612d8e-bab6-4d8d-a036-e6484aa344ac" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/FluidSim/apps/gpu-free-surface.cu" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/mgpcg.cuh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/FluidSim/src/cuda/mgpcg.cu" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/FluidSim/src/cuda/utils.cu" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/FluidSim/tests/test-fluid-utils.cu" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/CMakeLists.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FluidSim/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/CMakeLists.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/apps/fluid-sim.cc" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/apps/fluid-sim.cc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/apps/gpu-smoke.cu" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/apps/gpu-smoke.cu" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cpu/fluid-simulator.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cpu/fluid-simulator.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/advect-solver.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/advect-solver.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/fluid-simulator.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/fluid-simulator.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/gpu-arrays.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/gpu-arrays.cuh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/kernels.cuh" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/kernels.cuh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/particle-reconstructor.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/particle-reconstructor.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/particle-system.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/particle-system.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/project-solver.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/project-solver.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/smoke-simulator.cuh" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/smoke-simulator.cuh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/utils.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/cuda/utils.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/fluid-sim.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/fluid-sim.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/fluid-simulator.h" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/include/FluidSim/fluid-simulator.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/include/FluidSim/utils.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/src/cpu/fluid-simulator.cc" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/src/cpu/fluid-simulator.cc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/src/cpu/rebuild-surface.cc" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/src/cpu/rebuild-surface.cc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/src/cuda/advect-solver.cu" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/src/cuda/advect-solver.cu" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/src/cuda/fluid-simulator.cu" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/src/cuda/fluid-simulator.cu" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/src/cuda/kernels.cu" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/src/cuda/kernels.cu" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/src/cuda/particle-reconstructor.cu" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/src/cuda/particle-reconstructor.cu" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/src/cuda/project-solver.cu" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/src/cuda/project-solver.cu" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FluidSim/src/fluid-simulator.cc" beforeDir="false" afterPath="$PROJECT_DIR$/FluidSim/src/fluid-simulator.cc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FluidSim/test/test.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/.cmake/api/v1/reply/cache-v2-1c3a6afc81ac64e15c50.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/.cmake/api/v1/reply/cmakeFiles-v1-bfb4b5037a9c85cd1ffc.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/.cmake/api/v1/reply/codemodel-v2-704a76b572ea8c27e2bf.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/.cmake/api/v1/reply/index-2024-04-26T23-14-50-0800.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/.cmake/api/v1/reply/target-demo-Debug-073cfe2f472a7dcaf7f2.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/.cmake/api/v1/reply/target-fluid-sim-Debug-66540a5382a0bf7f5afe.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/.cmake/api/v1/reply/target-gpu-free-surface-Debug-c272bb30d97d1913507b.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/.cmake/api/v1/reply/target-gpu-smoke-Debug-3fa767625d9829dff0c5.json" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeCache.txt" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeCache.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/TargetDirectories.txt" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/TargetDirectories.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/VerifyGlobs.cmake" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/VerifyGlobs.cmake" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/clion-Debug-Visual Studio-log.txt" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/clion-Debug-Visual Studio-log.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/rules.ninja" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug-visual-studio/CMakeFiles/rules.ninja" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-debug-visual-studio/build.ninja" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug-visual-studio/build.ninja" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/.cmake/api/v1/reply/cache-v2-6d62d9aca7c6186580ad.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/.cmake/api/v1/reply/cmakeFiles-v1-6d2add7a65b22399047a.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/.cmake/api/v1/reply/codemodel-v2-f4a8430644b1d3352f05.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/.cmake/api/v1/reply/index-2024-04-26T23-14-50-0811.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/.cmake/api/v1/reply/target-demo-Release-2b22d2ce249d10f50eb6.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/.cmake/api/v1/reply/target-fluid-sim-Release-179b506a12fe9efc694b.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/.ninja_deps" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/.ninja_deps" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/.ninja_log" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/.ninja_log" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeCache.txt" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeCache.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeFiles/clion-Release-Visual Studio-log.txt" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeFiles/clion-Release-Visual Studio-log.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeFiles/TargetDirectories.txt" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeFiles/TargetDirectories.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeFiles/VerifyGlobs.cmake" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeFiles/VerifyGlobs.cmake" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeFiles/rules.ninja" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/CMakeFiles/rules.ninja" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/Testing/Temporary/LastTest.log" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/Testing/Temporary/LastTest.log" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-release-visual-studio/build.ninja" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-release-visual-studio/build.ninja" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/external/imgui/backends/imgui_impl_vulkan.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/backends/imgui_impl_vulkan.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/external/imgui/backends/imgui_impl_vulkan.h" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/backends/imgui_impl_vulkan.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/external/imgui/backends/vulkan/generate_spv.sh" beforeDir="false" afterPath="$PROJECT_DIR$/external/imgui/backends/vulkan/generate_spv.sh" afterDir="false" />
@@ -86,7 +86,7 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="CMakeBuildProfile:Release-Visual Studio" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="CMakeBuildProfile:Debug-Visual Studio" />
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
     <option name="ROOT_SYNC" value="SYNC" />
@@ -105,34 +105,52 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;CMake Application.fluid-sim.executor&quot;: &quot;Run&quot;,
-    &quot;CMake Application.gpu-smoke.executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.cidr.known.project.marker&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.readMode.enableVisualFormatting&quot;: &quot;true&quot;,
-    &quot;cf.first.check.clang-format&quot;: &quot;false&quot;,
-    &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;Merging test&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/79105/source/repos/SimCraft&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.sourceCode.C/C++&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "C/C++ File.test-kernelSaxpy.cu.executor": "Run",
+    "CMake Application.fluid-sim.executor": "Run",
+    "CMake Application.gpu-free-surface.executor": "Run",
+    "CMake Application.gpu-smoke.executor": "Run",
+    "Google Test.SaxpyTest.RandomEquations.executor": "Debug",
+    "Google Test.test-fluid-utils.executor": "Run",
+    "Google Test.test-kernelSaxpy.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "cf.advertisement.text.has.clang-format": "true",
+    "cf.first.check.clang-format": "false",
+    "cidr.known.project.marker": "true",
+    "git-widget-placeholder": "test",
+    "last_opened_file_path": "C:/Users/79105/source/repos/SimCraft",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "CMakeSettings",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
-  <component name="RunManager" selected="CMake Application.fluid-sim">
+}]]></component>
+  <component name="RunManager" selected="Google Test.SaxpyTest.RandomEquations">
     <configuration default="true" type="CLionExternalRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
       <method v="2">
         <option name="CLION.EXTERNAL.BUILD" enabled="true" />
       </method>
     </configuration>
+    <configuration name="SaxpyTest.RandomEquations" type="CMakeGoogleTestRunConfigurationType" factoryName="Google Test" temporary="true" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="SimCraft" TARGET_NAME="test-fluid-utils" RUN_TARGET_PROJECT_NAME="SimCraft" RUN_TARGET_NAME="test-fluid-utils" TEST_CLASS="SaxpyTest" TEST_METHOD="RandomEquations" TEST_MODE="SUITE_TEST">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+        <option name="BeforeTestRunTask" enabled="true" />
+      </method>
+    </configuration>
     <configuration name="test-cubic-solver" type="CMakeGoogleTestRunConfigurationType" factoryName="Google Test" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="SimCraft" TARGET_NAME="test-cubic-solver" CONFIG_NAME="Debug-Visual Studio" RUN_TARGET_PROJECT_NAME="SimCraft" RUN_TARGET_NAME="test-cubic-solver" TEST_MODE="SUITE_TEST">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+        <option name="BeforeTestRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="test-fluid-utils" type="CMakeGoogleTestRunConfigurationType" factoryName="Google Test" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="SimCraft" TARGET_NAME="test-fluid-utils" CONFIG_NAME="Debug-Visual Studio" RUN_TARGET_PROJECT_NAME="SimCraft" RUN_TARGET_NAME="test-fluid-utils" TEST_MODE="SUITE_TEST">
       <method v="2">
         <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
         <option name="BeforeTestRunTask" enabled="true" />
@@ -164,6 +182,11 @@
       </method>
     </configuration>
     <configuration name="fluid-sim" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="SimCraft" TARGET_NAME="fluid-sim" CONFIG_NAME="Debug-Visual Studio" RUN_TARGET_PROJECT_NAME="SimCraft" RUN_TARGET_NAME="fluid-sim">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="gpu-free-surface" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="SimCraft" TARGET_NAME="gpu-free-surface" CONFIG_NAME="Debug-Visual Studio" RUN_TARGET_PROJECT_NAME="SimCraft" RUN_TARGET_NAME="gpu-free-surface">
       <method v="2">
         <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
       </method>
@@ -204,6 +227,7 @@
       <item itemvalue="CMake Application.demo" />
       <item itemvalue="CMake Application.fluid-sim" />
       <item itemvalue="CMake Application.GLAD" />
+      <item itemvalue="CMake Application.gpu-free-surface" />
       <item itemvalue="CMake Application.gpu-smoke" />
       <item itemvalue="CMake Application.GpuFluid" />
       <item itemvalue="CMake Application.imgui" />
@@ -212,7 +236,14 @@
       <item itemvalue="CMake Application.imgui_impl_vulkan" />
       <item itemvalue="CMake Application.ogl-render" />
       <item itemvalue="Google Test.test-cubic-solver" />
+      <item itemvalue="Google Test.test-fluid-utils" />
+      <item itemvalue="Google Test.SaxpyTest.RandomEquations" />
     </list>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Google Test.SaxpyTest.RandomEquations" />
+      </list>
+    </recent_temporary>
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
@@ -244,6 +275,17 @@
     <isAutomaticCheckingOnLaunch value="false" />
     <isAutomaticFoundErrors value="true" />
     <isAutomaticReloadCMake value="true" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
+          <url>file://$PROJECT_DIR$/FluidSim/tests/test-fluid-utils.cu</url>
+          <line>44</line>
+          <option name="timeStamp" value="23" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

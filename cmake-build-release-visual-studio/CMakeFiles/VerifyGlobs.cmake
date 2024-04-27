@@ -189,6 +189,16 @@ if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
   file(TOUCH_NOCREATE "C:/Users/79105/source/repos/SimCraft/cmake-build-release-visual-studio/CMakeFiles/cmake.verify_globs")
 endif()
 
+# test_srcs at FluidSim/CMakeLists.txt:41 (file)
+file(GLOB_RECURSE NEW_GLOB LIST_DIRECTORIES false "C:/Users/79105/source/repos/SimCraft/FluidSim/tests/*.cu")
+set(OLD_GLOB
+  "C:/Users/79105/source/repos/SimCraft/FluidSim/tests/test-fluid-utils.cu"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "C:/Users/79105/source/repos/SimCraft/cmake-build-release-visual-studio/CMakeFiles/cmake.verify_globs")
+endif()
+
 # srcs at OglRender/CMakeLists.txt:2 (file)
 file(GLOB_RECURSE NEW_GLOB LIST_DIRECTORIES false "C:/Users/79105/source/repos/SimCraft/OglRender/include/*.h")
 set(OLD_GLOB

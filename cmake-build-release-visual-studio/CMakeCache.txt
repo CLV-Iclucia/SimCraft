@@ -259,6 +259,9 @@ GLAD_IS_TOP_LEVEL:STATIC=OFF
 //Value Computed by CMake
 GLAD_SOURCE_DIR:STATIC=C:/Users/79105/source/repos/SimCraft/external/glad
 
+//The directory containing a CMake configuration file for GTest.
+GTest_DIR:PATH=C:/vcpkg/installed/x64-windows/share/gtest
+
 //Dependencies for the target
 GpuFluid_LIB_DEPENDS:STATIC=general;Core;
 
