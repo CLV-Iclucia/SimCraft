@@ -34,7 +34,6 @@ __global__ void ProlongateKernel(CudaSurfaceAccessor<float> uc,
                                  CudaSurfaceAccessor<float> u, uint n) {
   get_and_restrict_tid_3d(x, y, z, n, n, n);
   if (!active.read(x, y, z)) return;
-  double h = 1.0 / n;
   double sum = u.read(x, y, z);
   // use trilinear interpolation
   int x0 = (x - 1) / 2;
@@ -48,9 +47,9 @@ __global__ void ProlongateKernel(CudaSurfaceAccessor<float> uc,
   auto active_101 = active.read<cudaBoundaryModeZero>(x0 + 1, y0, z0 + 1);
   auto active_011 = active.read<cudaBoundaryModeZero>(x0, y0 + 1, z0 + 1);
   auto active_111 = active.read<cudaBoundaryModeZero>(x0 + 1, y0 + 1, z0 + 1);
-  auto tx = (x + 0.5) * h - (x0 + 0.5) * 2.0 * h;
-  auto ty = (y + 0.5) * h - (y0 + 0.5) * 2.0 * h;
-  auto tz = (z + 0.5) * h - (z0 + 0.5) * 2.0 * h;
+  auto tx = x * 0.5 - x0 - 0.25;
+  auto ty = y * 0.5 - y0 - 0.25;
+  auto tz = z * 0.5 - z0 - 0.25;
   auto w000 = (1.0 - tx) * (1.0 - ty) * (1.0 - tz);
   auto w100 = tx * (1.0 - ty) * (1.0 - tz);
   auto w010 = (1.0 - tx) * ty * (1.0 - tz);
