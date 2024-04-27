@@ -8,8 +8,8 @@
 #include <FluidSim/cuda/vec-op.cuh>
 
 namespace fluid::cuda {
-constexpr int kVcycleLevel = 5;
-constexpr int kSmoothingIters = 20;
+constexpr int kVcycleLevel = 3;
+constexpr int kSmoothingIters = 15;
 constexpr double kDampedJacobiOmega = 2.0 / 3.0;
 __global__ void PrecomputeDownSampleKernel(CudaSurfaceAccessor<uint8_t> u,
                                            CudaSurfaceAccessor<uint8_t> uc, uint n);
@@ -20,7 +20,10 @@ __global__ void ProlongateKernel(CudaSurfaceAccessor<float> uc,
 __global__ void DampedJacobiKernel(CudaSurfaceAccessor<float> u,
                                    CudaSurfaceAccessor<uint8_t> active,
                                    CudaSurfaceAccessor<float> f, uint n);
-
+void vCycle(std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel> &active,
+            std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> &u,
+            std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> &f,
+            int n);
 void prepareWeights();
 }
 #endif //SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_CUDA_MGPCG_CUH_

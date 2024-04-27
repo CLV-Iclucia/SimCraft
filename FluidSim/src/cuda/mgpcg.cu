@@ -94,9 +94,10 @@ __global__ void DampedJacobiKernel(CudaSurfaceAccessor<float> u,
       x, y, z);
 }
 
-void bottomSolve() {
-
-}
+void vCycle(std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel> &active,
+            std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> &u,
+            std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> &f,
+            int n);
 
 void prepareWeights() {
   double weights[4][4][4];

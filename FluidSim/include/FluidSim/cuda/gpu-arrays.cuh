@@ -70,6 +70,9 @@ struct CudaArray3D : core::NonCopyable {
     copy3DParams.kind = cudaMemcpyHostToDevice;
     cudaMemcpy3D(&copy3DParams);
   }
+  void copyFrom(const std::vector<T> &vec) {
+    copyFrom(vec.data());
+  }
   void copyFrom(const CudaArray3D<T> &other) {
     cudaMemcpy3DParms copy3DParams{};
     copy3DParams.srcArray = other.cuda_array;
@@ -78,7 +81,6 @@ struct CudaArray3D : core::NonCopyable {
     copy3DParams.kind = cudaMemcpyDeviceToDevice;
     cudaMemcpy3D(&copy3DParams);
   }
-
   void copyTo(T *data) {
     cudaMemcpy3DParms copy3DParams{};
     copy3DParams.srcArray = cuda_array;
@@ -89,7 +91,10 @@ struct CudaArray3D : core::NonCopyable {
     copy3DParams.kind = cudaMemcpyDeviceToHost;
     cudaMemcpy3D(&copy3DParams);
   }
-
+  void copyTo(std::vector<T>& vec) {
+    vec.resize(dim.x * dim.y * dim.z);
+    copyTo(vec.data());
+  }
   void zero() {
     auto ptr = make_cudaPitchedPtr(static_cast<void *>(cuda_array), dim.x * sizeof(T), dim.x, dim.y);
     cudaMemset3D(ptr, 0, make_cudaExtent(dim.x * sizeof(T), dim.y, dim.z));
