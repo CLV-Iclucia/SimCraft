@@ -46,7 +46,7 @@ CUDA_GLOBAL void kernelDotProduct(CudaSurfaceAccessor<float> surfaceA,
     result[block_idx] = block_result;
 }
 
-CUDA_GLOBAL void kernelNorm(CudaSurfaceAccessor<float> surface,
+CUDA_GLOBAL void kernelLinfNorm(CudaSurfaceAccessor<float> surface,
                             CudaSurfaceAccessor<uint8_t> active,
                             DeviceArrayAccessor<float> result,
                             int3 dimensions) {
@@ -58,8 +58,7 @@ CUDA_GLOBAL void kernelNorm(CudaSurfaceAccessor<float> surface,
                                        kThreadBlockSize3D,
                                        kThreadBlockSize3D>;
   CUDA_SHARED BlockReduce::TempStorage temp_storage;
-  auto block_result = BlockReduce(temp_storage).Sum(local_result,
-                                                    blockDim.x * blockDim.y * blockDim.z);
+  auto block_result = BlockReduce(temp_storage).Reduce(local_result,cub::Max());
   if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0)
     result[block_idx] = block_result;
 }

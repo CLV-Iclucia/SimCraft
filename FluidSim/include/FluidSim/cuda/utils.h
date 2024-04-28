@@ -43,10 +43,10 @@ CUDA_GLOBAL void kernelDotProduct(CudaSurfaceAccessor<float> surfaceA,
                                   CudaSurfaceAccessor<uint8_t> active,
                                   DeviceArrayAccessor<double> result,
                                   int3 dimensions);
-CUDA_GLOBAL void kernelNorm(CudaSurfaceAccessor<float> surface,
-                            CudaSurfaceAccessor<uint8_t> active,
-                            DeviceArrayAccessor<double> result,
-                            int3 dimensions);
+CUDA_GLOBAL void kernelLinfNorm(CudaSurfaceAccessor<float> surface,
+                                CudaSurfaceAccessor<uint8_t> active,
+                                DeviceArrayAccessor<double> result,
+                                int3 dimensions);
 
 inline float dotProduct(CudaSurface<float> &surfaceA,
                         CudaSurface<float> &surfaceB,
@@ -68,7 +68,7 @@ inline float dotProduct(CudaSurface<float> &surfaceA,
   return static_cast<float>(std::accumulate(host_reduce_buffer.begin(), host_reduce_buffer.begin() + num_blocks, 0.0));
 }
 
-inline float L1Norm(CudaSurface<float> &surface,
+inline float LinfNorm(CudaSurface<float> &surface,
                     const CudaSurface<uint8_t> &active,
                     DeviceArray<double> &device_reduce_buffer,
                     std::vector<double> &host_reduce_buffer,
@@ -77,7 +77,7 @@ inline float L1Norm(CudaSurface<float> &surface,
   int num_block_y = (dimensions.y + kThreadBlockSize3D - 1) / kThreadBlockSize3D;
   int num_block_z = (dimensions.z + kThreadBlockSize3D - 1) / kThreadBlockSize3D;
   int num_blocks = num_block_x * num_block_y * num_block_z;
-  cudaSafeCheck(kernelNorm<<<LAUNCH_THREADS_3D(dimensions.x, dimensions.y, dimensions.z)>>>(
+  cudaSafeCheck(kernelLinfNorm<<<LAUNCH_THREADS_3D(dimensions.x, dimensions.y, dimensions.z)>>>(
       surface.surfaceAccessor(),
       active.surfaceAccessor(),
       device_reduce_buffer.accessor(),

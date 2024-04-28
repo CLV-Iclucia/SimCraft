@@ -164,9 +164,9 @@ class CgSolver final : public CompressedSolver {
   ~CgSolver() override = default;
 
  protected:
-  float L1Norm(const CudaSurface<float> &surface,
-              const CudaSurface<uint8_t> &active,
-              int3 resolution) const;
+  float LinfNorm(const CudaSurface<float> &surface,
+                 const CudaSurface<uint8_t> &active,
+                 int3 resolution) const;
   float dotProduct(const CudaSurface<float> &surfaceA,
                   const CudaSurface<float> &surfaceB,
                   const CudaSurface<uint8_t> &active,

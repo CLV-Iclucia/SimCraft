@@ -272,13 +272,13 @@ static CUDA_GLOBAL void kernelComputeMatrix(
   rhs.write(b, i, j, k);
 }
 
-float CgSolver::L1Norm(const CudaSurface<float> &surface,
-                      const CudaSurface<uint8_t> &active,
-                      int3 resolution) const {
+float CgSolver::LinfNorm(const CudaSurface<float> &surface,
+                         const CudaSurface<uint8_t> &active,
+                         int3 resolution) const {
   int block_num = (resolution.x + kThreadBlockSize3D - 1) / kThreadBlockSize3D
       * (resolution.y + kThreadBlockSize3D - 1) / kThreadBlockSize3D
       * (resolution.z + kThreadBlockSize3D - 1) / kThreadBlockSize3D;
-  cudaSafeCheck(kernelNorm<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
+  cudaSafeCheck(kernelLinfNorm<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
       surface.surfaceAccessor(), active.surfaceAccessor(), device_reduce_buffer->accessor(), resolution));
   device_reduce_buffer->copyTo(host_reduce_buffer);
   float sum = 0.0;
@@ -403,7 +403,7 @@ float CgSolver::solve(const CompressedSystem &sys,
                      int3 resolution) {
   pg.zero();
   r->copyFrom(*sys.rhs);
-  float residual = L1Norm(*r, active, resolution);
+  float residual = LinfNorm(*r, active, resolution);
   if (residual < tolerance) {
     std::cout << "naturally converged" << std::endl;
     return residual;
@@ -422,7 +422,7 @@ float CgSolver::solve(const CompressedSystem &sys,
     float alpha = sigma / sdotz;
     saxpy(pg, *s, alpha, active, resolution);
     saxpy(*r, *z, -alpha, active, resolution);
-    residual = L1Norm(*r, active, resolution);
+    residual = LinfNorm(*r, active, resolution);
     if (residual < tolerance) break;
     if (preconditioner)
       preconditioner->precond(sys, *r, active, *z);
