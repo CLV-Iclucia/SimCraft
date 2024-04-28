@@ -47,7 +47,7 @@ ImGuiIO& initImGui(GLFWwindow* window) {
 }
 
 struct Options {
-  int nParticles = 65536;
+  int nParticles = 262144;
   core::Vec3d size = core::Vec3d(1.0);
   core::Vec3i resolution = core::Vec3i(64);
   std::string colliderPath = std::format("{}/complex_bunny.obj",
@@ -209,7 +209,7 @@ int main(int argc, char** argv) {
   }
   relocateMesh(colliderMesh, size);
   simulator->setCollider(colliderMesh);
-  simulator->setAdvector(fluid::AdvectionMethod::PIC);
+  simulator->setAdvector(fluid::AdvectionMethod::FLIP);
   simulator->setProjector(fluid::ProjectSolver::FVM);
   simulator->setReconstructor(fluid::ReconstructorMethod::Naive);
   simulator->setInitialFluid(colliderMesh);
@@ -254,16 +254,16 @@ int main(int argc, char** argv) {
     simulator->step(frame);
     drawFluid(fluidCtx.get(), fluidShader.get(), camera, simulator->positions(),
               display_w, display_h);
-    if (frame.idx == 52) {
+    if(frame.idx >= 80 && frame.idx <= 240){
       simulator->reconstruct();
       simulator->smoothFluidSurface(5);
       core::Mesh fluidMesh;
-      const auto& surface = simulator->exportFluidSurface();
-      auto sdf_samples = surface.fieldSamples();
       fluid::cpu::rebuildSurface(fluidMesh, simulator->exportFluidSurface());
-      simulator->exportFluidSurface().saveSDF("the place to save your SDF file");
-      if (!core::exportObj("fluid.obj", fluidMesh)) {
-        std::cerr << "Failed to export fluid mesh" << std::endl;
+      std::ostringstream filename;
+      filename << "obj_file/fluid_" << std::setfill('0') << std::setw(3) << frame.idx << ".obj";
+      if (!core::exportObj(filename.str(), fluidMesh)) {
+        std::cerr << "Failed to export fluid mesh for frame " << frame.idx << std::endl;
+        std::cerr << "Failed to export fluid mesh for frame " << frame.idx << std::endl;
         exit(-1);
       }
     }

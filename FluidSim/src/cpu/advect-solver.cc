@@ -11,9 +11,9 @@ void PicAdvector3D::solveG2P(const std::span<Vec3d> pos,
                              const SDF<3> &collider_sdf,
                              Real dt) {
   int n = pos.size();
-  for (int i = 0; i < n; i++) {
+  tbb::parallel_for(0, n, [&](int i) {
     vel(i) = sampleVelocity(pos[i], ug, vg, wg);
-  }
+  });
 }
 void PicAdvector3D::solveP2G(const std::span<Vec3d> pos,
                              FaceCentredGrid<Real, Real, 3, 0> &ug,
@@ -142,17 +142,16 @@ void PicAdvector3D::advect(const std::span<Vec3d> pos,
                            const SDF<3> &collider_sdf,
                            Real dt) {
   int n = pos.size();
-  for (int i = 0; i < n; i++) {
+  tbb::parallel_for(0, n, [&](int i) {
     auto &p = pos[i];
     Vec3d k1 = vel(i);
     Vec3d p1 = p + 0.5 * dt * k1;
     Vec3d k2 = sampleVelocity(p1, ug, vg, wg);
-    handleCollision(collider_sdf, p, k2);
-    Vec3d p2 = p - dt * k1 + 2.0 * dt * k2;
+    Vec3d p2 = p + 0.75 * dt * k2;
     Vec3d k3 = sampleVelocity(p2, ug, vg, wg);
-    p = p + dt / 6.0 * (k1 + 4.0 * k2 + k3);
+    p = p + 2.0 / 9.0 * dt * k1 + 1.0 / 3.0 * dt * k2 + 4.0 / 9.0 * dt * k3;
     handleCollision(collider_sdf, p, vel(i));
-  }
+  });
 }
 
 void FlipAdvectionSolver3D::solveG2P(const std::span<Vec3d> pos,
@@ -180,10 +179,9 @@ void FlipAdvectionSolver3D::advect(std::span<Vec3d> pos,
     Vec3d k1 = vel(i);
     Vec3d p1 = p + 0.5 * dt * k1;
     Vec3d k2 = sampleVelocity(p1, ug, vg, wg);
-    handleCollision(collider_sdf, p, k2);
-    Vec3d p2 = p - dt * k1 + 2.0 * dt * k2;
+    Vec3d p2 = p + 0.75 * dt * k2;
     Vec3d k3 = sampleVelocity(p2, ug, vg, wg);
-    p = p + dt / 6.0 * (k1 + 4.0 * k2 + k3);
+    p = p + 2.0 / 9.0 * dt * k1 + 1.0 / 3.0 * dt * k2 + 4.0 / 9.0 * dt * k3;
     handleCollision(collider_sdf, p, vel(i));
   });
 }

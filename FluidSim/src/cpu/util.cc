@@ -47,9 +47,9 @@ Vec3d sampleVelocity(const Vec3d& p,
   Real h = ug.gridSpacing().x;
   Real u = 0.0, v = 0.0, w = 0.0;
   Real w_u = 0.0, w_v = 0.0, w_w = 0.0;
-  for (int i = -1; i <= 1; i++) {
-    for (int j = -1; j <= 1; j++) {
-      for (int k = -1; k <= 1; k++) {
+  for (int i = -1; i <= 2; i++) {
+    for (int j = -1; j <= 2; j++) {
+      for (int k = -1; k <= 2; k++) {
         if (u_idx.x + i >= 0 && u_idx.x + i < ug.width() &&
             u_idx.y + j >= 0 && u_idx.y + j < ug.height() &&
             u_idx.z + k >= 0 && u_idx.z + k < ug.depth()) {

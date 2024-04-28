@@ -144,7 +144,7 @@ void FluidSimulator::substep(Real dt) {
   std::cout << "Done." << std::endl;
   std::cout << "Reconstructing surface... ";
   fluidSurfaceReconstructor->reconstruct(
-      m_particles.positions, 0.6 * ug->gridSpacing().x / std::sqrt(2.0),
+      m_particles.positions, 0.6 * ug->gridSpacing().x,
       *fluidSurface, *sdfValid);
   std::cout << "Done." << std::endl;
   std::cout << "Smoothing surface... ";
