@@ -61,7 +61,7 @@ struct CudaArray3D : core::NonCopyable {
     }
     return *this;
   }
-  void copyFrom(const T *data) {
+  void copyFrom(T *data) {
     cudaMemcpy3DParms copy3DParams{};
     copy3DParams.srcPtr =
         make_cudaPitchedPtr(static_cast<void*>(data), dim.x * sizeof(T), dim.x, dim.y);
