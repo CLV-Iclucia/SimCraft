@@ -26,21 +26,7 @@ static __global__ void ComputeResidualKernel(CudaSurfaceAccessor<float> u,
                                              CudaSurfaceAccessor<uint8_t> active, uint n) {
   get_and_restrict_tid_3d(x, y, z, n, n, n);
   if (!active.read(x, y, z)) return;
-  float u_old = u.read(x, y, z);
-  uint8_t axp = active.read<cudaBoundaryModeZero>(x - 1, y, z);
-  uint8_t axn = active.read<cudaBoundaryModeZero>(x + 1, y, z);
-  uint8_t ayp = active.read<cudaBoundaryModeZero>(x, y - 1, z);
-  uint8_t ayn = active.read<cudaBoundaryModeZero>(x, y + 1, z);
-  uint8_t azp = active.read<cudaBoundaryModeZero>(x, y, z - 1);
-  uint8_t azn = active.read<cudaBoundaryModeZero>(x, y, z + 1);
-  auto cnt = static_cast<double>(axp + axn + ayp + ayn + azp + azn);
-  float pxp = static_cast<float>(axp) * u.read<cudaBoundaryModeClamp>(x - 1, y, z);
-  float pxn = static_cast<float>(axn) * u.read<cudaBoundaryModeClamp>(x + 1, y, z);
-  float pyp = static_cast<float>(ayp) * u.read<cudaBoundaryModeClamp>(x, y - 1, z);
-  float pyn = static_cast<float>(ayn) * u.read<cudaBoundaryModeClamp>(x, y + 1, z);
-  float pzp = static_cast<float>(azp) * u.read<cudaBoundaryModeClamp>(x, y, z - 1);
-  float pzn = static_cast<float>(azn) * u.read<cudaBoundaryModeClamp>(x, y, z + 1);
-  r.write(b.read(x, y, z) - (pxp + pxn + pyp + pyn + pzp + pzn), x, y, z);
+  r.write(b.read(x, y, z) - localLaplacian(u, active, x, y, z), x, y, z);
 }
 __global__ void RestrictKernel(CudaSurfaceAccessor<float> u,
                                CudaSurfaceAccessor<float> uc, uint n) {
@@ -112,10 +98,8 @@ __global__ void DampedJacobiKernel(CudaSurfaceAccessor<float> u,
   float pzp = static_cast<float>(azp) * u.read<cudaBoundaryModeClamp>(x, y, z - 1);
   float pzn = static_cast<float>(azn) * u.read<cudaBoundaryModeClamp>(x, y, z + 1);
   float div = f.read(x, y, z);
-  u_buf.write(
-      (1.0 - kDampedJacobiOmega) * static_cast<double>(u_old) +
-          kDampedJacobiOmega * static_cast<double>((pxp + pxn + pyp + pyn + pzp + pzn - div) / cnt),
-      x, y, z);
+  u_buf.write(u_old + kDampedJacobiOmega * static_cast<double>((pxp + pxn + pyp + pyn + pzp + pzn - div) / cnt),
+              x, y, z);
 }
 
 static void smooth(const std::unique_ptr<CudaSurface<uint8_t>> &active,
@@ -161,8 +145,8 @@ static __global__ void BottomSolveKernel(CudaSurfaceAccessor<float> u,
     float pzp = static_cast<float>(azp) * u_shared[cur][x][y][max(z - 1, 0)];
     float pzn = static_cast<float>(azn) * u_shared[cur][x][y][min(z + 1, n - 1)];
     float div = b_shared[x][y][z];
-    u_shared[cur ^ 1][x][y][z] = (1.0 - kDampedJacobiOmega) * static_cast<double>(u_old) +
-        kDampedJacobiOmega * static_cast<double>((pxp + pxn + pyp + pyn + pzp + pzn - div) / cnt);
+    u_shared[cur ^ 1][x][y][z] =
+        u_old + kDampedJacobiOmega * static_cast<double>((pxp + pxn + pyp + pyn + pzp + pzn - div) / cnt);
     cur ^= 1;
     __syncthreads();
   }
@@ -180,26 +164,27 @@ static void bottomSolve(const std::unique_ptr<CudaSurface<uint8_t>> &active,
   BottomSolveKernel<<<1, 8 * 8 * 8>>>(u->surfaceAccessor(), b->surfaceAccessor(),
                                       active->surfaceAccessor(), n);
 }
-void vCycle(std::array<std::unique_ptr<CudaSurface<uint8_t >>, kVcycleLevel> &active,
-            std::array<std::unique_ptr<CudaSurface<float >>, kVcycleLevel> &u,
-            std::array<std::unique_ptr<CudaSurface<float >>, kVcycleLevel> &uBuf,
-            std::array<std::unique_ptr<CudaSurface<float >>, kVcycleLevel> &b,
+void vCycle(std::array<std::unique_ptr<CudaSurface<uint8_t >>, kVcycleLevel + 1> &active,
+            std::array<std::unique_ptr<CudaSurface<float >>, kVcycleLevel + 1> &u,
+            std::array<std::unique_ptr<CudaSurface<float >>, kVcycleLevel + 1> &uBuf,
+            std::array<std::unique_ptr<CudaSurface<float >>, kVcycleLevel + 1> &b,
             int n) {
+  u[0]->zero();
   for (int l = 0; l < kVcycleLevel; l++) {
     int N = n >> l;
     smooth(active[l], u[l], uBuf[l], b[l], N);
     ComputeResidualKernel<<<LAUNCH_THREADS_3D(N, N, N)>>>(u[l]->surfaceAccessor(), b[l]->surfaceAccessor(),
-                                                          uBuf[l]->surfaceAccessor(), active[l]->surfaceAccessor(), n);
+                                                          uBuf[l]->surfaceAccessor(), active[l]->surfaceAccessor(), N);
     RestrictKernel<<<LAUNCH_THREADS_3D(N >> 1, N >> 1, N >> 1)>>>(uBuf[l]->surfaceAccessor(),
                                                                   uBuf[l + 1]->surfaceAccessor(),
-                                                                  n);
+                                                                  N >> 1);
   }
   bottomSolve(active[kVcycleLevel], u[kVcycleLevel], b[kVcycleLevel], n >> kVcycleLevel);
   for (int l = kVcycleLevel - 1; l >= 0; l--) {
     int N = n >> l;
     ProlongateKernel<<<LAUNCH_THREADS_3D(N, N, N)>>>(u[l + 1]->surfaceAccessor(),
                                                      active[l]->surfaceAccessor(),
-                                                     u[l]->surfaceAccessor(), n);
+                                                     u[l]->surfaceAccessor(), N);
     smooth(active[l], u[l], uBuf[l], b[l], N);
   }
 }
@@ -226,12 +211,14 @@ static __global__ void kernelComputeResidualAndAverage(CudaSurfaceAccessor<float
     ave_buffer[block_idx] = block_result;
 }
 
-static __global__ void kernelModifyAndNorm(CudaSurfaceAccessor<float> u,
+static __global__ void kernelModifyAndNorm(CudaSurfaceAccessor<float> r,
                                            CudaSurfaceAccessor<uint8_t> active,
                                            DeviceArrayAccessor<double> norm_buffer,
                                            float mu, int n) {
   get_and_restrict_tid_3d(x, y, z, n, n, n);
-  float val = fabs(u.read(x, y, z) - mu) * active.read(x, y, z);
+  float modified_r = (r.read(x, y, z) - mu) * active.read(x, y, z);
+  float val = fabs(modified_r);
+  r.write(modified_r, x, y, z);
   using BlockReduce = cub::BlockReduce<float, kThreadBlockSize3D,
                                        cub::BLOCK_REDUCE_WARP_REDUCTIONS,
                                        kThreadBlockSize3D,
@@ -249,7 +236,7 @@ static double computeResidualAndAverage(CudaSurface<float> &u,
                                         CudaSurface<uint8_t> &active,
                                         DeviceArray<double> &ave_buffer,
                                         std::vector<double> &host_buffer,
-                                        int n) {
+                                        int n, int active_cnt) {
   kernelComputeResidualAndAverage<<<LAUNCH_THREADS_3D(n, n, n)>>>(u.surfaceAccessor(),
                                                                   b.surfaceAccessor(),
                                                                   active.surfaceAccessor(),
@@ -257,17 +244,16 @@ static double computeResidualAndAverage(CudaSurface<float> &u,
                                                                   n);
   ave_buffer.copyTo(host_buffer);
   double mu = std::accumulate(host_buffer.begin(), host_buffer.begin() + n * n * n, 0.0);
-  return mu;
+  return mu / active_cnt;
 }
 
-static __global__ void kernelLaplacianAndDot(CudaSurfaceAccessor<float> u,
-                                             CudaSurfaceAccessor<float> p,
+static __global__ void kernelLaplacianAndDot(CudaSurfaceAccessor<float> p,
                                              CudaSurfaceAccessor<float> z,
                                              CudaSurfaceAccessor<uint8_t> active,
                                              DeviceArrayAccessor<double> buffer,
                                              int n) {
   get_and_restrict_tid_3d(i, j, k, n, n, n);
-  double laplacian_result = active.read(i, j, k) * localLaplacian(u, active, i, j, k);
+  double laplacian_result = active.read(i, j, k) * localLaplacian(p, active, i, j, k);
   double local_result = laplacian_result * p.read(i, j, k);
   z.write(local_result, i, j, k);
   using BlockReduce = cub::BlockReduce<double, kThreadBlockSize3D,
@@ -310,7 +296,7 @@ static double saxpyAndAverage(CudaSurface<float> &r,
                               float alpha,
                               DeviceArray<double> &ave_buffer,
                               std::vector<double> &host_buffer,
-                              int n) {
+                              int n, int active_cnt) {
   kernelSaxpyAndComputeAverage<<<LAUNCH_THREADS_3D(n, n, n)>>>(r.surfaceAccessor(),
                                                                z.surfaceAccessor(),
                                                                active.surfaceAccessor(),
@@ -319,7 +305,7 @@ static double saxpyAndAverage(CudaSurface<float> &r,
                                                                n);
   ave_buffer.copyTo(host_buffer);
   double mu = std::accumulate(host_buffer.begin(), host_buffer.begin() + n * n * n, 0.0);
-  return mu;
+  return mu / active_cnt;
 }
 
 static double subAveAndNorm(CudaSurface<float> &r,
@@ -406,15 +392,15 @@ void mgpcg(std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel> &acti
            CudaSurface<float> &x,
            DeviceArray<double> &device_buffer,
            std::vector<double> &host_buffer,
-           int n, int maxIters, float tolerance) {
-  auto mu = computeResidualAndAverage(x, *r[0], *active[0], device_buffer, host_buffer, n);
+           int active_cnt, int n, int maxIters, float tolerance) {
+  auto mu = computeResidualAndAverage(x, *r[0], *active[0], device_buffer, host_buffer, n, active_cnt);
   auto v = subAveAndNorm(*r[0], *active[0], device_buffer, host_buffer, mu, n);
   if (v < tolerance) return;
   double rho = precondAndDot(active, p, pBuf, r, device_buffer, host_buffer, n);
-  for (int i = 0; i < maxIters; i++) {
+  for (int i = 0; i <= maxIters; i++) {
     double sigma = laplacianAndDot(x, *p[0], *z[0], *active[0], device_buffer, host_buffer, n);
     double alpha = rho / sigma;
-    mu = saxpyAndAverage(*r[0], *z[0], *active[0], alpha, device_buffer, host_buffer, n);
+    mu = saxpyAndAverage(*r[0], *z[0], *active[0], alpha, device_buffer, host_buffer, n, active_cnt);
     v = subAveAndNorm(*r[0], *active[0], device_buffer, host_buffer, mu, n);
     if (v < tolerance || i == maxIters) {
       saxpy(x, *p[0], alpha, *active[0], make_int3(n, n, n));

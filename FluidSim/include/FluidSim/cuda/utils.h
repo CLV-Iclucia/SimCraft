@@ -45,7 +45,7 @@ CUDA_GLOBAL void kernelDotProduct(CudaSurfaceAccessor<float> surfaceA,
                                   int3 dimensions);
 CUDA_GLOBAL void kernelLinfNorm(CudaSurfaceAccessor<float> surface,
                                 CudaSurfaceAccessor<uint8_t> active,
-                                DeviceArrayAccessor<double> result,
+                                DeviceArrayAccessor<float> result,
                                 int3 dimensions);
 
 inline float dotProduct(CudaSurface<float> &surfaceA,
@@ -69,10 +69,10 @@ inline float dotProduct(CudaSurface<float> &surfaceA,
 }
 
 inline float LinfNorm(CudaSurface<float> &surface,
-                    const CudaSurface<uint8_t> &active,
-                    DeviceArray<double> &device_reduce_buffer,
-                    std::vector<double> &host_reduce_buffer,
-                    int3 dimensions) {
+                      const CudaSurface<uint8_t> &active,
+                      DeviceArray<double> &device_reduce_buffer,
+                      std::vector<double> &host_reduce_buffer,
+                      int3 dimensions) {
   int num_block_x = (dimensions.x + kThreadBlockSize3D - 1) / kThreadBlockSize3D;
   int num_block_y = (dimensions.y + kThreadBlockSize3D - 1) / kThreadBlockSize3D;
   int num_block_z = (dimensions.z + kThreadBlockSize3D - 1) / kThreadBlockSize3D;
@@ -83,7 +83,10 @@ inline float LinfNorm(CudaSurface<float> &surface,
       device_reduce_buffer.accessor(),
       dimensions));
   device_reduce_buffer.copyTo(host_reduce_buffer);
-  return static_cast<float>(std::accumulate(host_reduce_buffer.begin(), host_reduce_buffer.begin() + num_blocks, 0.0));
+  float max_val = 0.0;
+  for (int i = 0; i < num_blocks; i++)
+    max_val = std::max(max_val, static_cast<float>(host_reduce_buffer[i]));
+  return max_val;
 }
 
 inline void scaleAndAdd(CudaSurface<float> &x,

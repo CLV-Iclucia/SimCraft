@@ -10,10 +10,11 @@
 #include <vector_types.h>
 #include <memory>
 #include <array>
+#include <numeric>
 
 namespace fluid::cuda {
 struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
-  uint n;
+  uint32_t n;
   std::unique_ptr<CudaSurface<float4>> loc;
   std::unique_ptr<CudaTexture<float4>> vel;
   std::unique_ptr<CudaTexture<float4>> velBuf;
@@ -23,19 +24,23 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
   std::unique_ptr<CudaTexture<float>> T;
   std::unique_ptr<CudaTexture<float>> TBuf;
   std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel> fluidRegion{};
-  std::unique_ptr<CudaSurface<float>> div;
   std::unique_ptr<CudaSurface<float4>> vort;
   std::unique_ptr<CudaSurface<float4>> normal;
   std::unique_ptr<CudaSurface<float>> p{};
-  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> res;
-  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> resBuf;
-  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> err{};
+  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> r;
+  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> pcg_p;
+  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> pcg_pbuf;
+  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> pcg_z;
+  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> pcg_zbuf;
+  std::vector<double> host_reduce_buffer;
+  std::unique_ptr<DeviceArray<double>> device_reduce_buffer{};
   std::vector<uint> sizes;
+  int active_cnt = 0;
   float alpha = 1.f;
   float beta = 1.f;
   float epsilon = 1.5f;
   float ambientTemperature = 0.f;
-  explicit GpuSmokeSimulator(unsigned int _n, unsigned int _n0 = 16)
+  explicit GpuSmokeSimulator(unsigned int _n)
       : n(_n),
         loc(std::make_unique<CudaSurface<float4>>(uint3{n, n, n})),
         vel(std::make_unique<CudaTexture<float4>>(uint3{n, n, n})),
@@ -45,14 +50,18 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
         rhoBuf(std::make_unique<CudaTexture<float>>(uint3{n, n, n})),
         T(std::make_unique<CudaTexture<float>>(uint3{n, n, n})),
         TBuf(std::make_unique<CudaTexture<float>>(uint3{n, n, n})),
-        div(std::make_unique<CudaSurface<float>>(uint3{n, n, n})),
         vort(std::make_unique<CudaSurface<float4>>(uint3{n, n, n})),
-        normal(std::make_unique<CudaSurface<float4>>(uint3{n, n, n})) {
+        normal(std::make_unique<CudaSurface<float4>>(uint3{n, n, n})),
+        p(std::make_unique<CudaSurface<float>>(uint3{n, n, n})),
+        device_reduce_buffer(std::make_unique<DeviceArray<double>>(n * n * n)),
+        host_reduce_buffer(n * n * n) {
     prepareWeights();
     for (int i = 0; i < kVcycleLevel; i++) {
-      res[i] = std::make_unique<CudaSurface<float>>(uint3{n >> i, n >> i, n >> i});
-      resBuf[i] = std::make_unique<CudaSurface<float>>(uint3{n >> i, n >> i, n >> i});
-      err[i] = std::make_unique<CudaSurface<float>>(uint3{n >> i, n >> i, n >> i});
+      r[i] = std::make_unique<CudaSurface<float>>(uint3{n >> i, n >> i, n >> i});
+      pcg_p[i] = std::make_unique<CudaSurface<float>>(uint3{n >> i, n >> i, n >> i});
+      pcg_pbuf[i] = std::make_unique<CudaSurface<float>>(uint3{n >> i, n >> i, n >> i});
+      pcg_z[i] = std::make_unique<CudaSurface<float>>(uint3{n >> i, n >> i, n >> i});
+      pcg_zbuf[i] = std::make_unique<CudaSurface<float>>(uint3{n >> i, n >> i, n >> i});
     }
     for (int i = 0; i < kVcycleLevel; i++)
       fluidRegion[i] = std::make_unique<CudaSurface<uint8_t>>(uint3{n >> i, n >> i, n >> i});
@@ -72,6 +81,7 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
   void setCollider(const std::vector<uint8_t> &region_marker) {
     std::unique_ptr<DeviceArray<uint8_t>> region_marker_dev =
         std::make_unique<DeviceArray<uint8_t>>(region_marker);
+    active_cnt = std::accumulate(region_marker.begin(), region_marker.end(), 0);
     kernelSetupFluidRegion<<<dim3(n / 8, n / 8, n / 8),
     dim3(8, 8, 8)>>>(fluidRegion[0]->surfaceAccessor(), region_marker_dev->accessor(), n);
     for (int i = 1; i < kVcycleLevel; i++) {
@@ -143,9 +153,21 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
     uint nblocks = (n + nthreads_dim - 1) / 8;
     DivergenceKernel<<<dim3(nblocks, nblocks, nblocks),
     dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
-        vel->surfaceAccessor(), div->surfaceAccessor(), n);
+        vel->surfaceAccessor(), r[0]->surfaceAccessor(), n);
     checkCUDAErrorWithLine("Compute divergence failed!");
-    mgpcg(*div, p, res, resBuf, err, fluidRegion, sizes, n, dt);
+    mgpcg(fluidRegion,
+          r,
+          pcg_p,
+          pcg_pbuf,
+          pcg_z,
+          pcg_zbuf,
+          *p,
+          *device_reduce_buffer,
+          host_reduce_buffer,
+          active_cnt,
+          n,
+          kMaxIters,
+          kTolerance);
     SubgradientKernel<<<dim3(nblocks, nblocks, nblocks),
     dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
         p->surfaceAccessor(), vel->surfaceAccessor(),
