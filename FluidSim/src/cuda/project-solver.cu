@@ -278,8 +278,8 @@ float CgSolver::LinfNorm(const CudaSurface<float> &surface,
   int block_num = (resolution.x + kThreadBlockSize3D - 1) / kThreadBlockSize3D
       * (resolution.y + kThreadBlockSize3D - 1) / kThreadBlockSize3D
       * (resolution.z + kThreadBlockSize3D - 1) / kThreadBlockSize3D;
-  cudaSafeCheck(kernelLinfNorm<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
-      surface.surfaceAccessor(), active.surfaceAccessor(), device_reduce_buffer->accessor(), resolution));
+//  cudaSafeCheck(kernelLinfNorm<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
+//      surface.surfaceAccessor(), active.surfaceAccessor(), device_reduce_buffer->accessor(), resolution));
   device_reduce_buffer->copyTo(host_reduce_buffer);
   float sum = 0.0;
   for (int i = 0; i < block_num; i++)
@@ -442,9 +442,9 @@ float CgSolver::dotProduct(const CudaSurface<float> &surfaceA,
   int block_num = (resolution.x + kThreadBlockSize3D - 1) / kThreadBlockSize3D
       * (resolution.y + kThreadBlockSize3D - 1) / kThreadBlockSize3D
       * (resolution.z + kThreadBlockSize3D - 1) / kThreadBlockSize3D;
-  cudaSafeCheck(kernelDotProduct<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
-      surfaceA.surfaceAccessor(), surfaceB.surfaceAccessor(),
-      active.surfaceAccessor(), device_reduce_buffer->accessor(), resolution));
+//  cudaSafeCheck(kernelDotProduct<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
+//      surfaceA.surfaceAccessor(), surfaceB.surfaceAccessor(),
+//      active.surfaceAccessor(), device_reduce_buffer->accessor(), resolution));
   device_reduce_buffer->copyTo(host_reduce_buffer);
   float sum = 0.0;
   for (int i = 0; i < block_num; i++)

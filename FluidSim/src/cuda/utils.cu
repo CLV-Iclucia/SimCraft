@@ -29,11 +29,14 @@ CUDA_GLOBAL void kernelDotProduct(CudaSurfaceAccessor<float> surfaceA,
                                   CudaSurfaceAccessor<uint8_t> active,
                                   DeviceArrayAccessor<double> result,
                                   int3 dimensions) {
-  get_and_restrict_tid_3d(x, y, z, dimensions.x, dimensions.y, dimensions.z);
+  int x = threadIdx.x + blockIdx.x * blockDim.x;
+  int y = threadIdx.y + blockIdx.y * blockDim.y;
+  int z = threadIdx.z + blockIdx.z * blockDim.z;
+  bool valid = x < dimensions.x && y < dimensions.y && z < dimensions.z;
   auto block_idx = blockIdx.x + blockIdx.y * gridDim.x + blockIdx.z * gridDim.x * gridDim.y;
-  auto valueA = static_cast<double>(surfaceA.read(x, y, z));
-  auto valueB = static_cast<double>(surfaceB.read(x, y, z));
-  auto local_result = valueA * valueB * active.read(x, y, z);
+  auto valueA = static_cast<double>(surfaceA.read<cudaBoundaryModeZero>(x, y, z));
+  auto valueB = static_cast<double>(surfaceB.read<cudaBoundaryModeZero>(x, y, z));
+  auto local_result = valueA * valueB * active.read<cudaBoundaryModeZero>(x, y, z) * valid;
   using BlockReduce = cub::BlockReduce<double, kThreadBlockSize3D,
                                        cub::BLOCK_REDUCE_WARP_REDUCTIONS,
                                        kThreadBlockSize3D,
@@ -41,24 +44,28 @@ CUDA_GLOBAL void kernelDotProduct(CudaSurfaceAccessor<float> surfaceA,
   CUDA_SHARED
   BlockReduce::TempStorage temp_storage;
   double block_result = BlockReduce(temp_storage).Sum(local_result,
-                                                     blockDim.x * blockDim.y * blockDim.z);
+                                                      blockDim.x * blockDim.y * blockDim.z);
   if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0)
     result[block_idx] = block_result;
 }
 
 CUDA_GLOBAL void kernelLinfNorm(CudaSurfaceAccessor<float> surface,
-                            CudaSurfaceAccessor<uint8_t> active,
-                            DeviceArrayAccessor<float> result,
-                            int3 dimensions) {
-  get_and_restrict_tid_3d(x, y, z, dimensions.x, dimensions.y, dimensions.z);
+                                CudaSurfaceAccessor<uint8_t> active,
+                                DeviceArrayAccessor<double> result,
+                                int3 dimensions) {
+  int x = threadIdx.x + blockIdx.x * blockDim.x;
+  int y = threadIdx.y + blockIdx.y * blockDim.y;
+  int z = threadIdx.z + blockIdx.z * blockDim.z;
+  bool valid = x < dimensions.x && y < dimensions.y && z < dimensions.z;
   uint32_t block_idx = blockIdx.x + blockIdx.y * gridDim.x + blockIdx.z * gridDim.x * gridDim.y;
-  float local_result = fabs(surface.read(x, y, z)) * active.read(x, y, z);
-  using BlockReduce = cub::BlockReduce<float, kThreadBlockSize3D,
+  double local_result =
+      fabs(surface.read<cudaBoundaryModeZero>(x, y, z)) * active.read<cudaBoundaryModeZero>(x, y, z) * valid;
+  using BlockReduce = cub::BlockReduce<double, kThreadBlockSize3D,
                                        cub::BLOCK_REDUCE_WARP_REDUCTIONS,
                                        kThreadBlockSize3D,
                                        kThreadBlockSize3D>;
   CUDA_SHARED BlockReduce::TempStorage temp_storage;
-  auto block_result = BlockReduce(temp_storage).Reduce(local_result,cub::Max());
+  auto block_result = BlockReduce(temp_storage).Reduce(local_result, cub::Max());
   if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0)
     result[block_idx] = block_result;
 }

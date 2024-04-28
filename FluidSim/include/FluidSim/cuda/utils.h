@@ -45,10 +45,10 @@ CUDA_GLOBAL void kernelDotProduct(CudaSurfaceAccessor<float> surfaceA,
                                   int3 dimensions);
 CUDA_GLOBAL void kernelLinfNorm(CudaSurfaceAccessor<float> surface,
                                 CudaSurfaceAccessor<uint8_t> active,
-                                DeviceArrayAccessor<float> result,
+                                DeviceArrayAccessor<double> result,
                                 int3 dimensions);
 
-inline float dotProduct(CudaSurface<float> &surfaceA,
+inline double dotProduct(CudaSurface<float> &surfaceA,
                         CudaSurface<float> &surfaceB,
                         const CudaSurface<uint8_t> &active,
                         DeviceArray<double> &device_reduce_buffer,
@@ -65,7 +65,7 @@ inline float dotProduct(CudaSurface<float> &surfaceA,
       device_reduce_buffer.accessor(),
       dimensions));
   device_reduce_buffer.copyTo(host_reduce_buffer);
-  return static_cast<float>(std::accumulate(host_reduce_buffer.begin(), host_reduce_buffer.begin() + num_blocks, 0.0));
+  return std::accumulate(host_reduce_buffer.begin(), host_reduce_buffer.begin() + num_blocks, 0.0);
 }
 
 inline float LinfNorm(CudaSurface<float> &surface,

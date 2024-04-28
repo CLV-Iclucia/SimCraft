@@ -266,9 +266,9 @@ void FluidSimulator::substep(Real dt) {
   applyDirichletBoundary();
   std::cout << "Done." << std::endl;
   std::cout << "Extrapolating velocities... ";
-  extrapolate(u, uBuf, uValid, uValidBuf, resolution, 5);
-  extrapolate(v, vBuf, vValid, vValidBuf, resolution, 5);
-  extrapolate(w, wBuf, wValid, wValidBuf, resolution, 5);
+//  extrapolate(u, uBuf, uValid, uValidBuf, resolution, 5);
+//  extrapolate(v, vBuf, vValid, vValidBuf, resolution, 5);
+//  extrapolate(w, wBuf, wValid, wValidBuf, resolution, 5);
   std::cout << "Done." << std::endl;
   applyForce(dt);
   std::cout << "Building linear system... ";

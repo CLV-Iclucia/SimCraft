@@ -135,15 +135,79 @@ TEST(DotProductTest, RandomEquations) {
           ref_x[i][j][k] = dis(gen);
           ref_y[i][j][k] = dis(gen);
           ref_active[i][j][k] = dis_b(gen);
-          ref_r += ref_x[i][j][k] * ref_y[i][j][k] * float(ref_active[i][j][k]);
+          ref_r += double(ref_x[i][j][k]) * double(ref_y[i][j][k]) * double(ref_active[i][j][k]);
         }
       }
     }
     x->copyFrom(&ref_x[0][0][0]);
     y->copyFrom(&ref_y[0][0][0]);
     active->copyFrom(&ref_active[0][0][0]);
-    float result = fluid::cuda::dotProduct(*x, *y, *active, device_reduce_buffer, host_reduce_buffer, resolution);
-    EXPECT_NEAR(result, ref_r, 0.05);
+    double result = fluid::cuda::dotProduct(*x, *y, *active, device_reduce_buffer, host_reduce_buffer, resolution);
+    EXPECT_NEAR(result, ref_r, 1e-4);
+  }
+  std::cout << "Test end" << std::endl;
+}
+
+
+float large_ref_x[100][100][100], large_ref_y[100][100][100];
+uint8_t large_ref_active[100][100][100];
+TEST(ReduceTest, RandomEquations) {
+  int3 resolution = {100, 100, 100};
+  double ref_r;
+  int num_block_x = (resolution.x + kThreadBlockSize3D - 1) / kThreadBlockSize3D;
+  int num_block_y = (resolution.y + kThreadBlockSize3D - 1) / kThreadBlockSize3D;
+  int num_block_z = (resolution.z + kThreadBlockSize3D - 1) / kThreadBlockSize3D;
+  int num_blocks = num_block_x * num_block_y * num_block_z;
+  std::unique_ptr<CudaSurface<float>> x;
+  std::unique_ptr<CudaSurface<float>> y;
+  std::unique_ptr<CudaSurface<uint8_t>> active;
+  DeviceArray<double> device_reduce_buffer(num_blocks);
+  std::vector<double> host_reduce_buffer(num_blocks);
+  x = std::make_unique<CudaSurface<float>>(make_uint3(100, 100, 100));
+  y = std::make_unique<CudaSurface<float>>(make_uint3(100, 100, 100));
+  active = std::make_unique<CudaSurface<uint8_t>>(make_uint3(100, 100, 100));
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<> dis(-10.0, 10.0); // 生成范围在 -10 到 10 之间的随机数
+  std::bernoulli_distribution dis_b(0.5);
+  //  Generate reference
+  int iters = 10;
+  std::cout << "Test begin for DotProduct: abs_error=0.05" << std::endl;
+  for(int iter = 0; iter < iters; iter++){
+    ref_r = 0.0;
+    for (int i = 0; i < 100; i++){
+      for (int j = 0; j < 100; j++){
+        for (int k = 0; k < 100; k++){
+          large_ref_x[i][j][k] = dis(gen);
+          large_ref_y[i][j][k] = dis(gen);
+          large_ref_active[i][j][k] = dis_b(gen);
+          ref_r += double(large_ref_x[i][j][k]) * double(large_ref_y[i][j][k]) * double(large_ref_active[i][j][k]);
+        }
+      }
+    }
+    x->copyFrom(&large_ref_x[0][0][0]);
+    y->copyFrom(&large_ref_y[0][0][0]);
+    active->copyFrom(&large_ref_active[0][0][0]);
+    double result = fluid::cuda::dotProduct(*x, *y, *active, device_reduce_buffer, host_reduce_buffer, resolution);
+    EXPECT_NEAR(result, ref_r, 1e-2);
+    ref_r = 0.0;
+    for (int i = 0; i < 100; i++) {
+      for (int j = 0; j < 100; j++) {
+        for (int k = 0; k < 100; k++) {
+          large_ref_x[i][j][k] = dis(gen);
+          large_ref_active[i][j][k] = dis_b(gen);
+          if (large_ref_active[i][j][k]){
+            if (fabs(large_ref_x[i][j][k]) > ref_r){
+              ref_r = fabs(large_ref_x[i][j][k]);
+            }
+          }
+        }
+      }
+    }
+    x->copyFrom(&large_ref_x[0][0][0]);
+    active->copyFrom(&large_ref_active[0][0][0]);
+    result = fluid::cuda::LinfNorm(*x, *active, device_reduce_buffer, host_reduce_buffer, resolution);
+    EXPECT_NEAR(result, ref_r, 1e-6);
   }
   std::cout << "Test end" << std::endl;
 }
@@ -165,7 +229,6 @@ TEST(LinfNormTest, RandomEquations) {
   std::vector<double> host_reduce_buffer(num_blocks);
   x = std::make_unique<CudaSurface<float>>(make_uint3(10, 10, 10));
   active = std::make_unique<CudaSurface<uint8_t>>(make_uint3(10, 10, 10));
-
   std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_real_distribution<> dis(-100.0, 100.0); // 生成范围在 -10 到 10 之间的随机数
@@ -191,12 +254,10 @@ TEST(LinfNormTest, RandomEquations) {
     x->copyFrom(&ref_x[0][0][0]);
     active->copyFrom(&ref_active[0][0][0]);
     float result = fluid::cuda::LinfNorm(*x, *active, device_reduce_buffer, host_reduce_buffer, resolution);
-    EXPECT_NEAR(result, ref_r, 1e-2);
+    EXPECT_NEAR(result, ref_r, 1e-6);
   }
   std::cout << "Test end" << std::endl;
 }
-
-
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);

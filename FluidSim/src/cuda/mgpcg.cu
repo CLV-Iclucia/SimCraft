@@ -147,8 +147,9 @@ static __global__ void BottomSolveKernel(CudaSurfaceAccessor<float> u,
     float div = b_shared[x][y][z];
     u_shared[cur ^ 1][x][y][z] =
         u_old + kDampedJacobiOmega * static_cast<double>((pxp + pxn + pyp + pyn + pzp + pzn - div) / cnt);
-    cur ^= 1;
     __syncthreads();
+    if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0)
+      cur ^= 1;
   }
   u.write(u_shared[cur][x][y][z], x, y, z);
 }
@@ -332,8 +333,7 @@ static double laplacianAndDot(CudaSurface<float> &u,
                               DeviceArray<double> &buffer,
                               std::vector<double> &host_buffer,
                               int n) {
-  kernelLaplacianAndDot<<<LAUNCH_THREADS_3D(n, n, n)>>>(u.surfaceAccessor(),
-                                                        p.surfaceAccessor(),
+  kernelLaplacianAndDot<<<LAUNCH_THREADS_3D(n, n, n)>>>(p.surfaceAccessor(),
                                                         z.surfaceAccessor(),
                                                         active.surfaceAccessor(),
                                                         buffer.accessor(),
