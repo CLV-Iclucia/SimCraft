@@ -249,7 +249,7 @@ static double computeResidualAndAverage(CudaSurface<float> &u,
                                         CudaSurface<uint8_t> &active,
                                         DeviceArray<double> &ave_buffer,
                                         std::vector<double> &host_buffer,
-                                        int n) {
+                                        int n, int active_cnt) {
   kernelComputeResidualAndAverage<<<LAUNCH_THREADS_3D(n, n, n)>>>(u.surfaceAccessor(),
                                                                   b.surfaceAccessor(),
                                                                   active.surfaceAccessor(),
@@ -257,7 +257,7 @@ static double computeResidualAndAverage(CudaSurface<float> &u,
                                                                   n);
   ave_buffer.copyTo(host_buffer);
   double mu = std::accumulate(host_buffer.begin(), host_buffer.begin() + n * n * n, 0.0);
-  return mu;
+  return mu / active_cnt;
 }
 
 static __global__ void kernelLaplacianAndDot(CudaSurfaceAccessor<float> u,
@@ -310,7 +310,7 @@ static double saxpyAndAverage(CudaSurface<float> &r,
                               float alpha,
                               DeviceArray<double> &ave_buffer,
                               std::vector<double> &host_buffer,
-                              int n) {
+                              int n, int active_cnt) {
   kernelSaxpyAndComputeAverage<<<LAUNCH_THREADS_3D(n, n, n)>>>(r.surfaceAccessor(),
                                                                z.surfaceAccessor(),
                                                                active.surfaceAccessor(),
@@ -319,7 +319,7 @@ static double saxpyAndAverage(CudaSurface<float> &r,
                                                                n);
   ave_buffer.copyTo(host_buffer);
   double mu = std::accumulate(host_buffer.begin(), host_buffer.begin() + n * n * n, 0.0);
-  return mu;
+  return mu / active_cnt;
 }
 
 static double subAveAndNorm(CudaSurface<float> &r,
@@ -406,15 +406,15 @@ void mgpcg(std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel> &acti
            CudaSurface<float> &x,
            DeviceArray<double> &device_buffer,
            std::vector<double> &host_buffer,
-           int n, int maxIters, float tolerance) {
-  auto mu = computeResidualAndAverage(x, *r[0], *active[0], device_buffer, host_buffer, n);
+           int active_cnt, int n, int maxIters, float tolerance) {
+  auto mu = computeResidualAndAverage(x, *r[0], *active[0], device_buffer, host_buffer, n, active_cnt);
   auto v = subAveAndNorm(*r[0], *active[0], device_buffer, host_buffer, mu, n);
   if (v < tolerance) return;
   double rho = precondAndDot(active, p, pBuf, r, device_buffer, host_buffer, n);
   for (int i = 0; i < maxIters; i++) {
     double sigma = laplacianAndDot(x, *p[0], *z[0], *active[0], device_buffer, host_buffer, n);
     double alpha = rho / sigma;
-    mu = saxpyAndAverage(*r[0], *z[0], *active[0], alpha, device_buffer, host_buffer, n);
+    mu = saxpyAndAverage(*r[0], *z[0], *active[0], alpha, device_buffer, host_buffer, n, active_cnt);
     v = subAveAndNorm(*r[0], *active[0], device_buffer, host_buffer, mu, n);
     if (v < tolerance || i == maxIters) {
       saxpy(x, *p[0], alpha, *active[0], make_int3(n, n, n));
