@@ -23,15 +23,15 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
   std::unique_ptr<CudaTexture<float>> rhoBuf;
   std::unique_ptr<CudaTexture<float>> T;
   std::unique_ptr<CudaTexture<float>> TBuf;
-  std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel> fluidRegion{};
+  std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel + 1> fluidRegion{};
   std::unique_ptr<CudaSurface<float4>> vort;
   std::unique_ptr<CudaSurface<float4>> normal;
   std::unique_ptr<CudaSurface<float>> p{};
-  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> r;
-  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> pcg_p;
-  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> pcg_pbuf;
-  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> pcg_z;
-  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> pcg_zbuf;
+  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> r;
+  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> pcg_p;
+  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> pcg_pbuf;
+  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> pcg_z;
+  std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> pcg_zbuf;
   std::vector<double> host_reduce_buffer;
   std::unique_ptr<DeviceArray<double>> device_reduce_buffer{};
   std::vector<uint> sizes;
@@ -56,14 +56,14 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
         device_reduce_buffer(std::make_unique<DeviceArray<double>>(n * n * n)),
         host_reduce_buffer(n * n * n) {
     prepareWeights();
-    for (int i = 0; i < kVcycleLevel; i++) {
+    for (int i = 0; i < kVcycleLevel + 1; i++) {
       r[i] = std::make_unique<CudaSurface<float>>(uint3{n >> i, n >> i, n >> i});
       pcg_p[i] = std::make_unique<CudaSurface<float>>(uint3{n >> i, n >> i, n >> i});
       pcg_pbuf[i] = std::make_unique<CudaSurface<float>>(uint3{n >> i, n >> i, n >> i});
       pcg_z[i] = std::make_unique<CudaSurface<float>>(uint3{n >> i, n >> i, n >> i});
       pcg_zbuf[i] = std::make_unique<CudaSurface<float>>(uint3{n >> i, n >> i, n >> i});
     }
-    for (int i = 0; i < kVcycleLevel; i++)
+    for (int i = 0; i < kVcycleLevel + 1; i++)
       fluidRegion[i] = std::make_unique<CudaSurface<uint8_t>>(uint3{n >> i, n >> i, n >> i});
     int nthreads_dim = 8;
     int nblocks = (n + nthreads_dim - 1) / 8;
@@ -78,13 +78,13 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
         T->surfaceAccessor(), 0.f, n);
   }
 
-  void setCollider(const std::vector<uint8_t> &region_marker) {
+  void setActiveRegion(const std::vector<uint8_t> &region_marker) {
     std::unique_ptr<DeviceArray<uint8_t>> region_marker_dev =
         std::make_unique<DeviceArray<uint8_t>>(region_marker);
     active_cnt = std::accumulate(region_marker.begin(), region_marker.end(), 0);
     kernelSetupFluidRegion<<<dim3(n / 8, n / 8, n / 8),
     dim3(8, 8, 8)>>>(fluidRegion[0]->surfaceAccessor(), region_marker_dev->accessor(), n);
-    for (int i = 1; i < kVcycleLevel; i++) {
+    for (int i = 1; i < kVcycleLevel + 1; i++) {
       int nthreads_dim = 8;
       int nblocks = (n >> i) + nthreads_dim - 1 / nthreads_dim;
       PrecomputeDownSampleKernel<<<dim3(nblocks, nblocks, nblocks),

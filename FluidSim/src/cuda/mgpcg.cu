@@ -5,7 +5,7 @@
 #include <FluidSim/cuda/utils.h>
 #include <Core/debug.h>
 namespace fluid::cuda {
-__constant__ double kTransferWights[4][4][4];
+__constant__ double kTransferWeights[4][4][4];
 // 0 stands for solid, 1 stands for fluid
 __global__ void PrecomputeDownSampleKernel(CudaSurfaceAccessor<uint8_t> surf,
                                            CudaSurfaceAccessor<uint8_t> surf_nxt, uint n) {
@@ -35,7 +35,7 @@ __global__ void RestrictKernel(CudaSurfaceAccessor<float> u,
   for (int i = 0; i < 4; i++)
     for (int j = 0; j < 4; j++)
       for (int k = 0; k < 4; k++)
-        sum += kTransferWights[i][j][k] * u.read<cudaBoundaryModeZero>(x * 2 + i - 1, y * 2 + j - 1, z * 2 + k - 1);
+        sum += kTransferWeights[i][j][k] * u.read<cudaBoundaryModeZero>(x * 2 + i - 1, y * 2 + j - 1, z * 2 + k - 1);
   uc.write(static_cast<float>(sum), x, y, z);
 }
 __global__ void ProlongateKernel(CudaSurfaceAccessor<float> uc,
@@ -343,10 +343,10 @@ static double laplacianAndDot(CudaSurface<float> &u,
   return sigma;
 }
 
-static double precondAndDot(std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel> &active,
-                            std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> &u,
-                            std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> &uBuf,
-                            std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> &b,
+static double precondAndDot(std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel + 1> &active,
+                            std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> &u,
+                            std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> &uBuf,
+                            std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> &b,
                             DeviceArray<double> &buffer,
                             std::vector<double> &host_buffer,
                             int n) {
@@ -383,12 +383,12 @@ static void saxpyAndScaleAdd(CudaSurface<float> &x,
                                                          alpha, beta, active.surfaceAccessor(), n);
 }
 
-void mgpcg(std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel> &active,
-           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> &r,
-           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> &p,
-           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> &pBuf,
-           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> &z,
-           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> &zBuf,
+void mgpcg(std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel + 1> &active,
+           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> &r,
+           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> &p,
+           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> &pBuf,
+           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> &z,
+           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> &zBuf,
            CudaSurface<float> &x,
            DeviceArray<double> &device_buffer,
            std::vector<double> &host_buffer,
@@ -437,6 +437,6 @@ void prepareWeights() {
         if (k == 0 || k == 3) wij[k] *= 0.125;
         else if (k == 1 || k == 2) wij[k] *= 0.375;
       }
-  cudaMemcpyToSymbol(kTransferWights, weights, sizeof(weights));
+  cudaMemcpyToSymbol(kTransferWeights, weights, sizeof(weights));
 }
 }

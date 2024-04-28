@@ -12,7 +12,7 @@ constexpr int kVcycleLevel = 3;
 constexpr int kSmoothingIters = 15;
 constexpr int kBottomSolveIters = 20;
 constexpr double kDampedJacobiOmega = 2.0 / 3.0;
-constexpr double kTolerance = 1e-5;
+constexpr double kTolerance = 1e-3;
 constexpr double kMaxIters = 10;
 __device__ __forceinline__ float localLaplacian(CudaSurfaceAccessor<float> u, CudaSurfaceAccessor<uint8_t> active,
                                                 int x, int y, int z) {
@@ -40,17 +40,17 @@ __global__ void ProlongateKernel(CudaSurfaceAccessor<float> uc,
 __global__ void DampedJacobiKernel(CudaSurfaceAccessor<float> u,
                                    CudaSurfaceAccessor<uint8_t> active,
                                    CudaSurfaceAccessor<float> f, uint n);
-void vCycle(std::array<std::unique_ptr<CudaSurface<uint8_t >>, kVcycleLevel> &active,
-            std::array<std::unique_ptr<CudaSurface<float >>, kVcycleLevel> &u,
-            std::array<std::unique_ptr<CudaSurface<float >>, kVcycleLevel> &uBuf,
-            std::array<std::unique_ptr<CudaSurface<float >>, kVcycleLevel> &b,
+void vCycle(std::array<std::unique_ptr<CudaSurface<uint8_t >>, kVcycleLevel + 1> &active,
+            std::array<std::unique_ptr<CudaSurface<float >>, kVcycleLevel + 1> &u,
+            std::array<std::unique_ptr<CudaSurface<float >>, kVcycleLevel + 1> &uBuf,
+            std::array<std::unique_ptr<CudaSurface<float >>, kVcycleLevel + 1> &b,
             int n);
-void mgpcg(std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel> &active,
-           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> &r,
-           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> &p,
-           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> &pBuf,
-           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> &z,
-           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel> &zBuf,
+void mgpcg(std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel + 1> &active,
+           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> &r,
+           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> &p,
+           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> &pBuf,
+           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> &z,
+           std::array<std::unique_ptr<CudaSurface<float>>, kVcycleLevel + 1> &zBuf,
            CudaSurface<float> &x,
            DeviceArray<double> &device_buffer,
            std::vector<double> &host_buffer,

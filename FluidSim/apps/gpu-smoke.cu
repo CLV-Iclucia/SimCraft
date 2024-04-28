@@ -8,7 +8,7 @@
 #include <memory>
 #include <FluidSim/cuda/smoke-simulator.cuh>
 using namespace opengl;
-bool initGLFW(GLFWwindow*& window) {
+bool initGLFW(GLFWwindow *&window) {
   if (!glfwInit()) {
     std::cerr << "Failed to initialize GLFW" << std::endl;
     return false;
@@ -37,7 +37,7 @@ struct Options {
   std::string outputDir = ".";
 } opt;
 
-void processWindowInput(GLFWwindow* window, FpsCamera& camera) {
+void processWindowInput(GLFWwindow *window, FpsCamera &camera) {
   static float lastFrame = 0.f;
   float currentFrame = glfwGetTime();
   float deltaTime = currentFrame - lastFrame;
@@ -45,7 +45,7 @@ void processWindowInput(GLFWwindow* window, FpsCamera& camera) {
   camera.processKeyBoard(window, deltaTime);
 }
 
-Options parseOptions(int argc, char** argv) {
+Options parseOptions(int argc, char **argv) {
   Options opt;
   for (int i = 1; i < argc; i++) {
     if (std::string(argv[i]) == "-r") {
@@ -72,40 +72,60 @@ std::vector<float> screen{
     -1.f, -1.f,
 };
 
-void exportVolume(const std::vector<float>& density,
-                  const Options& opt) {
+void exportVolume(const std::vector<float> &density,
+                  const Options &opt) {
   std::string densityFile = opt.outputDir + "/" + opt.densityOutputFile;
   std::string albedoFile = opt.outputDir + "/" + opt.albedoOutputFile;
   std::ofstream outFile(densityFile);
   outFile << opt.resolution << " " << opt.resolution << " " << opt.resolution <<
-      std::endl;
+          std::endl;
   for (int i = 0; i < opt.resolution * opt.resolution * opt.resolution; i++) {
     outFile << density[i] * opt.density.x << " " << density[i] * opt.density.y
-        << " "
-        << density[i] * opt.density.z << std::endl;
+            << " "
+            << density[i] * opt.density.z << std::endl;
   }
   outFile << std::endl;
   outFile.close();
   outFile.open(albedoFile);
   outFile << opt.resolution << " " << opt.resolution << " " << opt.resolution <<
-      std::endl;
+          std::endl;
   for (int i = 0; i < opt.resolution * opt.resolution * opt.resolution; i++) {
     outFile << opt.albedo.x << " " << opt.albedo.y << " " << opt.albedo.z <<
-        std::endl;
+            std::endl;
   }
   outFile << std::endl;
   outFile.close();
 }
 
-int main(int argc, char** argv) {
+static void setFluidRegion(std::vector<uint8_t> &fluid_region, int resolution) {
+  for (int i = 0; i < resolution; i++) {
+    for (int j = 0; j < resolution; j++) {
+      for (int k = 0; k < resolution; k++) {
+        double x = i / static_cast<double>(resolution);
+        double y = j / static_cast<double>(resolution);
+        double z = k / static_cast<double>(resolution);
+        double r = (x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5) +
+            (z - 0.5) * (z - 0.5);
+        if (r <= 1.0)
+          fluid_region[i * resolution * resolution + j * resolution + k] = 1;
+      }
+    }
+  }
+}
+
+int main(int argc, char **argv) {
   Options opt = parseOptions(argc, argv);
-  GLFWwindow* window;
+  GLFWwindow *window;
   if (!initGLFW(window)) return -1;
   auto simulator = std::make_unique<fluid::cuda::GpuSmokeSimulator>(opt.resolution);
-  if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+  if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
     std::cerr << "Failed to initialize GLAD" << std::endl;
     return -1;
   }
+  std::vector<uint8_t> fluid_region(opt.resolution * opt.resolution *
+      opt.resolution, 0);
+  setFluidRegion(fluid_region, opt.resolution);
+  simulator->setActiveRegion(fluid_region);
   ShaderProg smokeShader(FLUIDSIM_SHADER_DIR"/default.vs",
                          FLUIDSIM_SHADER_DIR"/smoke.fs");
   std::unique_ptr<OpenGLContext> smokeCtx = std::make_unique<OpenGLContext>();
@@ -133,7 +153,7 @@ int main(int argc, char** argv) {
     if (frame.idx == opt.exportFrame || glfwGetKey(window, GLFW_KEY_P) ==
         GLFW_PRESS) {
       std::vector<float> albedo(opt.resolution * opt.resolution *
-                                opt.resolution);
+          opt.resolution);
       exportVolume(buffer, opt);
       std::cout << "exporting frame " << frame.idx << " to directory " << opt.outputDir << std::endl;
       return 0;
