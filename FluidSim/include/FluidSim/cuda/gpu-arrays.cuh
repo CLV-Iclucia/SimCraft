@@ -30,11 +30,13 @@ struct CudaSurfaceAccessor {
 
   template<cudaSurfaceBoundaryMode mode = cudaBoundaryModeTrap>
   CUDA_DEVICE CUDA_FORCEINLINE void write(T val, int x, int y, int z) {
+//    if constexpr (std::is_floating_point_v<T>)
+//      assert(!isnan(val) && !isinf(val));
     surf3Dwrite<T>(val, cuda_surf, x * sizeof(T), y, z, mode);
   }
 };
 
-template <typename T>
+template<typename T>
 __global__ void kernelFill(CudaSurfaceAccessor<T> surf, T val, uint n) {
   int x = threadIdx.x + blockDim.x * blockIdx.x;
   int y = threadIdx.y + blockDim.y * blockIdx.y;
@@ -83,7 +85,7 @@ struct CudaArray3D : core::NonCopyable {
       : cuda_array(other.cuda_array), dim(other.dim) {
     other.cuda_array = nullptr;
   }
-  CudaArray3D& operator=(CudaArray3D &&other) noexcept {
+  CudaArray3D &operator=(CudaArray3D &&other) noexcept {
     if (this != &other) {
       cuda_array = other.cuda_array;
       dim = other.dim;
@@ -94,7 +96,7 @@ struct CudaArray3D : core::NonCopyable {
   void copyFrom(T *data) {
     cudaMemcpy3DParms copy3DParams{};
     copy3DParams.srcPtr =
-        make_cudaPitchedPtr(static_cast<void*>(data), dim.x * sizeof(T), dim.x, dim.y);
+        make_cudaPitchedPtr(static_cast<void *>(data), dim.x * sizeof(T), dim.x, dim.y);
     copy3DParams.dstArray = cuda_array;
     copy3DParams.extent = make_cudaExtent(dim.x, dim.y, dim.z);
     copy3DParams.kind = cudaMemcpyHostToDevice;
@@ -121,7 +123,7 @@ struct CudaArray3D : core::NonCopyable {
     copy3DParams.kind = cudaMemcpyDeviceToHost;
     cudaMemcpy3D(&copy3DParams);
   }
-  void copyTo(std::vector<T>& vec) {
+  void copyTo(std::vector<T> &vec) {
     vec.resize(dim.x * dim.y * dim.z);
     copyTo(vec.data());
   }
@@ -130,7 +132,6 @@ struct CudaArray3D : core::NonCopyable {
 
   ~CudaArray3D() { cudaFreeArray(cuda_array); }
 };
-
 
 template<typename T>
 struct CudaSurface : CudaArray3D<T> {
@@ -146,9 +147,9 @@ struct CudaSurface : CudaArray3D<T> {
   }
 
   [[nodiscard]] cudaSurfaceObject_t surface() const { return cuda_surf; }
-  void fill(const T& val) {
+  void fill(const T &val) {
     kernelFill<<<dim3((dim.x + 7) / 8, (dim.y + 7) / 8, (dim.z + 7) / 8),
-                 dim3(8, 8, 8)>>>(surfaceAccessor(), val, dim.x);
+    dim3(8, 8, 8)>>>(surfaceAccessor(), val, dim.x);
   }
   CudaSurfaceAccessor<T> surfaceAccessor() const { return {cuda_surf}; }
   ~CudaSurface() { cudaDestroySurfaceObject(cuda_surf); }
