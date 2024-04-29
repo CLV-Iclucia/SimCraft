@@ -95,6 +95,7 @@ __global__ void DampedJacobiKernel(CudaSurfaceAccessor<float> u,
   get_and_restrict_tid_3d(x, y, z, n, n, n);
   if (!active.read(x, y, z)) return;
   float u_old = u.read(x, y, z);
+  assert(!isinf(u_old) && !isnan(u_old));
   uint8_t axp = active.read<cudaBoundaryModeZero>(x - 1, y, z);
   uint8_t axn = active.read<cudaBoundaryModeZero>(x + 1, y, z);
   uint8_t ayp = active.read<cudaBoundaryModeZero>(x, y - 1, z);
@@ -102,6 +103,7 @@ __global__ void DampedJacobiKernel(CudaSurfaceAccessor<float> u,
   uint8_t azp = active.read<cudaBoundaryModeZero>(x, y, z - 1);
   uint8_t azn = active.read<cudaBoundaryModeZero>(x, y, z + 1);
   auto cnt = static_cast<double>(axp + axn + ayp + ayn + azp + azn);
+  assert(cnt > 0);
   float pxp = static_cast<float>(axp) * u.read<cudaBoundaryModeClamp>(x - 1, y, z);
   float pxn = static_cast<float>(axn) * u.read<cudaBoundaryModeClamp>(x + 1, y, z);
   float pyp = static_cast<float>(ayp) * u.read<cudaBoundaryModeClamp>(x, y - 1, z);
@@ -109,7 +111,8 @@ __global__ void DampedJacobiKernel(CudaSurfaceAccessor<float> u,
   float pzp = static_cast<float>(azp) * u.read<cudaBoundaryModeClamp>(x, y, z - 1);
   float pzn = static_cast<float>(azn) * u.read<cudaBoundaryModeClamp>(x, y, z + 1);
   float div = f.read(x, y, z);
-  auto u_new = u_old + kDampedJacobiOmega * static_cast<double>((pxp + pxn + pyp + pyn + pzp + pzn - div) / cnt);
+  auto u_new = (1.0 - kDampedJacobiOmega) * u_old
+      + kDampedJacobiOmega * static_cast<double>((pxp + pxn + pyp + pyn + pzp + pzn - div) / cnt);
   assert(!isinf(u_new) && !isnan(u_new));
   u_buf.write(u_new, x, y, z);
 }
@@ -163,8 +166,8 @@ static __global__ void BottomSolveKernel(CudaSurfaceAccessor<float> u,
       float pzp = static_cast<float>(azp) * u_shared[cur][x][y][max(z - 1, 0)];
       float pzn = static_cast<float>(azn) * u_shared[cur][x][y][min(z + 1, n - 1)];
       float div = b_shared[x][y][z];
-      u_shared[cur ^ 1][x][y][z] =
-          u_old + kDampedJacobiOmega * static_cast<double>((pxp + pxn + pyp + pyn + pzp + pzn - div) / cnt);
+      u_shared[cur ^ 1][x][y][z] = (1.0 - kDampedJacobiOmega) * u_old
+          + kDampedJacobiOmega * static_cast<double>((pxp + pxn + pyp + pyn + pzp + pzn - div) / cnt);
     }
     __syncthreads();
     if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0)
@@ -481,9 +484,9 @@ void mgpcg(std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel + 1> &
     double sigma = laplacianAndDot(*p[0], *z[0], *active[0], device_buffer, host_buffer, n);
     assert(sigma != 0);
     double alpha = rho / sigma;
-    mu = saxpyAndAverage(*r[0], *z[0], *active[0], alpha, device_buffer, host_buffer, n, active_cnt);
+    mu = saxpyAndAverage(*r[0], *z[0], *active[0], -alpha, device_buffer, host_buffer, n, active_cnt);
     v = subAveAndNorm(*r[0], *active[0], device_buffer, host_buffer, mu, n);
-    printf("iter %d, mu: %lf residual %lf\n", i, mu, v);
+    printf("iter %d, residual %lf\n", i, v);
     if (v < tolerance || i == maxIters) {
       saxpy(x, *p[0], alpha, *active[0], make_int3(n, n, n));
       return;
@@ -492,7 +495,7 @@ void mgpcg(std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel + 1> &
     assert(rho != 0);
     double beta = rho_new / rho;
     rho = rho_new;
-    saxpyAndScaleAdd(*r[0], *p[0], *z[0], alpha, beta, *active[0], n);
+    saxpyAndScaleAdd(x, *p[0], *z[0], alpha, beta, *active[0], n);
   }
 }
 

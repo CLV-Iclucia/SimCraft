@@ -9,8 +9,8 @@
 
 namespace fluid::cuda {
 constexpr int kVcycleLevel = 3;
-constexpr int kSmoothingIters = 15;
-constexpr int kBottomSolveIters = 20;
+constexpr int kSmoothingIters = 20;
+constexpr int kBottomSolveIters = 50;
 constexpr double kDampedJacobiOmega = 2.0 / 3.0;
 constexpr double kTolerance = 1e-3;
 constexpr double kMaxIters = 10;
@@ -42,9 +42,6 @@ __global__ void ProlongateKernel(CudaSurfaceAccessor<float> uc,
                                  CudaSurfaceAccessor<float> u,
                                  CudaSurfaceAccessor<uint8_t> active,
                                  CudaSurfaceAccessor<uint8_t> active_c, uint n);
-__global__ void DampedJacobiKernel(CudaSurfaceAccessor<float> u,
-                                   CudaSurfaceAccessor<uint8_t> active,
-                                   CudaSurfaceAccessor<float> f, uint n);
 void vCycle(std::array<std::unique_ptr<CudaSurface<uint8_t >>, kVcycleLevel + 1> &active,
             std::array<std::unique_ptr<CudaSurface<float >>, kVcycleLevel + 1> &u,
             std::array<std::unique_ptr<CudaSurface<float >>, kVcycleLevel + 1> &uBuf,
