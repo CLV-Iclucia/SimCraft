@@ -106,7 +106,7 @@ static void setFluidRegion(std::vector<uint8_t> &fluid_region, int resolution) {
         double z = k / static_cast<double>(resolution);
         double r = (x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5) +
             (z - 0.5) * (z - 0.5);
-        if (r <= 1.0)
+        if (r <= 0.5)
           fluid_region[i * resolution * resolution + j * resolution + k] = 1;
       }
     }

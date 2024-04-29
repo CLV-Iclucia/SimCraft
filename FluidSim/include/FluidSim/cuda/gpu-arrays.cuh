@@ -13,6 +13,36 @@
 #include <cstdint>
 
 namespace fluid::cuda {
+
+template<typename T>
+struct CudaSurfaceAccessor {
+  cudaSurfaceObject_t cuda_surf;
+
+  template<cudaSurfaceBoundaryMode mode = cudaBoundaryModeTrap>
+  CUDA_DEVICE CUDA_FORCEINLINE T read(int x, int y, int z) {
+    return surf3Dread<T>(cuda_surf, x * sizeof(T), y, z, mode);
+  }
+
+  template<cudaSurfaceBoundaryMode mode = cudaBoundaryModeTrap>
+  CUDA_DEVICE CUDA_FORCEINLINE T read(const int3 &idx) {
+    return surf3Dread<T>(cuda_surf, idx.x * sizeof(T), idx.y, idx.z, mode);
+  }
+
+  template<cudaSurfaceBoundaryMode mode = cudaBoundaryModeTrap>
+  CUDA_DEVICE CUDA_FORCEINLINE void write(T val, int x, int y, int z) {
+    surf3Dwrite<T>(val, cuda_surf, x * sizeof(T), y, z, mode);
+  }
+};
+
+template <typename T>
+__global__ void kernelFill(CudaSurfaceAccessor<T> surf, T val, uint n) {
+  int x = threadIdx.x + blockDim.x * blockIdx.x;
+  int y = threadIdx.y + blockDim.y * blockIdx.y;
+  int z = threadIdx.z + blockDim.z * blockIdx.z;
+  if (x >= n || y >= n || z >= n)
+    return;
+  surf.write(val, x, y, z);
+}
 template<typename T>
 struct DeviceArray;
 template<typename T>
@@ -95,38 +125,16 @@ struct CudaArray3D : core::NonCopyable {
     vec.resize(dim.x * dim.y * dim.z);
     copyTo(vec.data());
   }
-  void zero() {
-    auto ptr = make_cudaPitchedPtr(static_cast<void *>(cuda_array), dim.x * sizeof(T), dim.x, dim.y);
-    cudaMemset3D(ptr, 0, make_cudaExtent(dim.x * sizeof(T), dim.y, dim.z));
-  }
 
   [[nodiscard]] cudaArray *Array() const { return cuda_array; }
 
   ~CudaArray3D() { cudaFreeArray(cuda_array); }
 };
 
-template<typename T>
-struct CudaSurfaceAccessor {
-  cudaSurfaceObject_t cuda_surf;
-
-  template<cudaSurfaceBoundaryMode mode = cudaBoundaryModeTrap>
-  CUDA_DEVICE CUDA_FORCEINLINE T read(int x, int y, int z) {
-    return surf3Dread<T>(cuda_surf, x * sizeof(T), y, z, mode);
-  }
-
-  template<cudaSurfaceBoundaryMode mode = cudaBoundaryModeTrap>
-  CUDA_DEVICE CUDA_FORCEINLINE T read(const int3 &idx) {
-    return surf3Dread<T>(cuda_surf, idx.x * sizeof(T), idx.y, idx.z, mode);
-  }
-
-  template<cudaSurfaceBoundaryMode mode = cudaBoundaryModeTrap>
-  CUDA_DEVICE CUDA_FORCEINLINE void write(T val, int x, int y, int z) {
-    surf3Dwrite<T>(val, cuda_surf, x * sizeof(T), y, z, mode);
-  }
-};
 
 template<typename T>
 struct CudaSurface : CudaArray3D<T> {
+  using CudaArray3D<T>::dim;
   cudaSurfaceObject_t cuda_surf{};
 
   explicit CudaSurface(const uint3 &dim_)
@@ -138,7 +146,10 @@ struct CudaSurface : CudaArray3D<T> {
   }
 
   [[nodiscard]] cudaSurfaceObject_t surface() const { return cuda_surf; }
-
+  void fill(const T& val) {
+    kernelFill<<<dim3((dim.x + 7) / 8, (dim.y + 7) / 8, (dim.z + 7) / 8),
+                 dim3(8, 8, 8)>>>(surfaceAccessor(), val, dim.x);
+  }
   CudaSurfaceAccessor<T> surfaceAccessor() const { return {cuda_surf}; }
   ~CudaSurface() { cudaDestroySurfaceObject(cuda_surf); }
 };

@@ -7,6 +7,7 @@
 #include <FluidSim/cuda/kernels.cuh>
 #include <FluidSim/cuda/mgpcg.cuh>
 #include <FluidSim/cuda/gpu-arrays.cuh>
+#include <Core/cuda-utils.h>
 #include <vector_types.h>
 #include <memory>
 #include <array>
@@ -67,15 +68,9 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
       fluidRegion[i] = std::make_unique<CudaSurface<uint8_t>>(uint3{n >> i, n >> i, n >> i});
     int nthreads_dim = 8;
     int nblocks = (n + nthreads_dim - 1) / 8;
-    FillKernel<<<dim3(nblocks, nblocks, nblocks),
-    dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
-        vel->surfaceAccessor(), make_float4(0.f, 0.f, 0.f, 0.f), n);
-    FillKernel<<<dim3(nblocks, nblocks, nblocks),
-    dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
-        rho->surfaceAccessor(), 0.f, n);
-    FillKernel<<<dim3(nblocks, nblocks, nblocks),
-    dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
-        T->surfaceAccessor(), 0.f, n);
+    vel->fill(make_float4(0.f, 0.f, 0.f, 0.f));
+    rho->fill(0.f);
+    T->fill(0.f);
   }
 
   void setActiveRegion(const std::vector<uint8_t> &region_marker) {
@@ -97,22 +92,24 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
     uint nblocks = (n + nthreads_dim - 1) / 8;
     AdvectKernel<<<dim3(nblocks, nblocks, nblocks),
     dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
-        vel->texAccessor(), loc->surfaceAccessor(), n, dt);
+        vel->texAccessor(), loc->surfaceAccessor(), fluidRegion[0]->surfaceAccessor(), n, dt);
     checkCUDAErrorWithLine("AdvectKernel failed!");
     ResampleKernel<<<dim3(nblocks, nblocks, nblocks),
     dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
         loc->surfaceAccessor(), rho->texAccessor(), rhoBuf->surfaceAccessor(),
+        fluidRegion[0]->surfaceAccessor(),
         1.f, n);
     checkCUDAErrorWithLine("Resample rho failed!");
     ResampleKernel<<<dim3(nblocks, nblocks, nblocks),
     dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
         loc->surfaceAccessor(), vel->texAccessor(), velBuf->surfaceAccessor(),
+        fluidRegion[0]->surfaceAccessor(),
         make_float4(0.f, 0.0f, 0.f, 0.f), n);
     checkCUDAErrorWithLine("Resample vel failed!");
     ResampleKernel<float><<<dim3(nblocks, nblocks, nblocks),
     dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
         loc->surfaceAccessor(), T->texAccessor(), TBuf->surfaceAccessor(),
-        200.f, n);
+        fluidRegion[0]->surfaceAccessor(), 200.f, n);
     checkCUDAErrorWithLine("Resample T failed!");
     std::swap(vel, velBuf);
     std::swap(rho, rhoBuf);
@@ -124,7 +121,8 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
     CoolingKernel<<<dim3(nblocks, nblocks, nblocks),
     dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
         T->surfaceAccessor(), TBuf->surfaceAccessor(), rho->surfaceAccessor(),
-        rhoBuf->surfaceAccessor(), n, ambientTemperature, dt);
+        rhoBuf->surfaceAccessor(), fluidRegion[0]->surfaceAccessor(),
+        n, ambientTemperature, dt);
     std::swap(T, TBuf);
     std::swap(rho, rhoBuf);
   }
@@ -133,17 +131,20 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
     uint nblocks = (n + nthreads_dim - 1) / 8;
     CurlKernel<<<dim3(nblocks, nblocks, nblocks),
     dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
-        vel->surfaceAccessor(), vort->surfaceAccessor(), n);
+        vel->surfaceAccessor(), vort->surfaceAccessor(),
+        fluidRegion[0]->surfaceAccessor(), n);
     checkCUDAErrorWithLine("Compute vorticity failed!");
     AccumulateForceKernel<<<dim3(nblocks, nblocks, nblocks),
     dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
         vel->surfaceAccessor(), vort->surfaceAccessor(), T->surfaceAccessor(),
-        rho->surfaceAccessor(), n, alpha, beta, epsilon, ambientTemperature,
+        rho->surfaceAccessor(), fluidRegion[0]->surfaceAccessor(),
+        n, alpha, beta, epsilon, ambientTemperature,
         dt);
     checkCUDAErrorWithLine("Accumulate force failed!");
     ApplyForceKernel<<<dim3(nblocks, nblocks, nblocks),
     dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
         vel->surfaceAccessor(), velBuf->surfaceAccessor(), force->surfaceAccessor(),
+        fluidRegion[0]->surfaceAccessor(),
         n, dt);
     checkCUDAErrorWithLine("Apply force failed!");
     std::swap(vel, velBuf);
@@ -153,7 +154,7 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
     uint nblocks = (n + nthreads_dim - 1) / 8;
     DivergenceKernel<<<dim3(nblocks, nblocks, nblocks),
     dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
-        vel->surfaceAccessor(), r[0]->surfaceAccessor(), n);
+        vel->surfaceAccessor(), r[0]->surfaceAccessor(), fluidRegion[0]->surfaceAccessor(), n);
     checkCUDAErrorWithLine("Compute divergence failed!");
     mgpcg(fluidRegion,
           r,
@@ -171,6 +172,7 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
     SubgradientKernel<<<dim3(nblocks, nblocks, nblocks),
     dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
         p->surfaceAccessor(), vel->surfaceAccessor(),
+        fluidRegion[0]->surfaceAccessor(),
         make_float4(0.f, 0.0f, 0.f, 0.f), n);
     checkCUDAErrorWithLine("Subgradient failed!");
   }
@@ -180,7 +182,8 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
     for (int i = 0; i < 4; i++) {
       SmoothingKernel<<<dim3(nblocks, nblocks, nblocks),
       dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
-          rho->surfaceAccessor(), rhoBuf->surfaceAccessor(), n);
+          rho->surfaceAccessor(), rhoBuf->surfaceAccessor(),
+          fluidRegion[0]->surfaceAccessor(), n);
       checkCUDAErrorWithLine("Smooth failed!");
       std::swap(rho, rhoBuf);
     }
@@ -195,6 +198,7 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
   void step(core::Frame &frame) override {
     // std::cout << "Substep " << i << std::endl;
     substep(frame.dt);
+    getchar();
     frame.onAdvance();
   }
 };

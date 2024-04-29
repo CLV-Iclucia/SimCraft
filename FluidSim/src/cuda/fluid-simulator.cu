@@ -29,22 +29,22 @@ void FluidSimulator::applyForce(Real dt) const {
 }
 
 void FluidSimulator::clear() const {
-  uValid->zero();
-  vValid->zero();
-  wValid->zero();
-  uValidBuf->zero();
-  vValidBuf->zero();
-  wValidBuf->zero();
-  v->zero();
-  u->zero();
-  w->zero();
-  uBuf->zero();
-  vBuf->zero();
-  wBuf->zero();
-  uw->zero();
-  vw->zero();
-  ww->zero();
-  p->zero();
+//  uValid->zero();
+//  vValid->zero();
+//  wValid->zero();
+//  uValidBuf->zero();
+//  vValidBuf->zero();
+//  wValidBuf->zero();
+//  v->zero();
+//  u->zero();
+//  w->zero();
+//  uBuf->zero();
+//  vBuf->zero();
+//  wBuf->zero();
+//  uw->zero();
+//  vw->zero();
+//  ww->zero();
+//  p->zero();
 }
 
 static CUDA_GLOBAL void kernelSmooth(CudaSurfaceAccessor<float> grid,

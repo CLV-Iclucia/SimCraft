@@ -29,13 +29,13 @@ CUDA_FORCEINLINE CUDA_DEVICE double3 grad(CudaTextureAccessor<float> field,
 }
 CUDA_GLOBAL void kernelSaxpy(CudaSurfaceAccessor<float> x,
                              CudaSurfaceAccessor<float> y,
-                             float alpha,
+                             double alpha,
                              CudaSurfaceAccessor<uint8_t> active,
                              int3 resolution);
 
 CUDA_GLOBAL void kernelScaleAndAdd(CudaSurfaceAccessor<float> x,
                                    CudaSurfaceAccessor<float> y,
-                                   float alpha,
+                                   double alpha,
                                    CudaSurfaceAccessor<uint8_t> active,
                                    int3 resolution);
 CUDA_GLOBAL void kernelDotProduct(CudaSurfaceAccessor<float> surfaceA,
@@ -68,7 +68,7 @@ inline double dotProduct(CudaSurface<float> &surfaceA,
   return std::accumulate(host_reduce_buffer.begin(), host_reduce_buffer.begin() + num_blocks, 0.0);
 }
 
-inline float LinfNorm(CudaSurface<float> &surface,
+inline double LinfNorm(CudaSurface<float> &surface,
                       const CudaSurface<uint8_t> &active,
                       DeviceArray<double> &device_reduce_buffer,
                       std::vector<double> &host_reduce_buffer,
@@ -83,15 +83,15 @@ inline float LinfNorm(CudaSurface<float> &surface,
       device_reduce_buffer.accessor(),
       dimensions));
   device_reduce_buffer.copyTo(host_reduce_buffer);
-  float max_val = 0.0;
+  double max_val = 0.0;
   for (int i = 0; i < num_blocks; i++)
-    max_val = std::max(max_val, static_cast<float>(host_reduce_buffer[i]));
+    max_val = std::max(max_val, host_reduce_buffer[i]);
   return max_val;
 }
 
 inline void scaleAndAdd(CudaSurface<float> &x,
                         const CudaSurface<float> &y,
-                        float alpha,
+                        double alpha,
                         const CudaSurface<uint8_t> &active,
                         int3 resolution) {
   cudaSafeCheck(kernelScaleAndAdd<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
@@ -100,7 +100,7 @@ inline void scaleAndAdd(CudaSurface<float> &x,
 
 inline void saxpy(CudaSurface<float> &x,
                   const CudaSurface<float> &y,
-                  float alpha,
+                  double alpha,
                   const CudaSurface<uint8_t> &active,
                   int3 resolution) {
   cudaSafeCheck(kernelSaxpy<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(

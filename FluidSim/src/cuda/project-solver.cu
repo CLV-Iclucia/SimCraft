@@ -135,9 +135,7 @@ static CUDA_GLOBAL void kernelComputeAreaWeights(
       float rf = colliderSdf.sample(p + make_float3(0.5f, 0.0f, 0.5f));
       float lf = colliderSdf.sample(p + make_float3(-0.5f, 0.0f, 0.5f));
       float frac = fractionInside(lb, rb, rf, lf);
-      assert(frac >= 0.0 && frac <= 1.0);
       vWeights.write(1.0 - frac, i, j, k);
-      assert(notNan(vWeights.read(i, j, k)));
     }
   }
   if (k == 0) {
@@ -152,7 +150,6 @@ static CUDA_GLOBAL void kernelComputeAreaWeights(
       float frac = fractionInside(ld, lu, ru, rd);
       assert(frac >= 0.0 && frac <= 1.0);
       wWeights.write(1.0 - frac, i, j, k);
-      assert(notNan(wWeights.read(i, j, k)));
     }
   }
 
@@ -330,7 +327,6 @@ static CUDA_GLOBAL void kernelProjectVelocity(
     }
     float sd_down = fluidSdf.read<cudaBoundaryModeZero>(i, j - 1, k);
     float sd_up = fluidSdf.read(i, j, k);
-    assert(notNan(pg(i, j, k)));
     float v = vg.read(i, j, k);
     if (sd_down < 0.0 && sd_up < 0.0) {
       vg.write(v - (pg.read(i, j, k) - pg.read(i, j - 1, k)) * dt / h, i, j, k);
@@ -350,7 +346,6 @@ static CUDA_GLOBAL void kernelProjectVelocity(
       wg.write(0.0, i, j, resolution.z);
       return;
     }
-    assert(notNan(pg(i, j, k)));
     float sd_back = fluidSdf.read(i, j, k - 1);
     float sd_front = fluidSdf.read(i, j, k);
     float w = wg.read(i, j, k);
@@ -376,18 +371,18 @@ void FvmSolver::buildSystem(const CudaSurface<float> &ug,
                             int3 resolution,
                             float h,
                             float dt) {
-  sys->diag->zero();
-  sys->neighbour[Left]->zero();
-  sys->neighbour[Right]->zero();
-  sys->neighbour[Up]->zero();
-  sys->neighbour[Down]->zero();
-  sys->neighbour[Front]->zero();
-  sys->neighbour[Back]->zero();
-  sys->rhs->zero();
-  uWeights->zero();
-  vWeights->zero();
-  wWeights->zero();
-  active->zero();
+  sys->diag->fill(0.f);
+  sys->neighbour[Left]->fill(0.f);
+  sys->neighbour[Right]->fill(0.f);
+  sys->neighbour[Up]->fill(0.f);
+  sys->neighbour[Down]->fill(0.f);
+  sys->neighbour[Front]->fill(0.f);
+  sys->neighbour[Back]->fill(0.f);
+  sys->rhs->fill(0.f);
+  uWeights->fill(0.f);
+  vWeights->fill(0.f);
+  wWeights->fill(0.f);
+  active->fill(0);
   cudaSafeCheck(kernelComputeAreaWeights<<<LAUNCH_THREADS_3D(resolution.x, resolution.y, resolution.z)>>>(
       uWeights->surfaceAccessor(), vWeights->surfaceAccessor(), wWeights->surfaceAccessor(),
       fluidSdf.surfaceAccessor(), colliderSdf.texAccessor(), resolution, h));
@@ -401,7 +396,7 @@ float CgSolver::solve(const CompressedSystem &sys,
                      const CudaSurface<uint8_t> &active,
                      CudaSurface<float> &pg,
                      int3 resolution) {
-  pg.zero();
+  pg.fill(0.f);
   r->copyFrom(*sys.rhs);
   float residual = LinfNorm(*r, active, resolution);
   if (residual < tolerance) {

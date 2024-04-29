@@ -34,9 +34,14 @@ __device__ __forceinline__ float localLaplacian(CudaSurfaceAccessor<float> u, Cu
 __global__ void PrecomputeDownSampleKernel(CudaSurfaceAccessor<uint8_t> u,
                                            CudaSurfaceAccessor<uint8_t> uc, uint n);
 __global__ void RestrictKernel(CudaSurfaceAccessor<float> u,
-                               CudaSurfaceAccessor<float> uc, uint n);
+                               CudaSurfaceAccessor<float> uc,
+                               CudaSurfaceAccessor<uint8_t> active,
+                               CudaSurfaceAccessor<uint8_t> active_c,
+                               uint n);
 __global__ void ProlongateKernel(CudaSurfaceAccessor<float> uc,
-                                 CudaSurfaceAccessor<float> u, uint n);
+                                 CudaSurfaceAccessor<float> u,
+                                 CudaSurfaceAccessor<uint8_t> active,
+                                 CudaSurfaceAccessor<uint8_t> active_c, uint n);
 __global__ void DampedJacobiKernel(CudaSurfaceAccessor<float> u,
                                    CudaSurfaceAccessor<uint8_t> active,
                                    CudaSurfaceAccessor<float> f, uint n);
