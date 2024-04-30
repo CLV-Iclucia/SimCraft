@@ -254,7 +254,7 @@ int main(int argc, char** argv) {
     simulator->step(frame);
     drawFluid(fluidCtx.get(), fluidShader.get(), camera, simulator->positions(),
               display_w, display_h);
-    if(frame.idx >= 80 && frame.idx <= 240){
+    if(frame.idx >= 80 && frame.idx <= 200){
       simulator->reconstruct();
       simulator->smoothFluidSurface(5);
       core::Mesh fluidMesh;

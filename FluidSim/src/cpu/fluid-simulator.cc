@@ -144,7 +144,7 @@ void FluidSimulator::substep(Real dt) {
   std::cout << "Done." << std::endl;
   std::cout << "Reconstructing surface... ";
   fluidSurfaceReconstructor->reconstruct(
-      m_particles.positions, 0.6 * ug->gridSpacing().x,
+      m_particles.positions, 0.8 * ug->gridSpacing().x,
       *fluidSurface, *sdfValid);
   std::cout << "Done." << std::endl;
   std::cout << "Smoothing surface... ";
@@ -199,8 +199,7 @@ Real FluidSimulator::CFL() const {
     if (wg->at(x, y, z) != 0.0)
       cfl = std::min(cfl, h / abs(wg->at(x, y, z)));
   });
-//  return 10.0 * std::max(1e-4, cfl);
-return 1.0;
+  return 5.0 * std::max(1e-3, cfl);
 }
 
 void FluidSimulator::step(core::Frame& frame) {
