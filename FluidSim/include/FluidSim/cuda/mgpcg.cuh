@@ -9,7 +9,7 @@
 
 namespace fluid::cuda {
 constexpr int kVcycleLevel = 3;
-constexpr int kSmoothingIters = 20;
+constexpr int kSmoothingIters = 10;
 constexpr int kBottomSolveIters = 50;
 constexpr double kDampedJacobiOmega = 2.0 / 3.0;
 constexpr double kTolerance = 1e-3;
@@ -29,7 +29,7 @@ __device__ __forceinline__ float localLaplacian(CudaSurfaceAccessor<float> u, Cu
   float pyn = static_cast<float>(ayn) * u.read<cudaBoundaryModeClamp>(x, y + 1, z);
   float pzp = static_cast<float>(azp) * u.read<cudaBoundaryModeClamp>(x, y, z - 1);
   float pzn = static_cast<float>(azn) * u.read<cudaBoundaryModeClamp>(x, y, z + 1);
-  return u.read(x, y, z) * cnt - (pxp + pxn + pyp + pyn + pzp + pzn);
+  return -u.read(x, y, z) * cnt + (pxp + pxn + pyp + pyn + pzp + pzn);
 }
 __global__ void PrecomputeDownSampleKernel(CudaSurfaceAccessor<uint8_t> u,
                                            CudaSurfaceAccessor<uint8_t> uc, uint n);

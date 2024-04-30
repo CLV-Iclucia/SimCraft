@@ -111,8 +111,8 @@ __global__ void DampedJacobiKernel(CudaSurfaceAccessor<float> u,
   float pzp = static_cast<float>(azp) * u.read<cudaBoundaryModeClamp>(x, y, z - 1);
   float pzn = static_cast<float>(azn) * u.read<cudaBoundaryModeClamp>(x, y, z + 1);
   float div = f.read(x, y, z);
-  auto u_new = (1.0 - kDampedJacobiOmega) * u_old
-      + kDampedJacobiOmega * static_cast<double>((pxp + pxn + pyp + pyn + pzp + pzn - div) / cnt);
+  auto u_nxt = (pxp + pxn + pyp + pyn + pzp + pzn - div) / cnt;
+  auto u_new = (1.0 - kDampedJacobiOmega) * u_old + kDampedJacobiOmega * u_nxt;
   assert(!isinf(u_new) && !isnan(u_new));
   u_buf.write(u_new, x, y, z);
 }
@@ -232,7 +232,8 @@ static __global__ void kernelComputeResidualAndAverage(CudaSurfaceAccessor<float
   double residual = r.read<cudaBoundaryModeZero>(x, y, z) - localLaplacian(u, active, x, y, z);
   auto local_result = valid * residual * active.read<cudaBoundaryModeZero>(x, y, z);
   assert(!isinf(local_result) && !isnan(local_result));
-  r.write(local_result, x, y, z);
+  if (valid)
+    r.write(static_cast<float>(local_result), x, y, z);
   using BlockReduce = cub::BlockReduce<double, kThreadBlockSize3D,
                                        cub::BLOCK_REDUCE_WARP_REDUCTIONS,
                                        kThreadBlockSize3D,
@@ -259,7 +260,8 @@ static __global__ void kernelModifyAndNorm(CudaSurfaceAccessor<float> r,
   double modified_r = valid * (r.read<cudaBoundaryModeZero>(x, y, z) - mu) * active.read<cudaBoundaryModeZero>(x, y, z);
   double val = fabs(modified_r);
   assert(!isinf(val) && !isnan(val));
-  r.write(static_cast<float>(modified_r), x, y, z);
+  if (valid)
+    r.write(static_cast<float>(modified_r), x, y, z);
   using BlockReduce = cub::BlockReduce<double, kThreadBlockSize3D,
                                        cub::BLOCK_REDUCE_WARP_REDUCTIONS,
                                        kThreadBlockSize3D,
@@ -289,8 +291,21 @@ static double computeResidualAndAverage(CudaSurface<float> &u,
                                                                                 active.surfaceAccessor(),
                                                                                 ave_buffer.accessor(),
                                                                                 n));
+//  std::vector<float> buffer;
+//  b.copyTo(buffer);
+//   print buffer
+//  for (int i = 0; i < n; i++) {
+//    for (int j = 0; j < n; j++) {
+//      for (int k = 0; k < n; k++) {
+//        printf("%f ", buffer[i * n * n + j * n + k]);
+//      }
+//      printf("\n");
+//    }
+//    printf("\n");
+//  }
   ave_buffer.copyTo(host_buffer);
   double mu = std::accumulate(host_buffer.begin(), host_buffer.begin() + nblocks, 0.0);
+  printf("mu: %f\n", mu);
   assert(active_cnt > 0);
   return mu / active_cnt;
 }
@@ -306,7 +321,8 @@ static __global__ void kernelLaplacianAndDot(CudaSurfaceAccessor<float> p,
   bool valid = i < n && j < n && k < n;
   double laplacian_result = valid * active.read<cudaBoundaryModeZero>(i, j, k) * localLaplacian(p, active, i, j, k);
   assert(!isinf(laplacian_result) && !isnan(laplacian_result));
-  z.write(laplacian_result, i, j, k);
+  if (valid)
+    z.write(static_cast<float>(laplacian_result), i, j, k);
   double local_result = laplacian_result * p.read<cudaBoundaryModeZero>(i, j, k);
   assert(!isinf(local_result) && !isnan(local_result));
   using BlockReduce = cub::BlockReduce<double, kThreadBlockSize3D,
@@ -316,8 +332,7 @@ static __global__ void kernelLaplacianAndDot(CudaSurfaceAccessor<float> p,
   CUDA_SHARED
   BlockReduce::TempStorage temp_storage;
   int block_idx = blockIdx.x + blockIdx.y * gridDim.x + blockIdx.z * gridDim.x * gridDim.y;
-  double block_result = BlockReduce(temp_storage).Sum(local_result,
-                                                      blockDim.x * blockDim.y * blockDim.z);
+  double block_result = BlockReduce(temp_storage).Sum(local_result);
   if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
     assert(block_result == block_result);
     buffer[block_idx] = block_result;
@@ -339,10 +354,8 @@ static __global__ void kernelSaxpyAndComputeAverage(CudaSurfaceAccessor<float> r
   auto z_val = z.read<cudaBoundaryModeZero>(i, j, k);
   double local_result = valid * active_val * (r_val + alpha * z_val);
   assert(!isinf(local_result) && !isnan(local_result));
-  r.write(local_result, i, j, k);
-  // assert not inf
-  assert(!isinf(local_result));
-  assert(local_result == local_result);
+  if (valid)
+    r.write(static_cast<float>(local_result), i, j, k);
   using BlockReduce = cub::BlockReduce<double, kThreadBlockSize3D,
                                        cub::BLOCK_REDUCE_WARP_REDUCTIONS,
                                        kThreadBlockSize3D,
@@ -374,9 +387,19 @@ static double saxpyAndAverage(CudaSurface<float> &r,
                                                                              alpha,
                                                                              ave_buffer.accessor(),
                                                                              n));
+//  std::vector<float> buffer;
+//  r.copyTo(buffer);
+//  for (int i = 0; i < n; i++) {
+//    for (int j = 0; j < n; j++) {
+//      for (int k = 0; k < n; k++) {
+//        printf("%f ", buffer[i * n * n + j * n + k]);
+//      }
+//      printf("\n");
+//    }
+//    printf("\n");
+//  }
   ave_buffer.copyTo(host_buffer);
   double mu = std::accumulate(host_buffer.begin(), host_buffer.begin() + nblocks, 0.0);
-  assert(active_cnt > 0);
   return mu / active_cnt;
 }
 
@@ -429,7 +452,10 @@ static double precondAndDot(std::array<std::unique_ptr<CudaSurface<uint8_t>>, kV
                             std::vector<double> &host_buffer,
                             int n) {
   vCycle(active, u, uBuf, b, n);
-  return dotProduct(*u[0], *b[0], *active[0], buffer, host_buffer, make_int3(n, n, n));
+//  u[0]->copyFrom(*b[0]);
+  double ret = dotProduct(*u[0], *b[0], *active[0], buffer, host_buffer, make_int3(n, n, n));
+  printf("precondAndDot: %lf\n", ret);
+  return ret;
 }
 
 static __global__ void kernelSaxpyAndScaleAdd(CudaSurfaceAccessor<float> x,
@@ -448,8 +474,8 @@ static __global__ void kernelSaxpyAndScaleAdd(CudaSurfaceAccessor<float> x,
   auto p_new = z_val + beta * p_val;
   assert(!isinf(x_new) && !isnan(x_new));
   assert(!isinf(p_new) && !isnan(p_new));
-  x.write(x_new, i, j, k);
-  p.write(p_new, i, j, k);
+  x.write(static_cast<float>(x_new), i, j, k);
+  p.write(static_cast<float>(p_new), i, j, k);
 }
 
 static void saxpyAndScaleAdd(CudaSurface<float> &x,
@@ -479,6 +505,7 @@ void mgpcg(std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel + 1> &
   auto v = subAveAndNorm(*r[0], *active[0], device_buffer, host_buffer, mu, n);
   printf("initial mu, v: %lf %lf\n", mu, v);
   if (v < tolerance) return;
+  std::vector<float> host_buffer_float;
   double rho = precondAndDot(active, p, pBuf, r, device_buffer, host_buffer, n);
   for (int i = 0; i <= maxIters; i++) {
     double sigma = laplacianAndDot(*p[0], *z[0], *active[0], device_buffer, host_buffer, n);
@@ -486,7 +513,7 @@ void mgpcg(std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel + 1> &
     double alpha = rho / sigma;
     mu = saxpyAndAverage(*r[0], *z[0], *active[0], -alpha, device_buffer, host_buffer, n, active_cnt);
     v = subAveAndNorm(*r[0], *active[0], device_buffer, host_buffer, mu, n);
-    printf("iter %d, residual %lf\n", i, v);
+    printf("iter %d, mu: %lf, residual %lf\n", i, mu, v);
     if (v < tolerance || i == maxIters) {
       saxpy(x, *p[0], alpha, *active[0], make_int3(n, n, n));
       return;
@@ -497,6 +524,19 @@ void mgpcg(std::array<std::unique_ptr<CudaSurface<uint8_t>>, kVcycleLevel + 1> &
     rho = rho_new;
     saxpyAndScaleAdd(x, *p[0], *z[0], alpha, beta, *active[0], n);
   }
+//  p[0]->copyFrom(*r[0]);
+//  for (int i = 0; i < kMaxIters; i++) {
+//    DampedJacobiKernel<<<LAUNCH_THREADS_3D(n, n, n)>>>(z[0]->surfaceAccessor(),
+//                                                       zBuf[0]->surfaceAccessor(),
+//                                                       active[0]->surfaceAccessor(),
+//                                                       r[0]->surfaceAccessor(),
+//                                                       n);
+//    std::swap(z[0], zBuf[0]);
+//    double mu = computeResidualAndAverage(*z[0], *p[0], *active[0], device_buffer, host_buffer, n, active_cnt);
+//    double norm_r = LinfNorm(*p[0], *active[0], device_buffer, host_buffer, make_int3(n, n, n));
+//    printf("iter %d, residual: %lf\n", i, norm_r);
+//    p[0]->copyFrom(*r[0]);
+//  }
 }
 
 void prepareWeights() {

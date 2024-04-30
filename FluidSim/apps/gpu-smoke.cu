@@ -101,12 +101,12 @@ static void setFluidRegion(std::vector<uint8_t> &fluid_region, int resolution) {
   for (int i = 0; i < resolution; i++) {
     for (int j = 0; j < resolution; j++) {
       for (int k = 0; k < resolution; k++) {
-        double x = i / static_cast<double>(resolution);
-        double y = j / static_cast<double>(resolution);
-        double z = k / static_cast<double>(resolution);
+        double x = (i + 0.5) / static_cast<double>(resolution);
+        double y = (j + 0.5) / static_cast<double>(resolution);
+        double z = (k + 0.5) / static_cast<double>(resolution);
         double r = (x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5) +
             (z - 0.5) * (z - 0.5);
-        if (r <= 0.5)
+        if (r <= 0.25)
           fluid_region[i * resolution * resolution + j * resolution + k] = 1;
       }
     }

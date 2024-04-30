@@ -138,10 +138,10 @@ __global__ void AccumulateForceKernel(CudaSurfaceAccessor<float4> surf_force,
   confine = neta == 0.f || withinSource(x, y, z, n)
             ? make_float3(0.f, 0.f, 0.f)
             : confine / neta;
-  float wind = 9.8f;
+//  float wind = 9.8f;
   float gravity = -9.8f;
   surf_force.write(make_float4(confine.x, confine.y + buoyancy + gravity,
-                               confine.z + wind, 0.f), x, y, z);
+                               confine.z, 0.f), x, y, z);
 }
 __global__ void ApplyForceKernel(CudaSurfaceAccessor<float4> surf_vel,
                                  CudaSurfaceAccessor<float4> surf_vel_nxt,
@@ -174,7 +174,7 @@ __global__ void CoolingKernel(CudaSurfaceAccessor<float> surf_T,
   float avg = (txp + txn + typ + tyn + tzp + tzn) / 6.f;
   float decayingRate = rho;
   surf_T_nxt.write((T - (T - avg) * dt) * exp(-0.01f), x, y, z);
-  surf_rho_nxt.write(rho - decayingRate * 0.075f * dt, x, y, z);
+  surf_rho_nxt.write(rho - decayingRate * 0.005f * dt, x, y, z);
 }
 __global__ void SmoothingKernel(CudaSurfaceAccessor<float> surf_rho,
                                 CudaSurfaceAccessor<float> surf_rho_nxt,

@@ -9,6 +9,7 @@
 #include <Core/cuda-utils.h>
 #include <Core/properties.h>
 #include <Core/core.h>
+#include <Core/debug.h>
 #include <cuda_runtime.h>
 #include <cstdint>
 
@@ -45,6 +46,17 @@ __global__ void kernelFill(CudaSurfaceAccessor<T> surf, T val, uint n) {
     return;
   surf.write(val, x, y, z);
 }
+
+template<typename T>
+__global__ void kernelCopy(CudaSurfaceAccessor<T> dst, CudaSurfaceAccessor<T> src, uint nx, uint ny, uint nz) {
+  int x = threadIdx.x + blockDim.x * blockIdx.x;
+  int y = threadIdx.y + blockDim.y * blockIdx.y;
+  int z = threadIdx.z + blockDim.z * blockIdx.z;
+  if (x >= nx || y >= ny || z >= nz)
+    return;
+  dst.write(src.read(x, y, z), x, y, z);
+}
+
 template<typename T>
 struct DeviceArray;
 template<typename T>
@@ -150,6 +162,12 @@ struct CudaSurface : CudaArray3D<T> {
   void fill(const T &val) {
     kernelFill<<<dim3((dim.x + 7) / 8, (dim.y + 7) / 8, (dim.z + 7) / 8),
     dim3(8, 8, 8)>>>(surfaceAccessor(), val, dim.x);
+  }
+  void copyFrom(const CudaSurface<T> &data) {
+    if (dim.x != data.dim.x || dim.y != data.dim.y || dim.z != data.dim.z)
+      ERROR("Dimension mismatch");
+    kernelCopy<<<dim3((dim.x + 7) / 8, (dim.y + 7) / 8, (dim.z + 7) / 8),
+    dim3(8, 8, 8)>>>(surfaceAccessor(), data.surfaceAccessor(), dim.x, dim.y, dim.z);
   }
   CudaSurfaceAccessor<T> surfaceAccessor() const { return {cuda_surf}; }
   ~CudaSurface() { cudaDestroySurfaceObject(cuda_surf); }

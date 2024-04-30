@@ -104,7 +104,7 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
     dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
         loc->surfaceAccessor(), vel->texAccessor(), velBuf->surfaceAccessor(),
         fluidRegion[0]->surfaceAccessor(),
-        make_float4(0.f, 0.0f, 0.f, 0.f), n);
+        make_float4(0.f, 1.0f, 0.f, 0.f), n);
     checkCUDAErrorWithLine("Resample vel failed!");
     ResampleKernel<float><<<dim3(nblocks, nblocks, nblocks),
     dim3(nthreads_dim, nthreads_dim, nthreads_dim)>>>(
@@ -198,7 +198,6 @@ struct GpuSmokeSimulator final : core::Animation, core::NonCopyable {
   void step(core::Frame &frame) override {
     // std::cout << "Substep " << i << std::endl;
     substep(frame.dt);
-    getchar();
     frame.onAdvance();
   }
 };
