@@ -254,14 +254,19 @@ int main(int argc, char** argv) {
     simulator->step(frame);
     drawFluid(fluidCtx.get(), fluidShader.get(), camera, simulator->positions(),
               display_w, display_h);
-    if (frame.idx == 52) {
+    if (frame.idx >= 80 && frame.idx < 140) {
       simulator->reconstruct();
+      simulator->erodeFluidSurface(2);
       simulator->smoothFluidSurface(5);
       core::Mesh fluidMesh;
       fluid::cpu::rebuildSurface(fluidMesh, simulator->exportFluidSurface());
       if (!core::exportObj("fluid.obj", fluidMesh)) {
         std::cerr << "Failed to export fluid mesh" << std::endl;
         exit(-1);
+      }
+      if (frame.idx == 139) {
+        std::cout << "Done." << std::endl;
+        break;
       }
     }
     drawCollider(colliderCtx.get(), meshShader.get(), camera, colliderMesh,

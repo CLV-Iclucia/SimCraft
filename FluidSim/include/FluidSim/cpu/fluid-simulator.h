@@ -172,6 +172,40 @@ class FluidSimulator final : public FluidComputeBackend {
 
   std::vector<Vec3d> &positions() { return m_particles.positions; }
 
+  void erodeFluidSurface(int iters) {
+    Real h = fluidSurface->grid.gridSpacing().x;
+    for (int iter = 0; iter < iters; iter++) {
+      fluidSurfaceBuf->grid.forEach([&](int i, int j, int k) {
+        // if any of my neighbors are outside of the fluid, then I am outside
+        if (i > 0 && fluidSurface->grid(i - 1, j, k) > 0.0) {
+          fluidSurfaceBuf->grid(i, j, k) = 0.5 * h;
+          return;
+        }
+        if (i < fluidSurface->width() - 1 && fluidSurface->grid(i + 1, j, k) > 0.0) {
+          fluidSurfaceBuf->grid(i, j, k) = 0.5 * h;
+          return;
+        }
+        if (j > 0 && fluidSurface->grid(i, j - 1, k) > 0.0) {
+          fluidSurfaceBuf->grid(i, j, k) = 0.5 * h;
+          return;
+        }
+        if (j < fluidSurface->height() - 1 && fluidSurface->grid(i, j + 1, k) > 0.0) {
+          fluidSurfaceBuf->grid(i, j, k) = 0.5 * h;
+          return;
+        }
+        if (k > 0 && fluidSurface->grid(i, j, k - 1) > 0.0) {
+          fluidSurfaceBuf->grid(i, j, k) = 0.5 * h;
+          return;
+        }
+        if (k < fluidSurface->depth() - 1 && fluidSurface->grid(i, j, k + 1) > 0.0) {
+          fluidSurfaceBuf->grid(i, j, k) = 0.5 * h;
+          return;
+        }
+      });
+      std::swap(fluidSurface, fluidSurfaceBuf);
+    }
+  }
+
  private:
   int nParticles{};
 
@@ -229,7 +263,6 @@ class FluidSimulator final : public FluidComputeBackend {
       std::swap(valid, validBuf);
     }
   }
-
   void clear();
   void applyForce(Real dt) const;
   void applyCollider() const;
