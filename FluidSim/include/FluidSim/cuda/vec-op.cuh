@@ -116,5 +116,10 @@ __device__ __forceinline__ double3 normalize(const double3 &vec) {
   if (n == 0) return make_double3(0, 0, 0);
   return make_double3(vec.x / n, vec.y / n, vec.z / n);
 }
+__device__ __forceinline__ float dot(const float3 &a, const float3 &b) {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
 }
+__device__ __forceinline__ float dot(const float4 &a, const float4 &b) {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}}
 #endif //FLUIDSIM_VEC_OP_CUH

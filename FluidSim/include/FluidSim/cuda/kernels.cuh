@@ -7,6 +7,7 @@
 
 #include <cuda_runtime.h>
 #include <FluidSim/cuda/gpu-arrays.cuh>
+#include <FluidSim/cuda/vec-op.cuh>
 
 inline void checkCUDAError(const char *msg, int line = -1) {
   cudaError_t err = cudaGetLastError();
@@ -25,7 +26,9 @@ using core::uint;
 __device__ __forceinline__ bool withinSource(float x, float y, float z,
                                              int n) {
   float centre = static_cast<float>(n) * 0.5f;
-  return abs(x - centre) < 8.f && abs(z - centre) < 8.f && y < 16.f;
+  bool insideBall = (x - centre) * (x - centre) + (z - centre) * (z - centre) +
+      (y - centre) * (y - centre) < centre * centre;
+  return (x - centre) * (x - centre) + (z - centre) * (z - centre) + (y) * (y) < 256.f && insideBall;
 }
 
 __device__ __forceinline__ float3 makeCellCenter(int x, int y, int z) {
@@ -98,6 +101,27 @@ __global__ void ApplyForceKernel(CudaSurfaceAccessor<float4> surf_vel,
 __global__ void kernelSetupFluidRegion(CudaSurfaceAccessor<uint8_t> surf,
                                        DeviceArrayAccessor<uint8_t> region,
                                        uint n);
+
+__global__ void ExtrapolateKernel(CudaSurfaceAccessor<float4> surf,
+                                  CudaSurfaceAccessor<float4> surfBuf,
+                                  CudaSurfaceAccessor<uint8_t> valid,
+                                  CudaSurfaceAccessor<uint8_t> validBuf,
+                                  uint n);
+__global__ void ExtrapolateKernel(CudaSurfaceAccessor<float> surf,
+                                  CudaSurfaceAccessor<float> surfBuf,
+                                  CudaSurfaceAccessor<uint8_t> valid,
+                                  CudaSurfaceAccessor<uint8_t> validBuf,
+                                  uint n);
+
+template<typename T>
+__global__ void ClearInactiveKernel(CudaSurfaceAccessor<float4> vel,
+                                    CudaSurfaceAccessor<uint8_t> active,
+                                    T zero,
+                                    uint n) {
+  get_and_restrict_tid_3d(x, y, z, n, n, n);
+  if (!active.read(x, y, z))
+    vel.write(zero, x, y, z);
+}
 }
 
 #endif //KERNELS_CUH

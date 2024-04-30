@@ -104,7 +104,7 @@ __global__ void SubgradientKernel(CudaSurfaceAccessor<float> surf_p,
   vel.x -= (pxn - pxp) * 0.5f;
   vel.y -= (pyn - pyp) * 0.5f;
   vel.z -= (pzn - pzp) * 0.5f;
-  float4 result = withinSource(x, y, z, n) ? src_vel : vel;
+  float4 result = withinSource(x, y, z, n) ? normalize(make_float4(x - n / 2, y - n / 2, z - n / 2, 0.f)) : vel;
   surf_vel.write(result, x, y, z);
 }
 __global__ void AccumulateForceKernel(CudaSurfaceAccessor<float4> surf_force,
@@ -114,7 +114,7 @@ __global__ void AccumulateForceKernel(CudaSurfaceAccessor<float4> surf_force,
                                       CudaSurfaceAccessor<uint8_t> active,
                                       uint n, float alpha, float beta,
                                       float epsilon,
-                                      float ambientTemperature, float dt) {
+                                      float ambientTemperature, float t) {
   get_and_restrict_tid_3d(x, y, z, n, n, n);
   if (!active.read(x, y, z))
     return;
@@ -133,15 +133,15 @@ __global__ void AccumulateForceKernel(CudaSurfaceAccessor<float4> surf_force,
   float3 eta = make_float3((nwnx - nwpx) * 0.5f,
                            (nwny - nwpy) * 0.5f,
                            (nwnz - nwpz) * 0.5f);
-  float3 confine = epsilon * cross(eta, make_float3(vort.x, vort.y, vort.z));
+  float3 confine = 1.75 * epsilon * cross(eta, make_float3(vort.x, vort.y, vort.z));
   float neta = norm(eta);
   confine = neta == 0.f || withinSource(x, y, z, n)
             ? make_float3(0.f, 0.f, 0.f)
             : confine / neta;
-//  float wind = 9.8f;
-  float gravity = -9.8f;
-  surf_force.write(make_float4(confine.x, confine.y + buoyancy + gravity,
-                               confine.z, 0.f), x, y, z);
+  float wind = 48.f;
+  float gravity = 9.8f;
+  surf_force.write(make_float4(confine.x + wind * cos(t / 10), confine.y + buoyancy + gravity,
+                               confine.z + wind * sin(t / 10), 0.f), x, y, z);
 }
 __global__ void ApplyForceKernel(CudaSurfaceAccessor<float4> surf_vel,
                                  CudaSurfaceAccessor<float4> surf_vel_nxt,
@@ -172,9 +172,8 @@ __global__ void CoolingKernel(CudaSurfaceAccessor<float> surf_T,
   float tzp = surf_T.read<cudaBoundaryModeClamp>(x, y, z + 1) * active.read<cudaBoundaryModeZero>(x, y, z + 1);
   float tzn = surf_T.read<cudaBoundaryModeClamp>(x, y, z - 1) * active.read<cudaBoundaryModeZero>(x, y, z - 1);
   float avg = (txp + txn + typ + tyn + tzp + tzn) / 6.f;
-  float decayingRate = rho;
   surf_T_nxt.write((T - (T - avg) * dt) * exp(-0.01f), x, y, z);
-  surf_rho_nxt.write(rho - decayingRate * 0.005f * dt, x, y, z);
+  surf_rho_nxt.write(rho - rho * 0.2 * dt, x, y, z);
 }
 __global__ void SmoothingKernel(CudaSurfaceAccessor<float> surf_rho,
                                 CudaSurfaceAccessor<float> surf_rho_nxt,

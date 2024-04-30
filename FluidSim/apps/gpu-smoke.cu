@@ -30,11 +30,9 @@ bool initGLFW(GLFWwindow *&window) {
 struct Options {
   int resolution = 64;
   int exportFrame = -1;
-  core::Vec3f density = core::Vec3f(1.f, 0.0f, 1.f);
-  core::Vec3f albedo = core::Vec3f(0.5f, 0.0f, 0.5f);
-  std::string densityOutputFile = "density.vol";
-  std::string albedoOutputFile = "albedo.vol";
-  std::string outputDir = ".";
+  core::Vec3f density = core::Vec3f(0.3f, 0.5f, 1.0f);
+  core::Vec3f albedo = core::Vec3f(0.2f, 0.3f, 0.8f);
+  std::string outputDir = "./smoke_b/";
 } opt;
 
 void processWindowInput(GLFWwindow *window, FpsCamera &camera) {
@@ -73,10 +71,11 @@ std::vector<float> screen{
 };
 
 void exportVolume(const std::vector<float> &density,
+                  const std::vector<float> &T,
+                  const std::string &filename,
                   const Options &opt) {
-  std::string densityFile = opt.outputDir + "/" + opt.densityOutputFile;
-  std::string albedoFile = opt.outputDir + "/" + opt.albedoOutputFile;
-  std::ofstream outFile(densityFile);
+  std::string file = opt.outputDir + "/" + filename;
+  std::ofstream outFile(file);
   outFile << opt.resolution << " " << opt.resolution << " " << opt.resolution <<
           std::endl;
   for (int i = 0; i < opt.resolution * opt.resolution * opt.resolution; i++) {
@@ -84,14 +83,10 @@ void exportVolume(const std::vector<float> &density,
             << " "
             << density[i] * opt.density.z << std::endl;
   }
-  outFile << std::endl;
-  outFile.close();
-  outFile.open(albedoFile);
-  outFile << opt.resolution << " " << opt.resolution << " " << opt.resolution <<
-          std::endl;
+
   for (int i = 0; i < opt.resolution * opt.resolution * opt.resolution; i++) {
-    outFile << opt.albedo.x << " " << opt.albedo.y << " " << opt.albedo.z <<
-            std::endl;
+    outFile << opt.albedo.x * density[i] << " " << opt.albedo.y * density[i] << " " << opt.albedo.z * density[i]
+            << std::endl;
   }
   outFile << std::endl;
   outFile.close();
@@ -150,13 +145,15 @@ int main(int argc, char **argv) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     simulator->step(frame);
     simulator->rho->copyTo(buffer.data());
-    if (frame.idx == opt.exportFrame || glfwGetKey(window, GLFW_KEY_P) ==
-        GLFW_PRESS) {
-      std::vector<float> albedo(opt.resolution * opt.resolution *
-          opt.resolution);
-      exportVolume(buffer, opt);
+    if (frame.idx >= 100 && frame.idx < 400) {
+      std::vector<float> T(opt.resolution * opt.resolution * opt.resolution);
+      std::string filename = "frame_" + std::to_string(frame.idx) + ".vol";
+      exportVolume(buffer, T, filename, opt);
       std::cout << "exporting frame " << frame.idx << " to directory " << opt.outputDir << std::endl;
-      return 0;
+      if (frame.idx == 399) {
+        std::cout << "done exporting" << std::endl;
+        break;
+      }
     }
     std::cout << "frame " << frame.idx << std::endl;
     glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, opt.resolution, opt.resolution,
