@@ -145,16 +145,16 @@ int main(int argc, char **argv) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     simulator->step(frame);
     simulator->rho->copyTo(buffer.data());
-    if (frame.idx >= 100 && frame.idx < 400) {
-      std::vector<float> T(opt.resolution * opt.resolution * opt.resolution);
-      std::string filename = "frame_" + std::to_string(frame.idx) + ".vol";
-      exportVolume(buffer, T, filename, opt);
-      std::cout << "exporting frame " << frame.idx << " to directory " << opt.outputDir << std::endl;
-      if (frame.idx == 399) {
-        std::cout << "done exporting" << std::endl;
-        break;
-      }
-    }
+//    if (frame.idx >= 100 && frame.idx < 400) {
+//      std::vector<float> T(opt.resolution * opt.resolution * opt.resolution);
+//      std::string filename = "frame_" + std::to_string(frame.idx) + ".vol";
+//      exportVolume(buffer, T, filename, opt);
+//      std::cout << "exporting frame " << frame.idx << " to directory " << opt.outputDir << std::endl;
+//      if (frame.idx == 399) {
+//        std::cout << "done exporting" << std::endl;
+//        break;
+//      }
+//    }
     std::cout << "frame " << frame.idx << std::endl;
     glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, opt.resolution, opt.resolution,
                     opt.resolution, GL_RED,
