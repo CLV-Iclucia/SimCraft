@@ -1,0 +1,7 @@
+project(Deforma LANGUAGES CXX)
+file(GLOB_RECURSE srcs CONFIGURE_DEPENDS src/*.cc src/*.cpp include/*.h)
+add_library(Deform STATIC ${srcs})
+target_link_libraries(Deform PUBLIC Maths)
+target_include_directories(Deform PUBLIC include)
+add_executable(deform apps/deform.cc)
+target_link_libraries(deform PUBLIC Deform)

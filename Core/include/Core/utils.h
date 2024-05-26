@@ -20,8 +20,8 @@ constexpr Real PI_180_INV =
 using glm::normalize;
 using glm::dot;
 
-template <typename T>
-CUDA_CALLABLE CUDA_FORCEINLINE T clamp(const T& x, const T& min, const T& max) {
+template<typename T>
+CUDA_CALLABLE CUDA_FORCEINLINE T clamp(const T &x, const T &min, const T &max) {
 #ifndef __CUDA_ARCH__
   return glm::clamp(x, min, max);
 #else
@@ -29,21 +29,25 @@ CUDA_CALLABLE CUDA_FORCEINLINE T clamp(const T& x, const T& min, const T& max) {
 #endif
 }
 
-template <typename T> inline T cubic(T x) { return x * x * x; }
+template<typename T>
+inline T cubic(T x) { return x * x * x; }
 
-template <typename T> inline T sqr(T x) { return x * x; }
+template<typename T>
+inline T sqr(T x) { return x * x; }
 
-template <typename T> inline T nearest(const T &A, const T &B, Real t) {
+template<typename T>
+inline T nearest(const T &A, const T &B, Real t) {
   assert(t >= 0.0 && t <= 1.0);
   return t <= 0.5 ? A : B;
 }
 
-template <typename T> inline T lerp(const T &A, const T &B, Real t) {
+template<typename T>
+inline T lerp(const T &A, const T &B, Real t) {
   assert(t >= 0.0 && t <= 1.0);
   return (1.0 - t) * A + t * B;
 }
 
-template <typename T>
+template<typename T>
 inline T catmullRomSpline(const T &A, const T &B, const T &C, const T &D,
                           Real t) {
   T d1 = (C - A) * 0.5;
@@ -56,24 +60,24 @@ inline T catmullRomSpline(const T &A, const T &B, const T &C, const T &D,
   return a3 * cubic(t) + a2 * sqr(t) + a1 * t + a0;
 }
 
-template <typename T>
+template<typename T>
 inline T bilerp(const T &AA, const T &BA, const T &AB, const T &BB,
                 const Vector<T, 2> &t) {
   assert(t.x >= 0.0 && t.x <= 1.0 && t.y >= 0.0 && t.y <= 1.0);
   return lerp(lerp(AA, BA, t.x), lerp(AB, BB, t.x), t.y);
 }
 
-template <typename T>
+template<typename T>
 inline T trilerp(const T &AAA, const T &BAA, const T &ABA, const T &BBA,
                  const T &AAB, const T &BAB, const T &ABB, const T &BBB,
                  const Vector<T, 3> &t) {
   assert(t.x >= 0.0 && t.x <= 1.0 && t.y >= 0.0 && t.y <= 1.0 && t.z >= 0.0 &&
-         t.z <= 1.0);
+      t.z <= 1.0);
   return lerp(bilerp(AAA, BAA, ABA, BBA, Vector<T, 2>(t.x, t.y)),
               bilerp(AAB, BAB, ABB, BBB, Vector<T, 2>(t.x, t.y)), t.z);
 }
 
-template <typename T>
+template<typename T>
 inline T biCatmullRomSpline(const T &AA, const T &BA, const T &AB, const T &BB,
                             const Vector<T, 2> &t) {
   assert(t.x >= 0.0 && t.x <= 1.0 && t.y >= 0.0 && t.y <= 1.0);
@@ -81,19 +85,19 @@ inline T biCatmullRomSpline(const T &AA, const T &BA, const T &AB, const T &BB,
                           catmullRomSpline(AA, BA, AB, BB, t.x), t.y);
 }
 
-template <typename T>
+template<typename T>
 inline T triCatmullRomSpline(const T &AAA, const T &BAA, const T &ABA,
                              const T &BBA, const T &AAB, const T &BAB,
                              const T &ABB, const T &BBB,
                              const Vector<T, 3> &t) {
   assert(t.x >= 0.0 && t.x <= 1.0 && t.y >= 0.0 && t.y <= 1.0 && t.z >= 0.0 &&
-         t.z <= 1.0);
+      t.z <= 1.0);
   return catmullRomSpline(
       biCatmullRomSpline(AAA, BAA, ABA, BBA, Vector<T, 2>(t.x, t.y)),
       biCatmullRomSpline(AAB, BAB, ABB, BBB, Vector<T, 2>(t.x, t.y)), t.z);
 }
 
-template <typename T, int Dim>
+template<typename T, int Dim>
 Vector<T, Dim> cwiseMin(const Vector<T, Dim> &a, const Vector<T, Dim> &b) {
   Vector<T, Dim> result;
   for (int i = 0; i < Dim; i++)
@@ -101,16 +105,21 @@ Vector<T, Dim> cwiseMin(const Vector<T, Dim> &a, const Vector<T, Dim> &b) {
   return result;
 }
 
-template <typename T, int Dim>
+template<typename T, int Dim>
 Vector<T, Dim> cwiseMax(const Vector<T, Dim> &a, const Vector<T, Dim> &b) {
   Vector<T, Dim> result;
   for (int i = 0; i < Dim; i++)
     result[i] = std::max(a[i], b[i]);
   return result;
 }
-
-bool quadraticSolve(Real a, Real b, Real c, Real& x1, Real& x2);
-Real cubicSolve(Real a, Real b, Real c, Real d, Real l, Real r, Real tolerance);
+struct QuadraticPolynomial {
+  Real a, b, c;
+};
+bool quadraticSolve(const QuadraticPolynomial& poly, Real &x1, Real &x2);
+struct CubicPolynomial {
+  Real a, b, c, d;
+};
+Real cubicSolve(const CubicPolynomial &poly, Real l, Real r, Real tolerance);
 
 } // namespace core
 // namespace core

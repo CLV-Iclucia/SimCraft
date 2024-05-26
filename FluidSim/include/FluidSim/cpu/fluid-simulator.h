@@ -24,7 +24,7 @@ using spatify::PaddedCellCentredGrid;
 
 class FluidSimulator final : public FluidComputeBackend {
  public:
-  core::Timer timer;
+  core::CpuTimer timer;
   FluidSimulator(int n, const Vec3d &size, const Vec3i &resolution)
       : nParticles(n), uw(resolution + Vec3i(1, 0, 0)),
         vw(resolution + Vec3i(0, 1, 0)), ww(resolution + Vec3i(0, 0, 1)),

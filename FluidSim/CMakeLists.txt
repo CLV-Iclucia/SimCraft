@@ -41,7 +41,19 @@ find_package(GTest CONFIG REQUIRED)
 file(GLOB_RECURSE test_srcs CONFIGURE_DEPENDS tests/*.cu)
 foreach(test_src ${test_srcs})
   get_filename_component(test_name ${test_src} NAME_WE)
-  add_executable(${test_name} ${test_src})
+  add_executable(${test_name} ${test_src}
+          ../Maths/include/Maths/sparse-matrix-builder.h
+          ../Deform/include/Deform/strain-energy-density.h
+          ../Deform/include/Deform/types.h
+          ../Deform/apps/deform.cc
+          ../FEM/apps/fem.cc
+          ../Maths/include/Maths/types.h
+          ../Maths/tests/test.cc
+          ../Maths/src/amg.cc
+          ../FEM/include/fem/types.h
+          ../FEM/include/fem/integrator.h
+          ../FEM/include/fem/tet-mesh.h
+  )
   target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
   target_link_libraries(${test_name} PUBLIC Core GTest::gtest GTest::gtest_main GpuFluid)
   add_test(NAME ${test_name} CONFIGURATIONS Release COMMAND ${test_name})

@@ -1,0 +1,7 @@
+project(Maths LANGUAGES CXX)
+file(GLOB_RECURSE srcs CONFIGURE_DEPENDS src/*.cc src/*.cpp include/*.h)
+add_library(Maths STATIC ${srcs})
+target_include_directories(Maths PUBLIC include ${EIGEN3_INCLUDE_DIR})
+target_link_libraries(Maths PUBLIC Eigen3)
+add_executable(test tests/test.cc)
+target_link_libraries(test PUBLIC Maths)

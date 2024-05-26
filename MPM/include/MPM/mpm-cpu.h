@@ -4,8 +4,6 @@
 
 #ifndef SIMCRAFT_MPM_INCLUDE_MPM_CPU_H_
 #define SIMCRAFT_MPM_INCLUDE_MPM_CPU_H_
-#include "Core/range-for.h"
-#include "constitutive-model.h"
 #include <Core/animation.h>
 #include <Core/timer.h>
 #include <MPM/mpm.h>
@@ -19,16 +17,16 @@ public:
   Derived &derived() { return static_cast<Derived &>(*this); }
   const Derived &derived() const { return static_cast<const Derived &>(*this); }
   void step(core::Frame &frame) override {
-    timer.startCpuTimer();
+    timer.start();
     derived().initStep();
     derived().P2G();
     derived().gridUpdate(frame.dt);
     derived().G2P();
-    timer.stopCpuTimer();
+    timer.stop();
   }
 
 protected:
-  mutable core::Timer timer;
+  mutable core::CpuTimer timer;
   int numParticles = 0;
 };
 

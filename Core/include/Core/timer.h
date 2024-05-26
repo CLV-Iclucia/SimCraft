@@ -6,22 +6,22 @@
 #define SIMCRAFT_CORE_INCLUDE_CORE_TIMER_H_
 #include <Core/core.h>
 #include <chrono>
-//#include <cuda.h>
-//#include <cuda_runtime.h>
 #include <iostream>
+#include <concepts>
+#include <utility>
 namespace core {
+template <typename T>
+concept Timer = requires(T& timer, const std::string& event) {
+  timer.start();
+  timer.stop();
+  { timer.elapsedTime } -> std::convertible_to<float>;
+  timer.logElapsedTime(event);
+};
+
 // this timer is from CIS 565
-class Timer {
+class CpuTimer {
 public:
-  Timer() {
-  //  cudaEventCreate(&start_event);
-  //  cudaEventCreate(&stop_event);
-  }
-  ~Timer() {
-  //  cudaEventDestroy(start_event);
-  //  cudaEventDestroy(stop_event);
-  }
-  void startCpuTimer() {
+  void start() {
     if (cpu_timer_started) {
       std::cerr << "Error: CPU timer already started." << std::endl;
       exit(-1);
@@ -29,53 +29,40 @@ public:
     cpu_timer_started = true;
     cpu_start_time = std::chrono::high_resolution_clock::now();
   }
-  void stopCpuTimer() {
+  void stop() {
     cpu_end_time = std::chrono::high_resolution_clock::now();
     if (!cpu_timer_started) {
       std::cerr << "Error: CPU timer not started." << std::endl;
       exit(-1);
     }
-    std::chrono::duration<double, std::milli> duro =
-        cpu_end_time - cpu_start_time;
+    std::chrono::duration<double, std::milli> duro = cpu_end_time - cpu_start_time;
     cpu_elapsed_time = static_cast<float>(duro.count());
     cpu_timer_started = false;
   }
-  // void startGpuTimer() {
-  //   if (gpu_timer_started) {
-  //     std::cerr << "Error: GPU timer already started." << std::endl;
-  //     exit(-1);
-  //   }
-  //   gpu_timer_started = true;
-  //   cudaEventRecord(start_event);
-  // }
-  // void stopGpuTimer() {
-  //   cudaEventRecord(stop_event);
-  //   cudaEventSynchronize(stop_event);
-  //   if (!gpu_timer_started) {
-  //     std::cerr << "Error: GPU timer not started." << std::endl;
-  //     exit(-1);
-  //   }
-  //   gpu_timer_started = false;
-  //   cudaEventElapsedTime(&gpu_elapsed_time, start_event, stop_event);
-  // }
-  float CpuElapsedTime() const { return cpu_elapsed_time; }
-  //float GpuElapsedTime() const { return gpu_elapsed_time; }
-  void logCpuElapsedTime(const char *event) const {
-    std::printf("%s: %lf ms\n", event, CpuElapsedTime());
+  float elapsedTime() const { return cpu_elapsed_time; }
+  void logElapsedTime(const std::string& event) const {
+    std::cout << std::format("{}: {} ms\n", event, elapsedTime());
   }
-  // void logGpuElapsedTime(const char *event) const {
-  //   std::printf("%s: %lf ms\n", event, GpuElapsedTime());
-  // }
 
 private:
-//  cudaEvent_t start_event;
-//  cudaEvent_t stop_event;
   std::chrono::high_resolution_clock::time_point cpu_start_time;
   std::chrono::high_resolution_clock::time_point cpu_end_time;
   bool cpu_timer_started = false;
-  bool gpu_timer_started = false;
   float cpu_elapsed_time = 0.0;
-  float gpu_elapsed_time = 0.0;
+};
+
+template <Timer T>
+struct TimerGuard {
+  explicit TimerGuard(std::string event_name) : event(std::move(event_name)) { timer.start(); }
+  TimerGuard() {
+    timer.start();
+  }
+  ~TimerGuard() {
+    timer.stop();
+    timer.logElapsedTime(event);
+  }
+  T timer;
+  std::string event;
 };
 } // namespace core
 #endif // SIMCRAFT_CORE_INCLUDE_CORE_TIMER_H_
