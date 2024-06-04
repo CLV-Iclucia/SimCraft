@@ -48,7 +48,7 @@ foreach(test_src ${test_srcs})
           ../Deform/apps/deform.cc
           ../FEM/apps/fem.cc
           ../Maths/include/Maths/types.h
-          ../Maths/tests/test.cc
+          ../Maths/tests/test-tensor.cc
           ../Maths/src/amg.cc
           ../FEM/include/fem/types.h
           ../FEM/include/fem/integrator.h

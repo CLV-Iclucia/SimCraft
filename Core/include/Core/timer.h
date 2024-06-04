@@ -14,7 +14,7 @@ template <typename T>
 concept Timer = requires(T& timer, const std::string& event) {
   timer.start();
   timer.stop();
-  { timer.elapsedTime } -> std::convertible_to<float>;
+  { timer.elapsedTime() } -> std::convertible_to<float>;
   timer.logElapsedTime(event);
 };
 

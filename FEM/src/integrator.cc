@@ -3,7 +3,4 @@
 //
 #include <fem/integrator.h>
 namespace fem {
-void ImplicitEuler::step(Real dt) {
-
-}
 }

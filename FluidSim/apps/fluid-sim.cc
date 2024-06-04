@@ -198,11 +198,9 @@ int main(int argc, char** argv) {
   GLFWwindow* window;
   if (!initGLFW(window)) return -1;
   ImGuiIO& io = initImGui(window);
-
   auto simulator = std::make_unique<fluid::cpu::FluidSimulator>(
       nParticles, size, resolution);
   core::Mesh colliderMesh;
-
   if (!myLoadObj(colliderPath, &colliderMesh)) {
     std::cerr << "Failed to load mesh: " << colliderPath << std::endl;
     return -1;

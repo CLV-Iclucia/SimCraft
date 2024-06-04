@@ -345,7 +345,7 @@ namespace glm
 		detail::tmat4x4<T> inverse = glm::inverse(proj * model);
 
 		detail::tvec4<T> tmp = detail::tvec4<T>(win, T(1));
-		tmp.x = (tmp.x - T(viewport[0])) / T(viewport[2]);
+		tmp.x = (tmp.x_t - T(viewport[0])) / T(viewport[2]);
 		tmp.y = (tmp.y - T(viewport[1])) / T(viewport[3]);
 		tmp = tmp * T(2) - T(1);
 

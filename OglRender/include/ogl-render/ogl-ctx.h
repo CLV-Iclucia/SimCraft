@@ -20,6 +20,16 @@ struct NonCopyable {
   NonCopyable &operator=(const NonCopyable &) = delete;
 };
 
+template<typename Derived>
+struct OpenGLHandle : NonCopyable {
+  GLuint id;
+  OpenGLHandle() = default;
+  OpenGLHandle(OpenGLHandle&& other) {
+    id = other.id;
+    other.id = 0;
+  }
+};
+
 struct VertexBufferObj : NonCopyable {
   GLuint id;
   VertexBufferObj() {
@@ -45,7 +55,7 @@ struct VertexBufferObj : NonCopyable {
     glBufferSubData(GL_ARRAY_BUFFER, 0, data.size() * sizeof(T), (void *) data.data());
   }
   template<typename T>
-  void updateData(const T* data, int offset, int size) {
+  void updateData(const T *data, int offset, int size) {
     glBufferSubData(GL_ARRAY_BUFFER, offset * sizeof(T), size * sizeof(T), data);
   }
   void bind() {
@@ -113,7 +123,7 @@ struct OpenGLContext : NonCopyable {
     glVertexAttribPointer(attributes[name], size, type, normalized, stride, pointer);
     glEnableVertexAttribArray(attributes[name]);
   }
-  VertexBufferObj& VBO(const std::string& name) {
+  VertexBufferObj &VBO(const std::string &name) {
     return vbo[attributes[name]];
   }
   int attribute(const std::string &name) {

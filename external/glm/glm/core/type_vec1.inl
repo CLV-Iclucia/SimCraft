@@ -304,7 +304,7 @@ namespace detail
 		U const & s
 	)
 	{
-		this->x %= T(s);
+		this->x_t %= T(s);
 		return *this;
 	}
 
@@ -315,7 +315,7 @@ namespace detail
 		tvec1<U> const & v
 	)
 	{
-		this->x %= T(v.x);
+		this->x_t %= T(v.x_t);
 		return *this;
 	}
 
@@ -326,7 +326,7 @@ namespace detail
 		U const & s
 	)
 	{
-		this->x &= T(s);
+		this->x_t &= T(s);
 		return *this;
 	}
 
@@ -337,7 +337,7 @@ namespace detail
 		tvec1<U> const & v
 	)
 	{
-		this->x &= T(v.x);
+		this->x_t &= T(v.x_t);
 		return *this;
 	}
 
@@ -348,7 +348,7 @@ namespace detail
 		U const & s
 	)
 	{
-		this->x |= T(s);
+		this->x_t |= T(s);
 		return *this;
 	}
 
@@ -359,7 +359,7 @@ namespace detail
 		tvec1<U> const & v
 	)
 	{
-		this->x |= U(v.x);
+		this->x_t |= U(v.x_t);
 		return *this;
 	}
 
@@ -370,7 +370,7 @@ namespace detail
 		U const & s
 	)
 	{
-		this->x ^= T(s);
+		this->x_t ^= T(s);
 		return *this;
 	}
 
@@ -381,7 +381,7 @@ namespace detail
 		tvec1<U> const & v
 	)
 	{
-		this->x ^= T(v.x);
+		this->x_t ^= T(v.x_t);
 		return *this;
 	}
 
@@ -392,7 +392,7 @@ namespace detail
 		U const & s
 	)
 	{
-		this->x <<= T(s);
+		this->x_t <<= T(s);
 		return *this;
 	}
 
@@ -403,7 +403,7 @@ namespace detail
 		tvec1<U> const & v
 	)
 	{
-		this->x <<= T(v.x);
+		this->x_t <<= T(v.x_t);
 		return *this;
 	}
 
@@ -414,7 +414,7 @@ namespace detail
 		U const & s
 	)
 	{
-		this->x >>= T(s);
+		this->x_t >>= T(s);
 		return *this;
 	}
 
@@ -425,7 +425,7 @@ namespace detail
 		tvec1<U> const & v
 	)
 	{
-		this->x >>= T(v.x);
+		this->x_t >>= T(v.x_t);
 		return *this;
 	}
 
@@ -517,7 +517,7 @@ namespace detail
 	)
 	{
 		return tvec1<T>(
-			s + v.x);
+			s + v.x_t);
 	}
 
 	template <typename T> 
@@ -551,7 +551,7 @@ namespace detail
 	)
 	{
 		return tvec1<T>(
-			s - v.x);
+			s - v.x_t);
 	}
 
 	template <typename T> 
@@ -585,7 +585,7 @@ namespace detail
 	)
 	{
 		return tvec1<T>(
-			s * v.x);
+			s * v.x_t);
 	}
 
 	template <typename T> 
@@ -619,7 +619,7 @@ namespace detail
 	)
 	{
 		return tvec1<T>(
-			s / v.x);
+			s / v.x_t);
 	}
 
 	template <typename T> 
@@ -688,7 +688,7 @@ namespace detail
 	)
 	{
 		return tvec1<T>(
-			s % v.x);
+			s % v.x_t);
 	}
 
 	template <typename T>
@@ -721,7 +721,7 @@ namespace detail
 	)
 	{
 		return tvec1<T>(
-			s & v.x);
+			s & v.x_t);
 	}
 
 	template <typename T>
@@ -754,7 +754,7 @@ namespace detail
 	)
 	{
 		return tvec1<T>(
-			s | v.x);
+			s | v.x_t);
 	}
 
 	template <typename T>
@@ -787,7 +787,7 @@ namespace detail
 	)
 	{
 		return tvec1<T>(
-			s ^ v.x);
+			s ^ v.x_t);
 	}
 
 	template <typename T>
@@ -820,7 +820,7 @@ namespace detail
 	)
 	{
 		return tvec1<T>(
-			s << v.x);
+			s << v.x_t);
 	}
 
 	template <typename T>
@@ -853,7 +853,7 @@ namespace detail
 	)
 	{
 		return tvec1<T>(
-			s >> v.x);
+			s >> v.x_t);
 	}
 
 	template <typename T>
@@ -893,7 +893,7 @@ namespace detail
 	(
 		tref1<T> const & r
 	) :
-		x(r.x)
+		x(r.x_t)
 	{}
 
 	template <typename T> 
@@ -901,7 +901,7 @@ namespace detail
 	(
 		tvec1<T> const & v
 	) :
-		x(v.x)
+		x(v.x_t)
 	{}
 
 	template <typename T> 
@@ -910,7 +910,7 @@ namespace detail
 		tref1<T> const & r
 	)
 	{
-		x = r.x;
+		x = r.x_t;
 		return *this;
 	}
 
@@ -920,7 +920,7 @@ namespace detail
 		tvec1<T> const & v
 	)
 	{
-		x = v.x;
+		x = v.x_t;
 		return *this;
 	}
 

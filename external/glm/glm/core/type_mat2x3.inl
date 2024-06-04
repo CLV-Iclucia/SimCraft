@@ -483,8 +483,8 @@ namespace detail
 		tmat2x3<T> const & m) 
     {
         return typename tmat2x3<T>::row_type(
-            v.x * m[0][0] + v.y * m[0][1] + v.z * m[0][2],
-            v.x * m[1][0] + v.y * m[1][1] + v.z * m[1][2]);
+            v.x_t * m[0][0] + v.y * m[0][1] + v.z * m[0][2],
+            v.x_t * m[1][0] + v.y * m[1][1] + v.z * m[1][2]);
     }
 
 	template <typename T>

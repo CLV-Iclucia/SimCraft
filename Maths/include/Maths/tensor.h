@@ -10,21 +10,33 @@ template<typename T, int N>
 Eigen::Map<Vector<T, N * N>> vectorize(const Matrix<T, N, N> &A) {
   return Eigen::Map<Vector<T, N * N>>(A.data());
 }
-template <typename T, int N>
+template<typename T, int N>
 using FourthOrderTensor = Matrix<T, N * N, N * N>;
-
-template <typename T, int N>
-auto doubleContract(const FourthOrderTensor<T, N>& tensor, const Matrix<T, N, N>& A) {
+template<typename T, int N>
+auto tensorProduct(const Vector<T, N> &a, const Vector<T, N> &b) {
+  return a * b.transpose();
+}
+template<typename T, int N, int M>
+using ThirdOrderTensor = Matrix<T, N * N, M>;
+template <typename T, int N, int M>
+auto submatrix(const ThirdOrderTensor<T, N, M> &tensor, int i) {
+  return Eigen::Map<Matrix<T, N, N>>(tensor.data() + i * N * N);
+}
+template<typename T, int N, int M>
+auto doubleContract(const ThirdOrderTensor<T, N, M> &tensor, const Matrix<T, N, N> &A) {
   return tensor.transpose() * vectorize(A);
 }
-template <typename T, int N, int M>
-using ThirdOrderTensor = Matrix<T, N * N, M>;
-template <typename T>
-Matrix<T, 3, 3> skewt(const Vector<T, 3>& v) {
-  Matrix<T, 3, 3> A;
-  A << 0, -v(2), v(1),
-      v(2), 0, -v(0),
-      -v(1), v(0), 0;
-  return A;
-}}
+template<typename T, int N>
+auto doubleContract(const FourthOrderTensor<T, N> &tensor, const Matrix<T, N, N> &A) {
+  return tensor.transpose() * vectorize(A);
+}
+template<typename T>
+auto determinantGradient(const Matrix<T, 3, 3> &F) {
+  Matrix<T, 3, 3> result;
+  result.col(0) = F.col(1).cross(F.col(2));
+  result.col(1) = F.col(2).cross(F.col(0));
+  result.col(2) = F.col(0).cross(F.col(1));
+  return result;
+}
+}
 #endif //SIMCRAFT_MATHS_INCLUDE_MATHS_TENSOR_H_

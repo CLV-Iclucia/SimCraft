@@ -10,33 +10,30 @@
 #include <fem/tet-mesh.h>
 #include <Core/utils.h>
 namespace fem {
-struct VertexTriangleCCDQuery {
-  Vector<Real, 3> vertex_pos;
-  Vector<Real, 3> vertex_vel;
-  Matrix<Real, 3, 3> triangle_pos;
-  Matrix<Real, 3, 3> triangle_vel;
+struct CCDQuery {
+  Vector<Real, 3> x1;
+  Vector<Real, 3> x2_x1;
+  Vector<Real, 3> x3_x1;
+  Vector<Real, 3> x4_x1;
+  Vector<Real, 3> u1;
+  Vector<Real, 3> u2_u1;
+  Vector<Real, 3> u3_u1;
+  Vector<Real, 3> u4_u1;
 };
-
-struct EdgeEdgeCCDQuery {
-  Matrix<Real, 3, 2> ea_pos;
-  Matrix<Real, 3, 2> ea_vel;
-  Matrix<Real, 3, 2> eb_pos;
-  Matrix<Real, 3, 2> eb_vel;
-};
-struct CollisionInfo {
+struct Contact {
   Vector<Real, 3> pos;
   Matrix<Real, 3, 3> frame;
   Real t;
 };
-std::optional<CollisionInfo> eeCCD(const EdgeEdgeCCDQuery& query, Real dt);
-std::optional<CollisionInfo> vtCCD(const VertexTriangleCCDQuery& query, Real dt);
+std::optional<Contact> eeCCD(const CCDQuery &query, Real toi);
+std::optional<Contact> vtCCD(const CCDQuery &query, Real toi);
 class System;
 class CollisionDetector {
  public:
-  void detect(const System& system, Real dt);
+  void detect(const System &system, Real dt);
  private:
   std::unique_ptr<spatify::LBVH<Real>> lbvh{};
-  tbb::concurrent_vector<CollisionInfo> collisions{};
+  tbb::concurrent_vector<Contact> active_contacts{};
 };
 struct CollisionResolver {
   std::unique_ptr<CollisionDetector> collision_detector;

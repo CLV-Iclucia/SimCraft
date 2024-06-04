@@ -500,8 +500,8 @@ namespace detail
 	) 
     {
         return typename tmat2x4<T>::row_type(
-            v.x * m[0][0] + v.y * m[0][1] + v.z * m[0][2] + v.w * m[0][3],
-            v.x * m[1][0] + v.y * m[1][1] + v.z * m[1][2] + v.w * m[1][3]);
+            v.x_t * m[0][0] + v.y * m[0][1] + v.z * m[0][2] + v.w * m[0][3],
+            v.x_t * m[1][0] + v.y * m[1][1] + v.z * m[1][2] + v.w * m[1][3]);
     }
 
     template <typename T> 

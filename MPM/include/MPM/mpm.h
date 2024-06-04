@@ -5,9 +5,7 @@
 #ifndef SIMCRAFT_MPM_INCLUDE_MPM_H_
 #define SIMCRAFT_MPM_INCLUDE_MPM_H_
 #include <Core/core.h>
-#include <Core/data-structures/grids.h>
-#include <Core/tensor.h>
-#include <Eigen/SparseCore>
+#include <Spatify/grids.h>
 namespace mpm {
 using core::Real;
 using core::Index;
@@ -21,10 +19,7 @@ using core::Vector;
 using core::vector;
 using core::Mat3d;
 using core::Matrix;
-using core::Grid;
-using core::FourthOrderTensor;
-using Eigen::Triplet;
-using Eigen::SparseMatrix;
-using Eigen::VectorXd;
+using spatify::CellCentredGrid;
+using spatify::Array3D;
 }
 #endif // SIMCRAFT_MPM_INCLUDE_MPM_H_

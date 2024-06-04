@@ -16,6 +16,9 @@ foreach(test_src ${test_srcs})
             include/Core/debug.h
             include/Core/cuda-utils.h
             include/Core/log.h
+            include/Core/dynamic-reflection.h
+            include/Core/zip.h
+            tests/zip-test.cc
     )
     target_link_libraries(${test_name} PUBLIC Core gtest gtest_main)
     add_test(NAME ${test_name} CONFIGURATIONS Release COMMAND ${test_name})

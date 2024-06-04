@@ -8,7 +8,8 @@
 #include <Core/core.h>
 #include <Core/properties.h>
 #include <Core/mesh.h>
-#include <Core/aabb.h>
+#include <Core/debug.h>
+#include <Spatify/bbox.h>
 namespace fluid {
 using Index = int;
 using core::Real;
@@ -23,7 +24,8 @@ using core::Vec3d;
 using core::Vector;
 using core::Matrix;
 using core::Mesh;
-using core::AABB;
+using spatify::BBox;
 using core::uint;
+using core::ERROR;
 };
 #endif // SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_CORE_H_

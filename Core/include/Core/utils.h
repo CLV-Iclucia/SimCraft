@@ -112,14 +112,6 @@ Vector<T, Dim> cwiseMax(const Vector<T, Dim> &a, const Vector<T, Dim> &b) {
     result[i] = std::max(a[i], b[i]);
   return result;
 }
-struct QuadraticPolynomial {
-  Real a, b, c;
-};
-bool quadraticSolve(const QuadraticPolynomial& poly, Real &x1, Real &x2);
-struct CubicPolynomial {
-  Real a, b, c, d;
-};
-Real cubicSolve(const CubicPolynomial &poly, Real l, Real r, Real tolerance);
 
 } // namespace core
 // namespace core

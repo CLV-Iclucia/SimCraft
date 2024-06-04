@@ -2,11 +2,9 @@
 // Created by creeper on 23-8-13.
 //
 #include <GLFW/glfw3.h>
-#include <MPM/transfer-stencil.h>
 #include <MPM/mpm-cpu.h>
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
-#include <Core/range-for.h>
 bool show_demo_window = true;
 bool show_another_window = false;
 ImVec4 kClearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);

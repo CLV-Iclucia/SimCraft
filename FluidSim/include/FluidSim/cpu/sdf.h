@@ -210,7 +210,7 @@ class NaiveReconstructor<
     }
 
   private:
-    spatify::NeighbourSearcher<T, 3> ns;
+    spatify::ParticleNeighbourSearcher<T, 3> ns;
 };
 
 void manifold2SDF(int exact_band, spatify::Array3D<int>& closest,

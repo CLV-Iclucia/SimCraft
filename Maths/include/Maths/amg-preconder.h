@@ -20,12 +20,12 @@ struct AlgebraicMultigridPreconditioner {
   AlgebraicMultigridPreconditioner() : m_isInitialized(false) {}
 
   template<typename MatType>
-  AlgebraicMultigridPreconditioner(const MatType &mat) : m_invdiag(mat.cols()) {
+  AlgebraicMultigridPreconditioner(const MatType &mat) {
     compute(mat);
   }
 
-  Index rows() const { return m_invdiag.size(); }
-  Index cols() const { return m_invdiag.size(); }
+  Index rows() const {  }
+  Index cols() const {  }
 
   template<typename MatType>
   AlgebraicMultigridPreconditioner &analyzePattern(const MatType &) {
@@ -34,15 +34,6 @@ struct AlgebraicMultigridPreconditioner {
 
   template<typename MatType>
   AlgebraicMultigridPreconditioner &factorize(const MatType &mat) {
-    m_invdiag.resize(mat.cols());
-    for (int j = 0; j < mat.outerSize(); ++j) {
-      typename MatType::InnerIterator it(mat, j);
-      while (it && it.index() != j) ++it;
-      if (it && it.index() == j && it.value() != Scalar(0))
-        m_invdiag(j) = Scalar(1) / it.value();
-      else
-        m_invdiag(j) = Scalar(1);
-    }
     m_isInitialized = true;
     return *this;
   }
@@ -54,7 +45,7 @@ struct AlgebraicMultigridPreconditioner {
 
   template<typename Rhs, typename Dest>
   void _solve(const Rhs &b, Dest &x) const {
-    x = m_invdiag.array() * b.array();
+
   }
 
   template<typename Rhs>
@@ -68,6 +59,7 @@ struct AlgebraicMultigridPreconditioner {
 
  protected:
   bool m_isInitialized;
+
 };
 template<typename MatrixType, int UpLo>
 using AmgPcgSolver = Eigen::ConjugateGradient<MatrixType,

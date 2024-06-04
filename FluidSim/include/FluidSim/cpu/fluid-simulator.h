@@ -7,6 +7,7 @@
 #include <Core/animation.h>
 #include <Core/timer.h>
 #include <Core/rand-gen.h>
+#include <Core/debug.h>
 #include <Spatify/grids.h>
 #include <Spatify/arrays.h>
 #include <FluidSim/fluid-sim.h>
@@ -28,7 +29,7 @@ class FluidSimulator final : public FluidComputeBackend {
   FluidSimulator(int n, const Vec3d &size, const Vec3i &resolution)
       : nParticles(n), uw(resolution + Vec3i(1, 0, 0)),
         vw(resolution + Vec3i(0, 1, 0)), ww(resolution + Vec3i(0, 0, 1)),
-        pg(resolution) {
+        pg(resolution), debugger("Fluid Simulation") {
     m_particles.positions.resize(n);
     // initialize grids
     ug = std::make_unique<FaceCentredGrid<Real, Real, 3, 0>>(resolution, size);
@@ -48,6 +49,7 @@ class FluidSimulator final : public FluidComputeBackend {
     fluidSurface = std::make_unique<SDF<3>>(resolution, size);
     fluidSurfaceBuf = std::make_unique<SDF<3>>(resolution, size);
     colliderSdf = std::make_unique<SDF<3>>(resolution, size);
+    debugger.activate();
     assert(
         ug->gridSpacing() == vg->gridSpacing() && vg->gridSpacing() == wg->
             gridSpacing());
@@ -280,6 +282,7 @@ class FluidSimulator final : public FluidComputeBackend {
   std::unique_ptr<SDF<3>> fluidSurface{}, fluidSurfaceBuf{}, colliderSdf{};
   std::unique_ptr<ProjectionSolver3D> projector{};
   std::unique_ptr<HybridAdvectionSolver3D> advector{};
+  core::Debugger debugger;
 };
 } // namespace fluid::cpu
 #endif  // SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_FLUID_SIMULATOR_H_
