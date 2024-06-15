@@ -33,6 +33,8 @@ static Real robustCubicNewton(const CubicPolynomial &poly, Real x, Real l,
   while (true) {
     Real f = evalCubic(poly, x);
     Real df = evalQuadratic({.a = 3 * a, .b = 2 * b, .c = c}, x);
+    if (df == 0.0) [[unlikely]]
+      return x;
     Real dx = -f / df;
     x = core::clamp(x + dx, l, r);
     if (std::abs(dx) < tolerance)

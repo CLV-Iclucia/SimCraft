@@ -2,7 +2,6 @@
 #define OGL_RENDER_INCLUDE_OGL_RENDER_SHADER_PROG_H_
 
 #include <glad/glad.h>
-
 #include <fstream>
 #include <ios>
 #include <iostream>
@@ -15,88 +14,26 @@
 #include <glm/glm.hpp>
 #include <glm/core/type.hpp>
 #include <vector>
+#include <filesystem>
+#include <format>
+#include <ogl-render/ogl-ctx.h>
 namespace opengl {
 
+struct ShaderProgramConfig {
+  std::filesystem::path vertex_shader_path;
+  std::filesystem::path fragment_shader_path;
+  std::filesystem::path geometry_shader_path;
+};
+
 // RAII shader program
-struct ShaderProg {
+struct ShaderProg : Resource {
   GLuint id;
   // create shader program from vertex and fragment shader source
-  ShaderProg(const char *vs_path, const char *fs_path, const char *gs_path = nullptr) {
-    // 1. retrieve the vertex/fragment source code from filePath
-    std::string vertexCode;
-    std::string fragmentCode;
-    std::string geometryCode;
-    std::ifstream vShaderFile;
-    std::ifstream fShaderFile;
-    std::ifstream gShaderFile;
-    vShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    gShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    try {
-      vShaderFile.open(vs_path);
-      fShaderFile.open(fs_path);
-      std::stringstream vShaderStream, fShaderStream;
-      vShaderStream << vShaderFile.rdbuf();
-      fShaderStream << fShaderFile.rdbuf();
-      vShaderFile.close();
-      fShaderFile.close();
-      vertexCode = vShaderStream.str();
-      fragmentCode = fShaderStream.str();
-      if (gs_path != nullptr) {
-        gShaderFile.open(gs_path);
-        std::stringstream gShaderStream;
-        gShaderStream << gShaderFile.rdbuf();
-        gShaderFile.close();
-        geometryCode = gShaderStream.str();
-      }
-    }
-    catch (std::ifstream::failure &e) {
-      std::cout << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ: " << e.what() << std::endl;
-    }
-    const char *vShaderCode = vertexCode.c_str();
-    const char *fShaderCode = fragmentCode.c_str();
-    unsigned int vertex, fragment;
-    vertex = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertex, 1, &vShaderCode, nullptr);
-    glCompileShader(vertex);
-    checkCompileErrors(vertex, "VERTEX");
-    // fragment Shader
-    fragment = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragment, 1, &fShaderCode, nullptr);
-    glCompileShader(fragment);
-    checkCompileErrors(fragment, "FRAGMENT");
-    // if geometry shader is given, compile geometry shader
-    unsigned int geometry;
-    if (gs_path != nullptr) {
-      const char *gShaderCode = geometryCode.c_str();
-      geometry = glCreateShader(GL_GEOMETRY_SHADER);
-      glShaderSource(geometry, 1, &gShaderCode, nullptr);
-      glCompileShader(geometry);
-      checkCompileErrors(geometry, "GEOMETRY");
-    }
-    // shader Program
-    id = glCreateProgram();
-    glAttachShader(id, vertex);
-    glAttachShader(id, fragment);
-    if (gs_path != nullptr)
-      glAttachShader(id, geometry);
-    glLinkProgram(id);
-    checkCompileErrors(id, "PROGRAM");
-    glDeleteShader(vertex);
-    glDeleteShader(fragment);
-    if (gs_path != nullptr)
-      glDeleteShader(geometry);
-    glGetProgramiv(id, GL_ACTIVE_UNIFORMS, &uniform_count);
-    glGetProgramiv(id, GL_ACTIVE_ATTRIBUTES, &attribute_count);
-    initAttributeHandles();
-    initUniformHandles();
-  }
+  explicit ShaderProg(ShaderProgramConfig config);
   std::unordered_map<std::string, GLuint> uniform_handles;
   std::unordered_map<std::string, GLuint> attribute_handles;
-  void initUniformHandles();
-  void initAttributeHandles();
 
-  void getActiveAttributes(std::vector<std::string>& attribute_names) const {
+  void activeAttributes(std::vector<std::string> &attribute_names) const {
     GLint num_attribs;
     glGetProgramiv(id, GL_ACTIVE_ATTRIBUTES, &num_attribs);
     char name[256];
@@ -110,9 +47,6 @@ struct ShaderProg {
   }
 
   void use() const { glUseProgram(id); }
-  static void unuse() {
-    glUseProgram(0);
-  }
   void setInt(const std::string &name, int value) {
     glUniform1i(uniform_handles[name], value);
   }
@@ -147,27 +81,32 @@ struct ShaderProg {
     glUniformMatrix4fv(uniform_handles[name], 1, GL_FALSE, &mat[0][0]);
   }
 
-
   ~ShaderProg() { glDeleteProgram(id); }
  private:
   int uniform_count;
   int attribute_count;
-  static void checkCompileErrors(GLuint shader, std::string type) {
+  void initUniformHandles();
+  void initAttributeHandles();
+  static void checkCompileErrors(GLuint shader, const std::string &type) {
     GLint success;
     GLchar infoLog[1024];
     if (type != "PROGRAM") {
       glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
       if (!success) {
         glGetShaderInfoLog(shader, 1024, nullptr, infoLog);
-        std::cout << "ERROR::SHADER_COMPILATION_ERROR of type: " << type << "\n" << infoLog
-                  << "\n -- --------------------------------------------------- -- " << std::endl;
+        std::cout << std::format(
+            "ERROR::SHADER_COMPILATION_ERROR of type: {}\n{}\n -------------------------------------------------------\n",
+            type,
+            infoLog) << std::endl;
       }
     } else {
       glGetProgramiv(shader, GL_LINK_STATUS, &success);
       if (!success) {
         glGetProgramInfoLog(shader, 1024, nullptr, infoLog);
-        std::cout << "ERROR::PROGRAM_LINKING_ERROR of type: " << type << "\n" << infoLog
-                  << "\n -- --------------------------------------------------- -- " << std::endl;
+        std::cout << std::format(
+            "ERROR::PROGRAM_LINKING_ERROR of type: {}\n{}\n -------------------------------------------------------\n",
+            type,
+            infoLog) << std::endl;
       }
     }
   }

@@ -4,9 +4,9 @@
 
 #ifndef SIMCRAFT_OGLRENDER_INCLUDE_OGL_RENDER_GL_UTILS_H_
 #define SIMCRAFT_OGLRENDER_INCLUDE_OGL_RENDER_GL_UTILS_H_
-
 #include <GL/gl.h>
 #include <iostream>
+#include <format>
 #define glCheckError(func) \
   do { \
     func;                   \
@@ -34,7 +34,7 @@ inline void gl_check_error(const char *function_name, const char *file, int line
         default:error = "UNKNOWN_ERROR";
           break;
       }
-      std::cerr << "OpenGL Error: " << error << " in " << function_name << " " << file << ":" << line << std::endl;
+      std::cerr << std::format("OpenGL error in function {} at {}:{}: {}", function_name, file, line, error) << std::endl;
       exit(1);
     }
 }

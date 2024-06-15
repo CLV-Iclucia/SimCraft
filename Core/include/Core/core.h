@@ -34,26 +34,26 @@ template <typename T, int Dim> struct TVector {
   static_assert(Dim == 2 || Dim == 3 || Dim == 4, "Dim must be 2, 3 or 4");
 };
 template <typename T> struct TVector<T, 2> {
-  using type = glm::detail::tvec2<T>;
+  using type = glm::tvec2<T>;
 };
 template <typename T> struct TVector<T, 3> {
-  using type = glm::detail::tvec3<T>;
+  using type = glm::tvec3<T>;
 };
 template <typename T> struct TVector<T, 4> {
-  using type = glm::detail::tvec4<T>;
+  using type = glm::tvec4<T>;
 };
 template <typename T, int Dim> using Vector = typename TVector<T, Dim>::type;
 template <typename T, int Dim> struct TMatrix {
   static_assert(Dim == 2 || Dim == 3 || Dim == 4, "Dim must be 2, 3 or 4");
 };
 template <typename T> struct TMatrix<T, 2> {
-  using type = glm::detail::tmat2x2<T>;
+  using type = glm::tmat2x2<T>;
 };
 template <typename T> struct TMatrix<T, 3> {
-  using type = glm::detail::tmat3x3<T>;
+  using type = glm::tmat3x3<T>;
 };
 template <typename T> struct TMatrix<T, 4> {
-  using type = glm::detail::tmat4x4<T>;
+  using type = glm::tmat4x4<T>;
 };
 template <typename T, int Dim> using Matrix = typename TMatrix<T, Dim>::type;
 enum Device {

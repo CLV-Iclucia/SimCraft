@@ -8,7 +8,7 @@
 namespace fem::ipc {
 struct System;
 struct Constraint {
-  System *system;
+  std::reference_wrapper<System> system;
   enum Type {
     EdgeEdge,
     VertexTriangle

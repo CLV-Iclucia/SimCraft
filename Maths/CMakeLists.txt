@@ -2,7 +2,7 @@ project(Maths LANGUAGES CXX)
 file(GLOB_RECURSE srcs CONFIGURE_DEPENDS src/*.cc src/*.cpp include/*.h)
 add_library(Maths STATIC ${srcs})
 target_include_directories(Maths PUBLIC include ${EIGEN3_INCLUDE_DIR})
-target_link_libraries(Maths PUBLIC Eigen3 Core)
+target_link_libraries(Maths PUBLIC Eigen3::Eigen Core)
 
 file(GLOB_RECURSE test_srcs CONFIGURE_DEPENDS tests/*.cc)
 

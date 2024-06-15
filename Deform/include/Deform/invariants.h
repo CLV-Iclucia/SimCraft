@@ -5,12 +5,14 @@
 #ifndef SIMCRAFT_DEFORM_INCLUDE_DEFORM_INVARIANTS_H_
 #define SIMCRAFT_DEFORM_INCLUDE_DEFORM_INVARIANTS_H_
 #include <Deform/types.h>
-#include <Deform/polar-decomp.h>
 #include <Deform/deformation-gradient.h>
 #include <Core/properties.h>
+#include <Maths/tensor.h>
+#include <Maths/linalg-utils.h>
 namespace deform {
-struct EigenMatrixSigmas : core::Singleton {
-  std::array<Matrix<Real, 3>, 3> eigenMatrixSigmas;
+template<typename T>
+struct EigenMatrixSigmas : core::NonCopyable {
+  std::array<Matrix<T, 3, 3>, 3> eigenMatrixSigmas;
   EigenMatrixSigmas() {
     eigenMatrixSigmas[0].setZero();
     eigenMatrixSigmas[0](0, 1) = -1.0;
@@ -27,55 +29,57 @@ struct EigenMatrixSigmas : core::Singleton {
   }
 };
 
-const EigenMatrixSigmas &eigenMatrixSigmas() {
-  static EigenMatrixSigmas instance;
+template<typename T>
+const EigenMatrixSigmas<T> &eigenMatrixSigmas() {
+  static EigenMatrixSigmas<T> instance;
   return instance;
 }
 
 template<typename T>
 Vector<T, 3> isotropicInvariants(const DeformationGradient<T, 3> &dg) {
-  return {dg.S().trace(), (dg.S() * dg.S()).trace(), dg.S().determinant()};
+  return {dg.S().trace(), (dg.F().transpose() * dg.F()).trace(), dg.F().determinant()};
 }
 
 template<typename T>
-Matrix<T, 3> gradientIi(const DeformationGradient<T, 3> &dg) {
+Matrix<T, 3, 3> gradientIi(const DeformationGradient<T, 3> &dg) {
   return dg.R();
 }
 
 template<typename T>
-Matrix<T, 3> gradientIii(const DeformationGradient<T, 3> &dg) {
+Matrix<T, 3, 3> gradientIii(const DeformationGradient<T, 3> &dg) {
   return 2.0 * dg.F();
 }
 
 template<typename T>
-Matrix<T, 3> gradientIiii(const DeformationGradient<T, 3> &dg) {
+Matrix<T, 3, 3> gradientIiii(const DeformationGradient<T, 3> &dg) {
   return maths::determinantGradient(dg.F());
 }
 template<typename T>
-FourthOrderTensor<T, 3> hessianIi(const DeformationGradient<T, 3> &dg) {
+Matrix<T, 9, 9> hessianIi(const DeformationGradient<T, 3> &dg) {
   std::array<Real, 3> lambda{2.0 / (dg.Sigma(0) + dg.Sigma(1)), 2.0 / (dg.Sigma(1) + dg.Sigma(2)),
                              2.0 / (dg.Sigma(0) + dg.Sigma(2))};
-  FourthOrderTensor<T, 3> pRpF;
+  Matrix<T, 9, 9> pRpF;
+  pRpF.setZero();
   for (int i = 0; i < 3; i++) {
-    auto Q = dg.U() * eigenMatrixSigmas().S(i) * dg.V().transpose();
-    pRpF += 0.5 * lambda[i] * vectorize(Q) * vectorize(Q).transpose();
+    Matrix<Real, 3, 3> Q = dg.U() * eigenMatrixSigmas<T>().S(i) * dg.V().transpose();
+    pRpF += 0.5 * lambda[i] * maths::vectorize(Q) * maths::vectorize(Q).transpose();
   }
   return pRpF;
 }
 template<typename T>
-FourthOrderTensor<T, 3> hessianIii() {
-  return 2 * FourthOrderTensor<T, 3>::Identity();
+Matrix<T, 9, 9> hessianIii() {
+  return 2 * Matrix<T, 9, 9>::Identity();
 }
 template<typename T>
-FourthOrderTensor<T, 3> hessianIiii(const DeformationGradient<T, 3> &dg) {
-  FourthOrderTensor<T, 3> result{};
+Matrix<T, 9, 9> hessianIiii(const DeformationGradient<T, 3> &dg) {
+  Matrix<T, 9, 9> result{};
   result.setZero();
-  result.block<3, 3>(0, 0) = skewt(dg.F().col(2));
-  result.block<3, 3>(6, 0) = -skewt(dg.F().col(1));
-  result.block<3, 3>(0, 3) = -skewt(dg.F().col(2));
-  result.block<3, 3>(6, 3) = skewt(dg.F().col(0));
-  result.block<3, 3>(0, 6) = skewt(dg.F().col(1));
-  result.block<3, 3>(3, 6) = -skewt(dg.F().col(0));
+  result.template block<3, 3>(3, 0) = maths::skewt(Vector<T, 3>(dg.F().col(2)));
+  result.template block<3, 3>(6, 0) = -maths::skewt(Vector<T, 3>(dg.F().col(1)));
+  result.template block<3, 3>(0, 3) = -maths::skewt(Vector<T, 3>(dg.F().col(2)));
+  result.template block<3, 3>(6, 3) = maths::skewt(Vector<T, 3>(dg.F().col(0)));
+  result.template block<3, 3>(0, 6) = maths::skewt(Vector<T, 3>(dg.F().col(1)));
+  result.template block<3, 3>(3, 6) = -maths::skewt(Vector<T, 3>(dg.F().col(0)));
   return result;
 }
 

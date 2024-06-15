@@ -7,7 +7,11 @@
 #include <fem/system.h>
 namespace fem {
 struct Integrator {
-  virtual void step(System& system, Real dt) = 0;
+  virtual void step(Real dt) = 0;
+  explicit Integrator(System &system_) : system_to_integrate(system_) {}
+  std::reference_wrapper<System> system_to_integrate;
+  [[nodiscard]] System& system() const { return system_to_integrate.get(); }
+  virtual ~Integrator() = default;
 };
 
 }

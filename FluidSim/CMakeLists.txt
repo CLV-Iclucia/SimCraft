@@ -45,11 +45,10 @@ foreach(test_src ${test_srcs})
           ../Maths/include/Maths/sparse-matrix-builder.h
           ../Deform/include/Deform/strain-energy-density.h
           ../Deform/include/Deform/types.h
-          ../Deform/apps/deform.cc
+          ../Deform/apps/deform-explore.cc
           ../FEM/apps/fem.cc
           ../Maths/include/Maths/types.h
           ../Maths/tests/test-tensor.cc
-          ../Maths/src/amg.cc
           ../FEM/include/fem/types.h
           ../FEM/include/fem/integrator.h
           ../FEM/include/fem/tet-mesh.h

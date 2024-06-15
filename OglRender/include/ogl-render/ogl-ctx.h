@@ -9,9 +9,6 @@
 #include <unordered_map>
 #include <string>
 namespace opengl {
-#ifndef offsetof
-#define offsetof(s, m) ((size_t)&(((s*)0)->m))
-#endif
 struct ShaderProg;
 
 struct NonCopyable {
@@ -20,14 +17,9 @@ struct NonCopyable {
   NonCopyable &operator=(const NonCopyable &) = delete;
 };
 
-template<typename Derived>
-struct OpenGLHandle : NonCopyable {
-  GLuint id;
-  OpenGLHandle() = default;
-  OpenGLHandle(OpenGLHandle&& other) {
-    id = other.id;
-    other.id = 0;
-  }
+struct Resource {
+  Resource() = default;
+  Resource(Resource&&) = default;
 };
 
 struct VertexBufferObj : NonCopyable {

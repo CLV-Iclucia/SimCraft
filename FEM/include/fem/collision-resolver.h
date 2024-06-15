@@ -22,7 +22,6 @@ struct CCDQuery {
 };
 struct Contact {
   Vector<Real, 3> pos;
-  Matrix<Real, 3, 3> frame;
   Real t;
 };
 std::optional<Contact> eeCCD(const CCDQuery &query, Real toi);
@@ -30,7 +29,7 @@ std::optional<Contact> vtCCD(const CCDQuery &query, Real toi);
 class System;
 class CollisionDetector {
  public:
-  void detect(const System &system, Real dt);
+  void detect(const System &system, const VecXd& p, Real dt);
  private:
   std::unique_ptr<spatify::LBVH<Real>> lbvh{};
   tbb::concurrent_vector<Contact> active_contacts{};

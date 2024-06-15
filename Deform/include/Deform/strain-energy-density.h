@@ -7,12 +7,14 @@
 #include <Deform/types.h>
 #include <Deform/invariants.h>
 #include <Deform/deformation-gradient.h>
+#include <Maths/svd.h>
 namespace deform {
 template<typename T>
 struct StrainEnergyDensity {
   virtual T computeEnergyDensity(const DeformationGradient<T, 3> &dg) const = 0;
-  virtual Matrix<T, 3> computeEnergyGradient(const DeformationGradient<T, 3> &dg) const = 0;
-  virtual FourthOrderTensor<T, 3> computeEnergyHessian(const DeformationGradient<T, 3> &dg) const = 0;
+  virtual Matrix<T, 3, 3> computeEnergyGradient(const DeformationGradient<T, 3> &dg) const = 0;
+  virtual Matrix<T, 9, 9> computeEnergyHessian(const DeformationGradient<T, 3> &dg) const = 0;
+  virtual Matrix<T, 9, 9> filteredEnergyHessian(const DeformationGradient<T, 3> &dg) const = 0;
 };
 
 template<typename T>
@@ -20,23 +22,37 @@ struct StableNeoHookean final : StrainEnergyDensity<T> {
   T mu, lambda;
   StableNeoHookean(T mu, T lambda) : mu(mu), lambda(lambda) {}
   T computeEnergyDensity(const DeformationGradient<T, 3> &dg) const override {
-    auto I = isotropicInvariants(dg.F());
-    return 0.5 * mu * (I(0) - 3.0) - mu * (I(2) - 1.0) + 0.5 * lambda * (I(2) - 1.0) * (I(2) - 1.0);
+    auto I = isotropicInvariants(dg);
+    return 0.5 * mu * (I(1) - 3.0) - mu * (I(2) - 1.0) + 0.5 * lambda * (I(2) - 1.0) * (I(2) - 1.0);
   }
-  // pEpIi = 0.5 * mu
+  // pEpIii = 0.5 * mu
   // pEpIiii = -mu + lambda * (I(2) - 1.0)
-  // p2EpIi2 = 0
+  // p2EpIii2 = 0
   // p2EpIiii2 = lambda
-  Matrix<T, 3> computeEnergyGradient(const DeformationGradient<T, 3> &dg) const override {
-    auto I = isotropicInvariantsUsingS(dg.S());
-    auto pIipF = gradientIi<T, true>(dg.R());
-    auto pIiiipF = gradientIii<T>(dg.F());
-    return 0.5 * mu * pIipF - mu * pIiiipF + lambda * (I(2) - 1.0) * pIiiipF;
+  Matrix<T, 3, 3> computeEnergyGradient(const DeformationGradient<T, 3> &dg) const override {
+    auto I = isotropicInvariants(dg);
+    auto pIiipF = gradientIii<T>(dg);
+    auto pIiiipF = gradientIiii<T>(dg);
+    return 0.5 * mu * pIiipF - mu * pIiiipF + lambda * (I(2) - 1.0) * pIiiipF;
   }
-  FourthOrderTensor<T, 3> computeEnergyHessian(const DeformationGradient<T, 3> &dg) const override {
-    auto I = isotropicInvariants(dg.F());
-    return lambda * maths::tensorProduct(maths::vectorize(hessianIi<T>(dg)))
+  Matrix<T, 9, 9> computeEnergyHessian(const DeformationGradient<T, 3> &dg) const override {
+    auto I = isotropicInvariants(dg);
+    Vector<T, 9> vec_giii = maths::vectorize(gradientIiii<T>(dg));
+    return lambda * vec_giii * vec_giii.transpose() + 0.5 * mu * hessianIii<T>()
         + ((I(2) - 1.0) * lambda - mu) * hessianIiii<T>(dg);
+  }
+  Matrix<T, 9, 9> filteredEnergyHessian(const DeformationGradient<T, 3> &dg) const override {
+    auto I = isotropicInvariants(dg);
+    Vector<T, 9> vec_giii = maths::vectorize(gradientIiii<T>(dg));
+    Matrix<T, 9, 9> H = lambda * vec_giii * vec_giii.transpose() + 0.5 * mu * hessianIii<T>()
+        + ((I(2) - 1.0) * lambda - mu) * hessianIiii<T>(dg);
+    // compute eigenvalues
+    Eigen::SelfAdjointEigenSolver<Matrix<T, 9, 9>> es(H);
+    Vector<T, 9> eigenvalues = es.eigenvalues();
+    Matrix<T, 9, 9> eigenvectors = es.eigenvectors();
+    for (int i = 0; i < 9; i++)
+      eigenvalues(i) = std::abs(eigenvalues(i));
+    return eigenvectors * eigenvalues.asDiagonal() * eigenvectors.transpose();
   }
 };
 
@@ -45,11 +61,20 @@ struct ARAP final : StrainEnergyDensity<T> {
   T computeEnergyDensity(const DeformationGradient<T, 3> &dg) const override {
     return (dg.F() - dg.R()).squaredNorm();
   }
-  Matrix<T, 3> computeEnergyGradient(const DeformationGradient<T, 3> &dg) const override {
+  Matrix<T, 3, 3> computeEnergyGradient(const DeformationGradient<T, 3> &dg) const override {
     return 2.0 * (dg.F() - dg.R());
   }
-  FourthOrderTensor<T, 3> computeEnergyHessian(const DeformationGradient<T, 3> &dg) const override {
+  Matrix<T, 9, 9> computeEnergyHessian(const DeformationGradient<T, 3> &dg) const override {
     return hessianIii<T>() - 2 * hessianIi(dg);
+  }
+  Matrix<T, 9, 9> filteredEnergyHessian(const DeformationGradient<T, 3> &dg) const override {
+    auto H = hessianIii<T>() - 2 * hessianIi(dg);
+    Matrix<T, 9, 9> U, V;
+    Vector<T, 9> S;
+    maths::SVD(H, U, S, V);
+    for (int i = 0; i < 9; i++)
+      S(i) = std::abs(S(i));
+    return U * S.asDiagonal() * V.transpose();
   }
 };
 }

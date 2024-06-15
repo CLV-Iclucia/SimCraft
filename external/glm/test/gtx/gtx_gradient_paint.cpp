@@ -1,16 +1,7 @@
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// OpenGL Mathematics Copyright (c) 2005 - 2012 G-Truc Creation (www.g-truc.net)
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// Created : 2011-10-13
-// Updated : 2011-10-13
-// Licence : This source is under MIT licence
-// File    : test/gtx/gradient_paint.cpp
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-#include <glm/glm.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/gradient_paint.hpp>
 
-int test_radialGradient()
+static int test_radialGradient()
 {
 	int Error = 0;
 	
@@ -20,7 +11,7 @@ int test_radialGradient()
 	return Error;
 }
 
-int test_linearGradient()
+static int test_linearGradient()
 {
 	int Error = 0;
 

@@ -10,11 +10,8 @@ struct NonCopyable {
   NonCopyable(const NonCopyable &) = delete;
   NonCopyable &operator=(const NonCopyable &) = delete;
 };
-
-struct Singleton : NonCopyable {
-  Singleton() = default;
-  Singleton(const Singleton &) = delete;
-  Singleton &operator=(const Singleton &) = delete;
+struct Resource {
+  Resource(Resource &&) = delete;
 };
 }
 #endif // SIMCRAFT_CORE_INCLUDE_CORE_PROPERTIES_H_
