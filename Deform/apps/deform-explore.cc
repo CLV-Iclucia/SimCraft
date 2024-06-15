@@ -30,7 +30,6 @@ template<int Dim>
 bool checkSymmetric(const Eigen::Matrix<Real, Dim, Dim> &A) {
   return (A - A.transpose()).norm() < 1e-6;
 }
-
 Vector<Real, 12> tetEnergyGradient(const StableNeoHookean<Real> &energy,
                                    const DeformationGradient<Real, 3> &dg) {
   auto gradient_F = energy.computeEnergyGradient(dg);
@@ -41,11 +40,20 @@ Vector<Real, 12> tetEnergyGradient(const StableNeoHookean<Real> &energy,
 
 Matrix<Real, 12, 12> tetEnergyHessian(const StableNeoHookean<Real> &energy,
                                       const DeformationGradient<Real, 3> &dg) {
-  auto hessian_F = energy.filteredEnergyHessian(dg);
+  auto hessian_F = energy.computeEnergyHessian(dg);
   auto res = maths::SVD(hessian_F);
   auto p_F_p_x = dg.gradient();
   auto hessian_x = p_F_p_x.transpose() * hessian_F * p_F_p_x;
-  return hessian_x;
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<Real, 12, 12>> es(hessian_x);
+
+  Eigen::MatrixXd DiagEval = es.eigenvalues().real().asDiagonal();
+  Eigen::MatrixXd Evec = es.eigenvectors().real();
+
+  for (int i = 0; i < 12; ++i)
+    if (es.eigenvalues()[i] < 0.0)
+      DiagEval(i,i) = std::abs(es.eigenvalues()[i]);
+
+  return Evec * DiagEval * Evec.transpose();
 }
 
 Matrix<Real, 3, 3> tetDs(const Vector<Real, 12> &x) {
@@ -64,7 +72,6 @@ void tetElasticityOptimize(const Vector<Real, 3> &a,
   StableNeoHookean<Real> energy(0.1, 1.0);
   Vector<Real, 12> x;
   x << a, b, c, d;
-  dg.updateCurrentConfig(Matrix<Real, 3, 3>::Identity());
   dg.updateCurrentConfig(tetDs(x));
   // one step
   Real E_prev = energy.computeEnergyDensity(dg);
@@ -75,7 +82,7 @@ void tetElasticityOptimize(const Vector<Real, 3> &a,
   while (true) {
     auto gradient_x = tetEnergyGradient(energy, dg);
     auto hessian_x = tetEnergyHessian(energy, dg);
-    Vector<Real, 12> p = -gradient_x;
+    Vector<Real, 12> p = -hessian_x.ldlt().solve(gradient_x);
     Real alpha = 1.0;
     Real E;
     Vector<Real, 12> x_new;
@@ -85,9 +92,9 @@ void tetElasticityOptimize(const Vector<Real, 3> &a,
       x_new = x + alpha * p;
       dg.updateCurrentConfig(tetDs(x_new));
       E = energy.computeEnergyDensity(dg);
+      if (alpha < 1e-8) break;
       alpha *= 0.5;
-      std::cout << E << " " << E_prev << " " << alpha << '\n';
-    } while (E > E_prev);
+    } while (E > E_prev + 1e-8 * g_dot_p);
     x = x_new;
     E_prev = E;
     std::cout << dg.Sigma(0) << ", " << dg.Sigma(1) << ", " << dg.Sigma(2) << '\n';
