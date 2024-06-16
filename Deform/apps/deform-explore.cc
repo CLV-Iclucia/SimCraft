@@ -69,7 +69,7 @@ void tetElasticityOptimize(const Vector<Real, 3> &a,
                            const Vector<Real, 3> &c,
                            const Vector<Real, 3> &d) {
   DeformationGradient<Real, 3> dg(Matrix<Real, 3, 3>::Identity());
-  StableNeoHookean<Real> energy(0.1, 1.0);
+  StableNeoHookean<Real> energy(ElasticityParameters<Real>{1e4, 0.49});
   Vector<Real, 12> x;
   x << a, b, c, d;
   dg.updateCurrentConfig(tetDs(x));
@@ -79,10 +79,14 @@ void tetElasticityOptimize(const Vector<Real, 3> &a,
   std::cout << dg.Sigma(0) << ", " << dg.Sigma(1) << ", " << dg.Sigma(2) << '\n';
 
   std::cout << "----------------------------\n";
+  int iter = 0;
   while (true) {
     auto gradient_x = tetEnergyGradient(energy, dg);
     auto hessian_x = tetEnergyHessian(energy, dg);
-    Vector<Real, 12> p = -hessian_x.ldlt().solve(gradient_x);
+    Vector<Real, 12> p;
+    if (iter > 10)
+      p = -hessian_x.ldlt().solve(gradient_x);
+    else p = -gradient_x;
     Real alpha = 1.0;
     Real E;
     Vector<Real, 12> x_new;
@@ -94,9 +98,10 @@ void tetElasticityOptimize(const Vector<Real, 3> &a,
       E = energy.computeEnergyDensity(dg);
       if (alpha < 1e-8) break;
       alpha *= 0.5;
-    } while (E > E_prev + 1e-8 * g_dot_p);
+    } while (E > E_prev + 1e-3 * alpha * g_dot_p);
     x = x_new;
     E_prev = E;
+    iter++;
     std::cout << dg.Sigma(0) << ", " << dg.Sigma(1) << ", " << dg.Sigma(2) << '\n';
     std::cout << "----------------------------\n";
     getchar();
@@ -104,8 +109,8 @@ void tetElasticityOptimize(const Vector<Real, 3> &a,
 }
 int main() {
   Vector<Real, 3> a(0, 0, 0);
-  Vector<Real, 3> b(-2, 0, 0);
-  Vector<Real, 3> c(0, 10, 0);
-  Vector<Real, 3> d(0, 0, 2);
+  Vector<Real, 3> b(1, 0, 0);
+  Vector<Real, 3> c(0, 1, 0);
+  Vector<Real, 3> d(0, 0, -1);
   tetElasticityOptimize(a, b, c, d);
 }

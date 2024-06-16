@@ -35,7 +35,7 @@ struct with_source_location {
  public:
   template<typename U>
   requires std::constructible_from<T, U>
-  consteval explicit with_source_location(U &&inner, std::source_location loc = std::source_location::current())
+  consteval with_source_location(U &&inner, std::source_location loc = std::source_location::current())
       : inner(std::forward<U>(inner)), loc(loc) {}
   constexpr T const &format() const { return inner; }
   [[nodiscard]] constexpr std::source_location const &location() const { return loc; }
@@ -53,15 +53,14 @@ inline std::string_view levelString(LogLevel level) {
 #undef SWITCH_CASE_ENTRY
 
 inline std::string message(LogLevel level, std::string_view msg, const std::source_location &loc) {
-//  std::chrono::zoned_time now{std::chrono::current_zone(), std::chrono::high_resolution_clock::now()};
-//  return std::format("{} {}:{} [Thread {}] [{}] {}\n",
-//                     now,
-//                     loc.file_name(),
-//                     loc.line(),
-//                     std::hash<std::thread::id>{}(std::this_thread::get_id()),
-//                     levelString(level),
-//                     msg);
-return {"not implemented"};
+  std::chrono::zoned_time now{std::chrono::current_zone(), std::chrono::high_resolution_clock::now()};
+  return std::format("{} {}:{} [Thread {}] [{}] {}\n",
+                     now,
+                     loc.file_name(),
+                     loc.line(),
+                     std::hash<std::thread::id>{}(std::this_thread::get_id()),
+                     levelString(level),
+                     msg);
 }
 
 template<typename... Args>

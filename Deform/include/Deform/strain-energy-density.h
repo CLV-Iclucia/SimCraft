@@ -18,9 +18,21 @@ struct StrainEnergyDensity {
 };
 
 template<typename T>
+struct ElasticityParameters {
+  T E, nu;
+};
+
+template<typename T>
 struct StableNeoHookean final : StrainEnergyDensity<T> {
   T mu, lambda;
   StableNeoHookean(T mu, T lambda) : mu(mu), lambda(lambda) {}
+  explicit StableNeoHookean(ElasticityParameters<T> params) {
+    auto [E, nu] = params;
+    auto mu_ = E / (2.0 * (1.0 + nu));
+    auto lambda_ = E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu));
+    mu = 0.4 / 0.3 * mu_;
+    lambda = lambda_ + 0.5 / 0.6 * mu_;
+  }
   T computeEnergyDensity(const DeformationGradient<T, 3> &dg) const override {
     auto I = isotropicInvariants(dg);
     return 0.5 * mu * (I(1) - 3.0) - mu * (I(2) - 1.0) + 0.5 * lambda * (I(2) - 1.0) * (I(2) - 1.0);
