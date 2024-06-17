@@ -2,8 +2,8 @@
   "name": "sim-craft",
   "version": "1.0.0",
   "dependencies": [
-    "glad",
     "eigen",
-    "glfw"
+    "glfw",
+    "tbb"
   ]
 }

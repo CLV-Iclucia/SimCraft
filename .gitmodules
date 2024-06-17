@@ -1,0 +1,9 @@
+[submodule "Spatify"]
+	path = Spatify
+	url = git@github.com:CLV-Iclucia/Spatify.git
+[submodule "external/glm"]
+	path = external/glm
+	url = https://github.com/icaven/glm.git
+[submodule "external/imgui-cmake"]
+	path = external/imgui-cmake
+	url = git@github.com:CLV-Iclucia/imgui-cmake.git

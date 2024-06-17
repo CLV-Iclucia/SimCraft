@@ -6,9 +6,11 @@ project(SimCraft)
 
 find_package(TBB REQUIRED)
 find_package(glfw3 REQUIRED)
+
 set(GLAD_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/glad/include)
 set(EXTERNAL_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external)
 set(ASSETS_PATH ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+
 find_package(Eigen3 REQUIRED)
 add_subdirectory(external/glad)
 add_subdirectory(external/imgui-cmake)
