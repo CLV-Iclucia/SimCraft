@@ -94,4 +94,27 @@ ShaderProg::ShaderProg(ShaderProgramConfig config) {
   initAttributeHandles();
   initUniformHandles();
 }
+void ShaderProg::checkCompileErrors(GLuint shader, const std::string &type) {
+  GLint success;
+  GLchar infoLog[1024];
+  if (type != "PROGRAM") {
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+      glGetShaderInfoLog(shader, 1024, nullptr, infoLog);
+      std::cout << std::format(
+          "ERROR::SHADER_COMPILATION_ERROR of type: {}\n{}\n -------------------------------------------------------\n",
+          type,
+          infoLog) << std::endl;
+    }
+  } else {
+    glGetProgramiv(shader, GL_LINK_STATUS, &success);
+    if (!success) {
+      glGetProgramInfoLog(shader, 1024, nullptr, infoLog);
+      std::cout << std::format(
+          "ERROR::PROGRAM_LINKING_ERROR of type: {}\n{}\n -------------------------------------------------------\n",
+          type,
+          infoLog) << std::endl;
+    }
+  }
+}
 }

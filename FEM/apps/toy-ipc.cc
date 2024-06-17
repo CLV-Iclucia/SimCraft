@@ -1,6 +1,3 @@
-//
-// Created by creeper on 5/23/24.
-//
 #include <Deform/types.h>
 #include <Deform/invariants.h>
 #include <Deform/strain-energy-density.h>
@@ -108,9 +105,7 @@ void ipcImplicitEuler(const Vector<Real, 3> &a,
   }
 }
 int main() {
-  Vector<Real, 3> a(0, 0, 0);
-  Vector<Real, 3> b(-0.1, 0, 0);
-  Vector<Real, 3> c(0, 2, 0);
-  Vector<Real, 3> d(0, 0, 1);
+  auto bunny = fem::readTetMeshFromTobj("bunny.tobj");
+
   ipcImplicitEuler(a, b, c, d);
 }

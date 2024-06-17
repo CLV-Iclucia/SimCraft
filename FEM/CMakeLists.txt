@@ -6,3 +6,6 @@ target_link_libraries(FEM PUBLIC Maths Core Spatify Deform)
 target_include_directories(FEM PUBLIC include)
 add_executable(fem apps/fem.cc)
 target_link_libraries(fem PUBLIC FEM)
+
+add_executable(toy-ipc apps/toy-ipc.cc)
+target_link_libraries(toy-ipc PUBLIC FEM)

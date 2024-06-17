@@ -100,7 +100,7 @@ struct OpenGLContext : NonCopyable {
   VertexArrayObj vao;
   std::vector<VertexBufferObj> vbo;
   ElementBufferObj ebo;
-  glm::vec3 clear_color;
+  glm::vec3 clear_color{0.0f, 0.0f, 0.0f};
   int attribute_count = 0;
   OpenGLContext() = default;
   std::unordered_map<std::string, GLuint> attributes;
@@ -131,7 +131,7 @@ struct OpenGLContext : NonCopyable {
     vbo.emplace_back();
     vbo.back().bind();
     vbo.back().allocData(data);
-    registerAttribute(name, size, type, false, stride, 0);
+    registerAttribute(name, size, type, false, stride, nullptr);
   }
 
   template<typename T>
@@ -140,12 +140,12 @@ struct OpenGLContext : NonCopyable {
       std::cerr << "[Warning] Attribute " << name << " not found" << std::endl;
       return;
     }
-    glVertexAttribPointer(attributes[name], size, type, false, stride, 0);
+    glVertexAttribPointer(attributes[name], size, type, false, stride, nullptr);
     glEnableVertexAttribArray(attributes[name]);
   }
 
   static void draw(GLuint mode, int count) {
-    glDrawElements(mode, count, GL_UNSIGNED_INT, 0);
+    glDrawElements(mode, count, GL_UNSIGNED_INT, nullptr);
   }
 
   static void unbind() {
