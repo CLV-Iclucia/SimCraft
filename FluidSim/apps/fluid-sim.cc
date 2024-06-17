@@ -1,7 +1,7 @@
 #include <Core/core.h>
 #include <Core/animation.h>
 #include <Core/mesh.h>
-#include <ogl-render/ogl-ctx.h>
+#include <ogl-render/resource-handles.h>
 #include <ogl-render/camera.h>
 #include <FluidSim/cpu/fluid-simulator.h>
 #include <FluidSim/cpu/rebuild-surface.h>
@@ -98,9 +98,9 @@ void relocateMesh(core::Mesh& mesh, const core::Vec3d& size) {
   }
 }
 
-std::tuple<std::unique_ptr<OpenGLContext>, std::unique_ptr<ShaderProg>>
+std::tuple<std::unique_ptr<OpenGLContext>, std::unique_ptr<ShaderProgram>>
 initSdfRender(const fluid::SDF<3>& sdf) {
-  auto shader = std::make_unique<ShaderProg>(
+  auto shader = std::make_unique<ShaderProgram>(
       std::format("{}/perspective-sdf.vs", FLUIDSIM_SHADER_DIR).c_str(),
       std::format("{}/sdf.fs", FLUIDSIM_SHADER_DIR).c_str());
   auto ctx = std::make_unique<OpenGLContext>();
@@ -112,9 +112,9 @@ initSdfRender(const fluid::SDF<3>& sdf) {
   return {std::move(ctx), std::move(shader)};
 }
 
-std::tuple<std::unique_ptr<OpenGLContext>, std::unique_ptr<ShaderProg>>
+std::tuple<std::unique_ptr<OpenGLContext>, std::unique_ptr<ShaderProgram>>
 initFluidRender(const std::vector<core::Vec3d>& particles) {
-  auto shader = std::make_unique<ShaderProg>(
+  auto shader = std::make_unique<ShaderProgram>(
       std::format("{}/perspective.vs", FLUIDSIM_SHADER_DIR).c_str(),
       std::format("{}/point.fs", FLUIDSIM_SHADER_DIR).c_str());
   auto ctx = std::make_unique<OpenGLContext>();
@@ -123,9 +123,9 @@ initFluidRender(const std::vector<core::Vec3d>& particles) {
   return {std::move(ctx), std::move(shader)};
 }
 
-std::tuple<std::unique_ptr<OpenGLContext>, std::unique_ptr<ShaderProg>>
+std::tuple<std::unique_ptr<OpenGLContext>, std::unique_ptr<ShaderProgram>>
 initColliderRender(const core::Mesh& mesh) {
-  auto shader = std::make_unique<ShaderProg>(
+  auto shader = std::make_unique<ShaderProgram>(
       std::format("{}/perspective-mesh.vs", FLUIDSIM_SHADER_DIR).c_str(),
       std::format("{}/fluidRegion.fs", FLUIDSIM_SHADER_DIR).c_str());
   auto ctx = std::make_unique<OpenGLContext>();
@@ -137,7 +137,7 @@ initColliderRender(const core::Mesh& mesh) {
   return {std::move(ctx), std::move(shader)};
 }
 
-void drawFluid(OpenGLContext* fluidCtx, ShaderProg* fluidShader,
+void drawFluid(OpenGLContext* fluidCtx, ShaderProgram* fluidShader,
                TargetCamera& camera, const std::vector<core::Vec3d>& positions,
                int display_w, int display_h) {
   core::Mat4f model;
@@ -157,7 +157,7 @@ void drawFluid(OpenGLContext* fluidCtx, ShaderProg* fluidShader,
   glDrawArrays(GL_POINTS, 0, positions.size());
 }
 
-void drawCollider(OpenGLContext* colliderCtx, ShaderProg* meshShader,
+void drawCollider(OpenGLContext* colliderCtx, ShaderProgram* meshShader,
                   TargetCamera& camera, const core::Mesh& colliderMesh,
                   int display_w, int display_h) {
   core::Mat4f model;
@@ -173,7 +173,7 @@ void drawCollider(OpenGLContext* colliderCtx, ShaderProg* meshShader,
   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
-void drawSDF(OpenGLContext* sdfCtx, ShaderProg* sdfShader,
+void drawSDF(OpenGLContext* sdfCtx, ShaderProgram* sdfShader,
              TargetCamera& camera, const fluid::SDF<3>& sdf, int display_w,
              int display_h) {
   core::Mat4f model;

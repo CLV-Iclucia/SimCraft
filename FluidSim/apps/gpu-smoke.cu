@@ -1,6 +1,6 @@
 #include <Core/core.h>
 #include <Core/animation.h>
-#include <ogl-render/ogl-ctx.h>
+#include <ogl-render/resource-handles.h>
 #include <ogl-render/camera.h>
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
@@ -121,7 +121,7 @@ int main(int argc, char **argv) {
       opt.resolution, 0);
   setFluidRegion(fluid_region, opt.resolution);
   simulator->setActiveRegion(fluid_region);
-  ShaderProg smokeShader(FLUIDSIM_SHADER_DIR"/default.vs",
+  ShaderProgram smokeShader(FLUIDSIM_SHADER_DIR"/default.vs",
                          FLUIDSIM_SHADER_DIR"/smoke.fs");
   std::unique_ptr<OpenGLContext> smokeCtx = std::make_unique<OpenGLContext>();
   smokeCtx->vao.bind();
