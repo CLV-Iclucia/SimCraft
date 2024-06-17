@@ -4,27 +4,27 @@
 #include <ogl-render/shader-prog.h>
 
 namespace opengl {
-void ShaderProg::initUniformHandles() {
+void ShaderProgram::initUniformHandles() {
   char name[256];
   for (int i = 0; i < uniform_count; i++) {
     int length;
     GLenum type;
     int size;
-    glGetActiveUniform(id, i, 256, &length, &size, &type, name);
+    glCheckError(glGetActiveUniform(id, i, 256, &length, &size, &type, name));
     uniform_handles[name] = glGetUniformLocation(id, name);
   }
 }
-void ShaderProg::initAttributeHandles() {
+void ShaderProgram::initAttributeHandles() {
   char name[256];
   for (int i = 0; i < attribute_count; i++) {
     int length;
     GLenum type;
     int size;
-    glGetActiveAttrib(id, i, 256, &length, &size, &type, name);
-    attribute_handles[name] = glGetAttribLocation(id, name);
+    glCheckError(glGetActiveAttrib(id, i, 256, &length, &size, &type, name));
+//    attribute_handles[name] = glGetAttribLocation(id, name);
   }
 }
-ShaderProg::ShaderProg(ShaderProgramConfig config) {
+ShaderProgram::ShaderProgram(ShaderProgramConfig config) {
   // 1. retrieve the vertex/fragment source code from filePath
   std::string vertexCode;
   std::string fragmentCode;
@@ -94,7 +94,7 @@ ShaderProg::ShaderProg(ShaderProgramConfig config) {
   initAttributeHandles();
   initUniformHandles();
 }
-void ShaderProg::checkCompileErrors(GLuint shader, const std::string &type) {
+void ShaderProgram::checkCompileErrors(GLuint shader, const std::string &type) {
   GLint success;
   GLchar infoLog[1024];
   if (type != "PROGRAM") {

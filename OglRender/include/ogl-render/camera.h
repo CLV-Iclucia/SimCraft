@@ -2,12 +2,10 @@
 // Created by creeper on 10/25/23.
 //
 
-#ifndef JEOCRAFT_OGLRENDER_INCLUDE_OGL_RENDER_CAMERA_H_
-#define JEOCRAFT_OGLRENDER_INCLUDE_OGL_RENDER_CAMERA_H_
-#include <glad/glad.h>
+#ifndef SIMCRAFT_OGLRENDER_INCLUDE_OGL_RENDER_CAMERA_H_
+#define SIMCRAFT_OGLRENDER_INCLUDE_OGL_RENDER_CAMERA_H_
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <GLFW/glfw3.h>
 
 #include <iostream>
 #include <vector>
@@ -26,13 +24,13 @@ static const float PITCH = 0.0f;
 static const float SPEED = 2.5f;
 static const float SENSITIVITY = 0.1f;
 static const float ZOOM = 45.0f;
-static const float PI = 3.1415926;
+struct Window;
 struct PerspectiveCamera {
   explicit PerspectiveCamera(float fov = ZOOM, float sensitivity = SENSITIVITY)
       : fov(fov), sensitivity(sensitivity) {
   }
 
-  virtual void processKeyBoard(GLFWwindow *window, float deltaTime) {
+  virtual void processKeyBoard(const Window& window, float deltaTime) {
   };
   virtual void processMouseMovement(float xoffset, float yoffset) {
   };
@@ -59,17 +57,7 @@ class FpsCamera : public PerspectiveCamera {
         yaw(YAW), pitch(PITCH), movementSpeed(speed) {
   }
 
-  void processKeyBoard(GLFWwindow *window, float deltaTime) override {
-    float cameraSpeed = movementSpeed * deltaTime;
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-      position += front * cameraSpeed;
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-      position -= front * cameraSpeed;
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-      position -= glm::normalize(glm::cross(front, up)) * cameraSpeed;
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-      position += glm::normalize(glm::cross(front, up)) * cameraSpeed;
-  }
+  void processKeyBoard(const Window& window, float deltaTime) override;
 
   void processMouseMovement(float xoffset, float yoffset) override {
     xoffset *= sensitivity;
@@ -119,7 +107,7 @@ class TargetCamera : public PerspectiveCamera {
         distance(distance), yaw(-90.0f), pitch(0.0f),
         movementSpeed(movementSpeed) {
   }
-  void processKeyBoard(GLFWwindow *window, float deltaTime) override;
+  void processKeyBoard(const Window& window, float deltaTime) override;
   void processMouseMovement(float xoffset, float yoffset) override {
   }
   void processMouseScroll(float yoffset) override {
@@ -148,4 +136,4 @@ class TargetCamera : public PerspectiveCamera {
   // Up vector, could be customizable
 };
 }
-#endif //JEOCRAFT_OGLRENDER_INCLUDE_OGL_RENDER_CAMERA_H_
+#endif //SIMCRAFT_OGLRENDER_INCLUDE_OGL_RENDER_CAMERA_H_

@@ -1,4 +1,4 @@
-#include <ogl-render/ogl-ctx.h>
+#include <ogl-render/resource-handles.h>
 
 namespace opengl {
 

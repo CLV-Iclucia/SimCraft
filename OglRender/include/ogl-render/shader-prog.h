@@ -15,7 +15,9 @@
 #include <vector>
 #include <filesystem>
 #include <format>
-#include <ogl-render/ogl-ctx.h>
+#include <ogl-render/resource-handles.h>
+#include <ogl-render/attribute-utils.h>
+#include <ogl-render/gl-utils.h>
 namespace opengl {
 
 struct ShaderProgramConfig {
@@ -25,62 +27,92 @@ struct ShaderProgramConfig {
 };
 
 // RAII shader program
-struct ShaderProg : Resource {
-  GLuint id;
+struct ShaderProgram : GLHandleBase<ShaderProgram> {
+  using GLHandleBase<ShaderProgram>::id;
   // create shader program from vertex and fragment shader source
-  explicit ShaderProg(ShaderProgramConfig config);
-  std::unordered_map<std::string, GLuint> uniform_handles;
-  std::unordered_map<std::string, GLuint> attribute_handles;
+  explicit ShaderProgram(ShaderProgramConfig config);
+  void create() {
+    glCheckError(id = glCreateProgram());
+  }
+  void destroy() {
+    glCheckError(glDeleteProgram(id));
+  }
+  void bind() const override {
+    glCheckError(glUseProgram(id));
+  }
+  static void unbind() {
+    glCheckError(glUseProgram(0));
+  }
+  ShaderProgram(ShaderProgram &&other) noexcept
+      : uniform_count(other.uniform_count), attribute_count(other.attribute_count) {
+    uniform_handles = std::move(other.uniform_handles);
+    other.uniform_count = 0;
+    other.attribute_count = 0;
+  }
+  ShaderProgram &operator=(ShaderProgram &&other) noexcept {
+    if (this != &other) {
+      uniform_handles = std::move(other.uniform_handles);
+      uniform_count = other.uniform_count;
+      attribute_count = other.attribute_count;
+      other.uniform_count = 0;
+      other.attribute_count = 0;
+    }
+    return *this;
+  }
+  std::unordered_map<std::string, GLint> uniform_handles;
+  AttributeLayout attribute_layout;
 
-  void activeAttributes(std::vector<std::string> &attribute_names) const {
+  std::vector<std::string> getActiveAttributes() const {
     GLint num_attribs;
-    glGetProgramiv(id, GL_ACTIVE_ATTRIBUTES, &num_attribs);
+    glCheckError(glGetProgramiv(id, GL_ACTIVE_ATTRIBUTES, &num_attribs));
     char name[256];
     GLint written, size, location;
     GLenum type;
+    std::vector<std::string> attribute_names;
     for (int i = 0; i < num_attribs; ++i) {
-      glGetActiveAttrib(id, i, 256, &written, &size, &type, name);
-      location = glGetAttribLocation(id, name);
-      attribute_names.emplace_back(name);
+      glCheckError(glGetActiveAttrib(id, i, 256, &written, &size, &type, name));
+      glCheckError(location = glGetAttribLocation(id, name));
+      attribute_names.push_back(name);
     }
+    return attribute_names;
   }
 
-  void use() const { glUseProgram(id); }
+  void use() const { bind(); }
   void setInt(const std::string &name, int value) {
-    glUniform1i(uniform_handles[name], value);
+    glCheckError(glUniform1i(uniform_handles[name], value));
   }
   void setFloat(const std::string &name, float value) {
-    glUniform1f(uniform_handles[name], value);
+    glCheckError(glUniform1f(uniform_handles[name], value));
   }
   void setVec2f(const std::string &name, float x, float y) {
-    glUniform2f(uniform_handles[name], x, y);
+    glCheckError(glUniform2f(uniform_handles[name], x, y));
   }
   void setVec2f(const std::string &name, const glm::vec2 &value) {
-    glUniform2f(uniform_handles[name], value.x, value.y);
+    glCheckError(glUniform2f(uniform_handles[name], value.x, value.y));
   }
   void setVec3f(const std::string &name, float x, float y, float z) {
-    glUniform3f(uniform_handles[name], x, y, z);
+    glCheckError(glUniform3f(uniform_handles[name], x, y, z));
   }
   void setVec3f(const std::string &name, const glm::vec3 &value) {
-    glUniform3f(uniform_handles[name], value.x, value.y, value.z);
+    glCheckError(glUniform3f(uniform_handles[name], value.x, value.y, value.z));
   }
   void setVec4f(const std::string &name, float x, float y, float z, float w) {
-    glUniform4f(uniform_handles[name], x, y, z, w);
+    glCheckError(glUniform4f(uniform_handles[name], x, y, z, w));
   }
   void setVec4f(const std::string &name, const glm::vec4 &value) {
-    glUniform4f(uniform_handles[name], value.x, value.y, value.z, value.w);
+    glCheckError(glUniform4f(uniform_handles[name], value.x, value.y, value.z, value.w));
   }
   void setMat2f(const std::string &name, const glm::mat2 &mat) {
-    glUniformMatrix2fv(uniform_handles[name], 1, GL_FALSE, &mat[0][0]);
+    glCheckError(glUniformMatrix2fv(uniform_handles[name], 1, GL_FALSE, &mat[0][0]));
   }
   void setMat3f(const std::string &name, const glm::mat3 &mat) {
-    glUniformMatrix3fv(uniform_handles[name], 1, GL_FALSE, &mat[0][0]);
+    glCheckError(glUniformMatrix3fv(uniform_handles[name], 1, GL_FALSE, &mat[0][0]));
   }
   void setMat4f(const std::string &name, const glm::mat4 &mat) {
-    glUniformMatrix4fv(uniform_handles[name], 1, GL_FALSE, &mat[0][0]);
+    glCheckError(glUniformMatrix4fv(uniform_handles[name], 1, GL_FALSE, &mat[0][0]));
   }
 
-  ~ShaderProg() { glDeleteProgram(id); }
+  ~ShaderProgram() = default;
  private:
   int uniform_count;
   int attribute_count;

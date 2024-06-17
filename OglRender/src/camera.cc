@@ -1,8 +1,8 @@
 //
 // Created by creeper on 10/25/23.
 //
+#include <ogl-render/window.h>
 #include <ogl-render/camera.h>
-#include <GLFW/glfw3.h>
 
 namespace opengl {
 
@@ -13,21 +13,28 @@ void FpsCamera::updateCameraVectors() {
   newFront.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
   front = glm::normalize(newFront);
 }
-void TargetCamera::processKeyBoard(GLFWwindow *window, float deltaTime) {
-  float cameraSpeed = 2 * PI * movementSpeed * deltaTime;
+void FpsCamera::processKeyBoard(const Window& window, float deltaTime) {
+  float cameraSpeed = movementSpeed * deltaTime;
+  if (glfwGetKey(window.window(), GLFW_KEY_W) == GLFW_PRESS)
+    position += front * cameraSpeed;
+  if (glfwGetKey(window.window(), GLFW_KEY_S) == GLFW_PRESS)
+    position -= front * cameraSpeed;
+  if (glfwGetKey(window.window(), GLFW_KEY_A) == GLFW_PRESS)
+    position -= glm::normalize(glm::cross(front, up)) * cameraSpeed;
+  if (glfwGetKey(window.window(), GLFW_KEY_D) == GLFW_PRESS)
+    position += glm::normalize(glm::cross(front, up)) * cameraSpeed;
+}
+void TargetCamera::processKeyBoard(const Window& window, float deltaTime) {
+  float cameraSpeed = 2.f * std::numbers::pi * movementSpeed * deltaTime;
 
-  if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+  if (glfwGetKey(window.window(), GLFW_KEY_A) == GLFW_PRESS)
     yaw -= cameraSpeed;
-  }
-  if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+  if (glfwGetKey(window.window(), GLFW_KEY_D) == GLFW_PRESS)
     yaw += cameraSpeed;
-  }
-  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+  if (glfwGetKey(window.window(), GLFW_KEY_W) == GLFW_PRESS)
     pitch += cameraSpeed;
-  }
-  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+  if (glfwGetKey(window.window(), GLFW_KEY_S) == GLFW_PRESS)
     pitch -= cameraSpeed;
-  }
 
   if (pitch > 89.0f)
     pitch = 89.0f;

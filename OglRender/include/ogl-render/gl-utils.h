@@ -7,20 +7,22 @@
 #include <GL/gl.h>
 #include <iostream>
 #include <format>
+#ifndef NDEBUG
 #define glCheckError(func) \
   do { \
     func;                   \
     details::gl_check_error(#func, __FILE__, __LINE__); \
     } while (0)
-
+#else
+#define glCheckError(func) func
+#endif
 #define FOR_EACH_GL_ERROR(replace) \
     replace(INVALID_ENUM)          \
     replace(INVALID_VALUE)         \
     replace(INVALID_OPERATION)     \
     replace(STACK_OVERFLOW)        \
     replace(STACK_UNDERFLOW)       \
-    replace(OUT_OF_MEMORY)         \
-    replace(TABLE_TOO_LARGE)
+    replace(OUT_OF_MEMORY)
 
 namespace opengl::details {
 inline void gl_check_error(const char *function_name, const char *file, int line) {
