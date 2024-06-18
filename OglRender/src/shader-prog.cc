@@ -6,25 +6,16 @@
 namespace opengl {
 void ShaderProgram::initUniformHandles() {
   char name[256];
+  glCheckError(glGetProgramiv(id, GL_ACTIVE_UNIFORMS, &uniform_count));
   for (int i = 0; i < uniform_count; i++) {
     int length;
     GLenum type;
     int size;
     glCheckError(glGetActiveUniform(id, i, 256, &length, &size, &type, name));
-    uniform_handles[name] = glGetUniformLocation(id, name);
+    glCheckError(uniform_handles[name] = glGetUniformLocation(id, name));
   }
 }
-void ShaderProgram::initAttributeHandles() {
-  char name[256];
-  for (int i = 0; i < attribute_count; i++) {
-    int length;
-    GLenum type;
-    int size;
-    glCheckError(glGetActiveAttrib(id, i, 256, &length, &size, &type, name));
-//    attribute_handles[name] = glGetAttribLocation(id, name);
-  }
-}
-ShaderProgram::ShaderProgram(ShaderProgramConfig config) {
+ShaderProgram::ShaderProgram(const ShaderProgramConfig &config) {
   // 1. retrieve the vertex/fragment source code from filePath
   std::string vertexCode;
   std::string fragmentCode;
@@ -91,8 +82,8 @@ ShaderProgram::ShaderProgram(ShaderProgramConfig config) {
     glDeleteShader(geometry);
   glGetProgramiv(id, GL_ACTIVE_UNIFORMS, &uniform_count);
   glGetProgramiv(id, GL_ACTIVE_ATTRIBUTES, &attribute_count);
-  initAttributeHandles();
   initUniformHandles();
+  initActiveAttributeLayout();
 }
 void ShaderProgram::checkCompileErrors(GLuint shader, const std::string &type) {
   GLint success;
@@ -116,5 +107,18 @@ void ShaderProgram::checkCompileErrors(GLuint shader, const std::string &type) {
           infoLog) << std::endl;
     }
   }
+}
+void ShaderProgram::initActiveAttributeLayout() {
+  glCheckError(glGetProgramiv(id, GL_ACTIVE_ATTRIBUTES, &attribute_count));
+  char name[256];
+  GLint written, size, location;
+  GLenum type;
+  std::unordered_map<GLuint, std::string> attribute_location_map;
+  for (int i = 0; i < attribute_count; ++i) {
+    glCheckError(glGetActiveAttrib(id, i, 256, &written, &size, &type, name));
+    glCheckError(location = glGetAttribLocation(id, name));
+    attribute_location_map[location] = name;
+  }
+  attribute_layout = AttributeLayout(attribute_location_map);
 }
 }

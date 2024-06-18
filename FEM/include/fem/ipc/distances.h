@@ -13,7 +13,7 @@ inline Real distancePointPoint(const Vector<Real, 3> &p1, const Vector<Real, 3> 
 }
 inline Vector<Real, 6> localDistancePointPointGradient(const Vector<Real, 3> &p1, const Vector<Real, 3> &p2) {
   Vector<Real, 6> local_grad;
-  local_grad.segment<3>(0) = (p1 - p2).normalized();
+  local_grad.segment<3>(0) = (p1 - p2).float_normalized();
   local_grad.segment<3>(3) = -local_grad.segment<3>(0);
   return local_grad;
 }

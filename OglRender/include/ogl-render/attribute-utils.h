@@ -9,20 +9,35 @@
 #include <unordered_map>
 namespace opengl {
 struct AttributeLayout {
-  std::optional<int> location(const std::string& name) const {
-    if (attribute_index_map.contains(name))
-      return attribute_index_map.at(name);
+  AttributeLayout() = default;
+  explicit AttributeLayout(const std::unordered_map<GLuint, std::string> &index_attribute_map_) : location_attribute_map(
+      index_attribute_map_) {
+    for (const auto &[index, name] : location_attribute_map)
+      attribute_location_map[name] = index;
+  }
+  std::array<uint8_t, 32> activeLocations() const {
+    std::array<uint8_t, 32> active_locations{};
+    int i = 0;
+    for (const auto &[name, loc] : attribute_location_map)
+      active_locations[i++] = loc;
+    return active_locations;
+  }
+  std::optional<GLuint> location(const std::string &name) const {
+    if (attribute_location_map.contains(name))
+      return attribute_location_map.at(name);
     return std::nullopt;
   }
   std::optional<std::string_view> attribute(int loc) const {
-    return attribute_names[loc];
+    if (location_attribute_map.contains(loc))
+      return location_attribute_map.at(loc);
+    return std::nullopt;
   }
   size_t size() const {
-    return attribute_names.size();
+    return attribute_location_map.size();
   }
  private:
-  std::vector<std::string> attribute_names{};
-  std::unordered_map<std::string, int> attribute_index_map{};
+  std::unordered_map<std::string, GLuint> attribute_location_map{};
+  std::unordered_map<GLuint, std::string> location_attribute_map{};
 };
 
 struct AttributeDataSOA {

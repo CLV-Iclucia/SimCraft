@@ -9,6 +9,7 @@ find_package(glfw3 REQUIRED)
 
 set(GLAD_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/glad/include)
 set(EXTERNAL_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external)
+set(IMGUI_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui-cmake)
 set(ASSETS_PATH ${CMAKE_CURRENT_SOURCE_DIR}/assets)
 
 find_package(Eigen3 REQUIRED)

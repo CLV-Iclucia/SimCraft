@@ -158,7 +158,7 @@ std::optional<Contact> vtCCD(const CCDQuery &query, Real toi) {
       continue;
     if (ta < 0 || ta > 1 || tb < 0 || tb > 1) continue;
     auto pos = updated_x1 + ta * updated_x2_x1;
-    auto normal = updated_x4_x3.cross(updated_x2_x1).normalized();
+    auto normal = updated_x4_x3.cross(updated_x2_x1).float_normalized();
     return std::make_optional(pos, t);
   }
   return std::nullopt;

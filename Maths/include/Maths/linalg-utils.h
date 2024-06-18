@@ -34,7 +34,7 @@ Matrix<T, 3, 3> constructFrame(const Vector<T, 3> &n) {
     x(0) = 1;
   else
     x(1) = 1;
-  x = (x - n.dot(x) * n).normalized();
+  x = (x - n.dot(x) * n).float_normalized();
   Vector<T, 3> y = n.cross(x);
   Matrix<T, 3, 3> R;
   R << x, y, n;

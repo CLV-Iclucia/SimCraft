@@ -21,16 +21,16 @@
 namespace opengl {
 
 struct ShaderProgramConfig {
-  std::filesystem::path vertex_shader_path;
-  std::filesystem::path fragment_shader_path;
-  std::filesystem::path geometry_shader_path;
+  std::filesystem::path vertex_shader_path{};
+  std::filesystem::path fragment_shader_path{};
+  std::filesystem::path geometry_shader_path{};
 };
 
 // RAII shader program
 struct ShaderProgram : GLHandleBase<ShaderProgram> {
   using GLHandleBase<ShaderProgram>::id;
   // create shader program from vertex and fragment shader source
-  explicit ShaderProgram(ShaderProgramConfig config);
+  explicit ShaderProgram(const ShaderProgramConfig& config);
   void create() {
     glCheckError(id = glCreateProgram());
   }
@@ -46,12 +46,14 @@ struct ShaderProgram : GLHandleBase<ShaderProgram> {
   ShaderProgram(ShaderProgram &&other) noexcept
       : uniform_count(other.uniform_count), attribute_count(other.attribute_count) {
     uniform_handles = std::move(other.uniform_handles);
+    attribute_layout = other.attribute_layout;
     other.uniform_count = 0;
     other.attribute_count = 0;
   }
   ShaderProgram &operator=(ShaderProgram &&other) noexcept {
     if (this != &other) {
       uniform_handles = std::move(other.uniform_handles);
+      attribute_layout = other.attribute_layout;
       uniform_count = other.uniform_count;
       attribute_count = other.attribute_count;
       other.uniform_count = 0;
@@ -61,21 +63,10 @@ struct ShaderProgram : GLHandleBase<ShaderProgram> {
   }
   std::unordered_map<std::string, GLint> uniform_handles;
   AttributeLayout attribute_layout;
-
-  std::vector<std::string> getActiveAttributes() const {
-    GLint num_attribs;
-    glCheckError(glGetProgramiv(id, GL_ACTIVE_ATTRIBUTES, &num_attribs));
-    char name[256];
-    GLint written, size, location;
-    GLenum type;
-    std::vector<std::string> attribute_names;
-    for (int i = 0; i < num_attribs; ++i) {
-      glCheckError(glGetActiveAttrib(id, i, 256, &written, &size, &type, name));
-      glCheckError(location = glGetAttribLocation(id, name));
-      attribute_names.push_back(name);
-    }
-    return attribute_names;
+  const AttributeLayout &attributeLayout() const {
+    return attribute_layout;
   }
+
 
   void use() const { bind(); }
   void setInt(const std::string &name, int value) {
@@ -114,10 +105,10 @@ struct ShaderProgram : GLHandleBase<ShaderProgram> {
 
   ~ShaderProgram() = default;
  private:
-  int uniform_count;
-  int attribute_count;
+  void initActiveAttributeLayout();
+  int uniform_count{};
+  int attribute_count{};
   void initUniformHandles();
-  void initAttributeHandles();
   static void checkCompileErrors(GLuint shader, const std::string &type);
 };
 }  // namespace core

@@ -11,7 +11,7 @@
 #include <memory>
 namespace opengl {
 struct Window : Resource {
-  Window(int width_, int height_, std::string_view title) : width(width_), height(height_) {
+  Window(int width_, int height_, std::string_view title) : m_width(width_), m_height(height_) {
     if (!glfwInit()) {
       // TODO: ERROR
       std::cerr << "Failed to initialize GLFW\n";
@@ -20,7 +20,7 @@ struct Window : Resource {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    m_window = glfwCreateWindow(width, height, title.data(), nullptr, nullptr);
+    m_window = glfwCreateWindow(m_width, m_height, title.data(), nullptr, nullptr);
     if (!m_window) {
       std::cerr << "Failed to create window\n";
       glfwTerminate();
@@ -30,10 +30,16 @@ struct Window : Resource {
   }
   void preRender() {
     glfwPollEvents();
-    glfwGetFramebufferSize(m_window, &width, &height);
+    glfwGetFramebufferSize(m_window, &m_width, &m_height);
   }
   void postRender() {
     glfwSwapBuffers(m_window);
+  }
+  [[nodiscard]] int width() const {
+    return m_width;
+  }
+  [[nodiscard]] int height() const {
+    return m_height;
   }
   bool shouldClose() {
     return glfwWindowShouldClose(m_window);
@@ -46,7 +52,7 @@ struct Window : Resource {
     glfwTerminate();
   }
  private:
-  int width{}, height{};
+  int m_width{}, m_height{};
   GLFWwindow *m_window{};
 };
 }

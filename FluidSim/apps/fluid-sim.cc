@@ -133,7 +133,7 @@ initColliderRender(const core::Mesh& mesh) {
   ctx->newAttribute("aPos", mesh.vertices, 3, 3 * sizeof(double),
                     GL_DOUBLE);
   ctx->ebo.bind();
-  ctx->ebo.passData(mesh.indices);
+  ctx->ebo.initAttributeData(mesh.indices);
   return {std::move(ctx), std::move(shader)};
 }
 
@@ -145,7 +145,7 @@ void drawFluid(OpenGLContext* fluidCtx, ShaderProgram* fluidShader,
   glEnable(GL_DEPTH_TEST);
   fluidCtx->vao.bind();
   fluidCtx->VBO("aPos").bind();
-  fluidCtx->VBO("aPos").passData(positions);
+  fluidCtx->VBO("aPos").initAttributeData(positions);
   fluidShader->use();
   glEnable(GL_PROGRAM_POINT_SIZE);
   glEnable(GL_BLEND);
@@ -181,7 +181,7 @@ void drawSDF(OpenGLContext* sdfCtx, ShaderProgram* sdfShader,
   glEnable(GL_DEPTH_TEST);
   sdfCtx->vao.bind();
   sdfCtx->VBO("aColor").bind();
-  sdfCtx->VBO("aColor").passData(sdf.fieldSamples());
+  sdfCtx->VBO("aColor").initAttributeData(sdf.fieldSamples());
   sdfShader->use();
   glEnable(GL_PROGRAM_POINT_SIZE);
   glEnable(GL_BLEND);

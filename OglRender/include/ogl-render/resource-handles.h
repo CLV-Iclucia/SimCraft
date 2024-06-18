@@ -37,8 +37,9 @@ struct GLHandleBase : NonCopyable {
   }
 };
 
+template <typename T>
 struct BufferSubDataOption {
-  std::span<const std::byte> data;
+  std::span<const T> data;
   size_t offset_in_bytes;
 };
 
@@ -58,12 +59,13 @@ struct BufferObject : GLHandleBase<BufferObject<Target>> {
   void destroy() {
     glCheckError(glDeleteBuffers(1, &id));
   }
-  template<GLenum Usage>
-  void bufferData(std::span<const std::byte> data) {
+  template<GLenum Usage, typename T>
+  void bufferData(std::span<const T> data) {
     size = data.size_bytes();
     glCheckError(glBufferData(Target, data.size_bytes(), data.data(), Usage));
   }
-  void bufferSubData(const BufferSubDataOption &option) {
+  template <typename T>
+  void bufferSubData(const BufferSubDataOption<T> &option) {
     assert(option.offset_in_bytes + option.data.size_bytes() <= size);
     glCheckError(glBufferSubData(Target, option.offset_in_bytes, option.data.size_bytes(), option.data.data()));
   }
@@ -73,11 +75,11 @@ using VertexBufferObj = BufferObject<GL_ARRAY_BUFFER>;
 using ElementBufferObj = BufferObject<GL_ELEMENT_ARRAY_BUFFER>;
 
 struct VertexAttribPointerOption {
-  GLuint index{};
-  GLint size{};
-  GLenum type{};
-  GLboolean normalized{GL_FALSE};
-  GLsizei stride{};
+  GLuint location{};
+  GLint components_per_attribute{};
+  GLenum component_type{};
+  GLboolean float_normalized{GL_FALSE};
+  GLsizei stride_in_bytes{};
   const void *pointer{};
 };
 

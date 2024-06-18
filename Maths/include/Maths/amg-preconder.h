@@ -52,7 +52,7 @@ struct AlgebraicMultigridPreconditioner {
   inline const Eigen::internal::solve_retval<AlgebraicMultigridPreconditioner, Rhs>
   solve(const Eigen::MatrixBase<Rhs> &b) const {
     eigen_assert(m_isInitialized && "DiagonalPreconditioner is not initialized.");
-    eigen_assert(m_invdiag.size() == b.rows()
+    eigen_assert(m_invdiag.components_per_attribute() == b.rows()
                      && "DiagonalPreconditioner::solve(): invalid number of rows of the right hand side matrix b");
     return Eigen::internal::solve_retval<AlgebraicMultigridPreconditioner, Rhs>(*this, b.derived());
   }
