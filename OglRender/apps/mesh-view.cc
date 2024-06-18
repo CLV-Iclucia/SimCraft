@@ -53,11 +53,11 @@ int main() {
                 1000.0f / io.Framerate, io.Framerate);
     ImGui::End();
     ImGui::Render();
-    glCheckError(glClearColor(0.1f, 1.0f, 1.0f, 1.0f));
+    glCheckError(glClearColor(1.0f, 1.0f, 1.0f, 1.0f));
     glCheckError(glClear(GL_COLOR_BUFFER_BIT));
     glCheckError(glViewport(0, 0, gui->window->width(), gui->window->height()));
     shader.use();
-    shader.setVec3f("color", 1.0f, 0.0f, 0.0f);
+    shader.setVec3f("color", 1.0f, 0.1f, 0.1f);
     glCheckError(glDrawArrays(GL_TRIANGLES, 0, 3));
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
   });

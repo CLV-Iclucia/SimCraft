@@ -126,6 +126,23 @@ struct TextureObject : GLHandleBase<TextureObject<Target>> {
   }
 };
 
+template <GLenum Target>
+struct FrameBufferObject : GLHandleBase<FrameBufferObject<Target>> {
+  using GLHandleBase<FrameBufferObject>::id;
+  void create() {
+    glCheckError(glGenFramebuffers(1, &id));
+  }
+  void bind() const override {
+    glCheckError(glBindFramebuffer(Target, id));
+  }
+  void destroy() {
+    glCheckError(glDeleteFramebuffers(1, &id));
+  }
+  static void unbind() {
+    glCheckError(glBindFramebuffer(Target, 0));
+  }
+};
+
 }
 
 #endif
