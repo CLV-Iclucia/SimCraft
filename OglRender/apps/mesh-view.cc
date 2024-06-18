@@ -48,7 +48,6 @@ int main() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     // ImGui code goes here
-    // use imgui to show fps on the window
     ImGui::Begin("FPS");
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
                 1000.0f / io.Framerate, io.Framerate);
