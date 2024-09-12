@@ -11,8 +11,6 @@
 #include <algorithm>
 #include <memory>
 namespace mpm {
-using std::max;
-using std::min;
 /**
  * Original MPM algorithm, velocity, mass, momentum and deformation gradient are
  * stored on particles.

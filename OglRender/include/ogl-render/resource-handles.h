@@ -46,7 +46,7 @@ struct BufferSubDataOption {
 template<GLenum Target>
 struct BufferObject : GLHandleBase<BufferObject<Target>> {
   using GLHandleBase<BufferObject<Target>>::id;
-  size_t size{};
+  size_t sizeBytes{};
   void create() {
     glCheckError(glGenBuffers(1, &id));
   }
@@ -59,14 +59,14 @@ struct BufferObject : GLHandleBase<BufferObject<Target>> {
   void destroy() {
     glCheckError(glDeleteBuffers(1, &id));
   }
-  template<GLenum Usage, typename T>
-  void bufferData(std::span<const T> data) {
-    size = data.size_bytes();
+  template<GLenum Usage>
+  void bufferData(std::span<const std::byte> data) {
+    sizeBytes = data.size_bytes();
     glCheckError(glBufferData(Target, data.size_bytes(), data.data(), Usage));
   }
   template <typename T>
   void bufferSubData(const BufferSubDataOption<T> &option) {
-    assert(option.offset_in_bytes + option.data.size_bytes() <= size);
+    assert(option.offset_in_bytes + option.data.size_bytes() <= sizeBytes);
     glCheckError(glBufferSubData(Target, option.offset_in_bytes, option.data.size_bytes(), option.data.data()));
   }
 };
@@ -75,7 +75,7 @@ using VertexBufferObj = BufferObject<GL_ARRAY_BUFFER>;
 using ElementBufferObj = BufferObject<GL_ELEMENT_ARRAY_BUFFER>;
 
 struct VertexAttribPointerOption {
-  GLuint location{};
+  GLuint index{};
   GLint components_per_attribute{};
   GLenum component_type{};
   GLboolean float_normalized{GL_FALSE};

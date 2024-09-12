@@ -6,7 +6,6 @@
 #define SIMCRAFT_OGLRENDER_INCLUDE_OGL_RENDER_WINDOW_H_
 #include <ogl-render/glad-glfw.h>
 #include <ogl-render/properties.h>
-#include <ogl-render/ext-gui-wrapper.h>
 #include <iostream>
 #include <memory>
 namespace opengl {
@@ -31,9 +30,19 @@ struct Window : Resource {
   void preRender() {
     glfwPollEvents();
     glfwGetFramebufferSize(m_window, &m_width, &m_height);
+    if (preRenderCallback)
+      preRenderCallback(m_window);
   }
   void postRender() {
+    if (postRenderCallback)
+      postRenderCallback(m_window);
     glfwSwapBuffers(m_window);
+  }
+  void setPreRenderCallback(std::function<void(GLFWwindow*)> callback) {
+    preRenderCallback = std::move(callback);
+  }
+  void setPostRenderCallback(std::function<void(GLFWwindow*)> callback) {
+    postRenderCallback = std::move(callback);
   }
   [[nodiscard]] int width() const {
     return m_width;
@@ -51,9 +60,11 @@ struct Window : Resource {
     glfwDestroyWindow(m_window);
     glfwTerminate();
   }
- private:
+private:
   int m_width{}, m_height{};
   GLFWwindow *m_window{};
+  std::function<void(GLFWwindow*)> preRenderCallback{};
+  std::function<void(GLFWwindow*)> postRenderCallback{};
 };
 }
 #endif //SIMCRAFT_OGLRENDER_INCLUDE_OGL_RENDER_WINDOW_H_

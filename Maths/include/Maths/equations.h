@@ -4,36 +4,61 @@
 
 #ifndef SIMCRAFT_MATHS_INCLUDE_MATHS_EQUATIONS_H_
 #define SIMCRAFT_MATHS_INCLUDE_MATHS_EQUATIONS_H_
+
+#include <optional>
+#include <iostream>
 #include <Maths/types.h>
 namespace maths {
 struct QuadraticPolynomial {
   Real a, b, c;
 };
-bool quadraticSolve(const QuadraticPolynomial &poly, Real &x1, Real &x2);
-struct CubicPolynomial {
-  Real a, b, c, d;
-};
+
 struct CubicEquationRoots {
+  bool infiniteSolutions{};
   std::array<Real, 3> roots{};
-  int num_roots{};
+  int numRoots{};
   CubicEquationRoots() = default;
-  explicit CubicEquationRoots(Real x) : num_roots(1) {
+  explicit CubicEquationRoots(bool infinite) : infiniteSolutions(infinite) {}
+  explicit CubicEquationRoots(Real x) : numRoots(1) {
     roots[0] = x;
   }
   void addRoot(Real x) {
-    roots[num_roots++] = x;
+    roots[numRoots++] = x;
   }
 };
+
+
+CubicEquationRoots quadraticSolve(const QuadraticPolynomial &poly);
+
+struct CubicPolynomial {
+  Real a, b, c, d;
+};
+
+inline CubicEquationRoots infiniteCubicRoots() {
+  return CubicEquationRoots{true};
+}
+
+struct BinaryLinearSolution {
+  Real x{}, y{};
+};
+
 CubicEquationRoots clampedCubicSolve(const CubicPolynomial &poly, Real l, Real r, Real tolerance);
+
 struct BinaryLinearSystem {
   Real a00, a01, a10, a11, b0, b1;
 };
-inline bool binaryLinearSolve(const BinaryLinearSystem &sys, Real &x, Real &y) {
+
+inline std::optional<BinaryLinearSolution> binaryLinearSolve(const BinaryLinearSystem &sys) {
   Real det = sys.a00 * sys.a11 - sys.a01 * sys.a10;
-  if (det == 0.0) return false;
-  x = (sys.b0 * sys.a11 - sys.b1 * sys.a01) / det;
-  y = (sys.a00 * sys.b1 - sys.a10 * sys.b0) / det;
-  return true;
+  if (det == 0.0)
+    return std::nullopt;
+  Real x = (sys.b0 * sys.a11 - sys.b1 * sys.a01) / det;
+  Real y = (sys.a00 * sys.b1 - sys.a10 * sys.b0) / det;
+  return std::make_optional<BinaryLinearSolution>({x, y});
+}
+
+inline bool hasInfiniteSolutions(const BinaryLinearSystem &sys) {
+  return sys.a00 * sys.a11 == sys.a01 * sys.a10 && sys.a00 * sys.b1 == sys.a10 * sys.b0;
 }
 }
 #endif //SIMCRAFT_MATHS_INCLUDE_MATHS_EQUATIONS_H_

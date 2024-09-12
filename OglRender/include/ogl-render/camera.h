@@ -13,9 +13,10 @@
 namespace opengl {
 struct CameraParameters {
   glm::vec3 position;
-  glm::vec3 front;
   glm::vec3 up;
   glm::vec3 right;
+  float yaw_in_deg;
+  float pitch_in_deg;
   float fov_in_deg;
   float aspectRatio;
   float nearPlane;
@@ -27,58 +28,70 @@ struct CameraParameters {
   }
 };
 
+inline CameraParameters defaultCameraParams() {
+  return CameraParameters{
+      .position = glm::vec3(0.0f, 0.0f, 3.0f),
+      .up = glm::vec3(0.0f, 1.0f, 0.0f),
+      .right = glm::vec3(1.0f, 0.0f, 0.0f),
+      .yaw_in_deg = -90.0f,
+      .pitch_in_deg = 0.0f,
+      .fov_in_deg = 45.0f,
+      .aspectRatio = 16.0f / 9.0f,
+      .nearPlane = 0.1f,
+      .farPlane = 100.0f
+  };
+}
+
 struct Camera {
-  explicit Camera(const CameraParameters &params) : m_position(params.position),
-                                                    m_front(params.front),
-                                                    m_up(params.up),
-                                                    m_right(params.right),
-                                                    m_fov_in_deg(params.fov_in_deg),
-                                                    m_aspect_ratio(params.aspectRatio),
-                                                    m_near_plane(params.nearPlane),
-                                                    m_far_plane(params.farPlane) {
+  Camera() : m_params(defaultCameraParams()) {}
+  explicit Camera(const CameraParameters &params) : m_params(params) {
     params.selfCheck();
   }
   [[nodiscard]] glm::mat4 viewMatrix() const {
-    return glm::lookAt(m_position, m_position + m_front, m_up);
+    return glm::lookAt(m_params.position, m_params.position + front(), m_params.up);
   }
-  [[nodiscard]] glm::mat4 projectionMatrix() const {
-    return glm::perspective(glm::radians(m_fov_in_deg), m_aspect_ratio, m_near_plane, m_far_plane);
+  [[nodiscard]] glm::mat4 perspectiveProjectionMatrix() const {
+    return glm::perspective(fovInRad(), m_params.aspectRatio, m_params.nearPlane, m_params.farPlane);
   }
   [[nodiscard]] const glm::vec3 &position() const {
-    return m_position;
+    return m_params.position;
   }
-  [[nodiscard]] const glm::vec3 &front() const {
-    return m_front;
+  [[nodiscard]] glm::vec3 front() const {
+    glm::vec3 front;
+    front.x = cos(glm::radians(m_params.yaw_in_deg)) * cos(glm::radians(m_params.pitch_in_deg));
+    front.y = sin(glm::radians(m_params.pitch_in_deg));
+    front.z = sin(glm::radians(m_params.yaw_in_deg)) * cos(glm::radians(m_params.pitch_in_deg));
+    return glm::normalize(front);
   }
   [[nodiscard]] const glm::vec3 &up() const {
-    return m_up;
+    return m_params.up;
   }
   [[nodiscard]] const glm::vec3 &right() const {
-    return m_right;
+    return m_params.right;
   }
   [[nodiscard]] float fovInDeg() const {
-    return m_fov_in_deg;
+    return m_params.fov_in_deg;
   }
   [[nodiscard]] float fovInRad() const {
-    return glm::radians(m_fov_in_deg);
+    return glm::radians(m_params.fov_in_deg);
   }
   [[nodiscard]] float aspectRatio() const {
-    return m_aspect_ratio;
+    return m_params.aspectRatio;
   }
   [[nodiscard]] float nearPlane() const {
-    return m_near_plane;
+    return m_params.nearPlane;
   }
- private:
-  template <typename Derived>
-  friend struct CameraController;
-  glm::vec3 m_position;
-  glm::vec3 m_front;
-  glm::vec3 m_up;
-  glm::vec3 m_right;
-  float m_fov_in_deg;
-  float m_aspect_ratio;
-  float m_near_plane;
-  float m_far_plane;
+  [[nodiscard]] float yawInDeg() const {
+    return m_params.yaw_in_deg;
+  }
+  [[nodiscard]] float pitchInDeg() const {
+    return m_params.pitch_in_deg;
+  }
+ protected:
+  template<typename Derived>
+  friend
+  struct CameraController;
+  CameraParameters m_params;
 };
 }
 #endif //SIMCRAFT_OGLRENDER_INCLUDE_OGL_RENDER_CAMERA_H_

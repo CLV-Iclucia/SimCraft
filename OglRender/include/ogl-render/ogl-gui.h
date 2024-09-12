@@ -14,21 +14,16 @@ namespace opengl {
 struct GuiOption {
   int width{}, height{};
   std::string_view title{};
-  std::unique_ptr<ExtGuiWrapper> optional_ext_gui{};
 };
 
 struct OpenglGui : Resource {
   using RenderLoop = std::function<void()>;
   using LoopCondition = std::function<bool()>;
-  explicit OpenglGui(GuiOption& option) {
-    auto& [width, height, title, optional_ext_gui] = option;
+  explicit OpenglGui(const GuiOption& option) {
+    auto& [width, height, title] = option;
     window = std::make_unique<Window>(width, height, title);
-    if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
-      // TODO: ERROR
-      std::cerr << "Failed to initialize GLAD\n";
-      exit(-1);
-    }
-    ext_gui = std::move(optional_ext_gui);
+    if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress))
+      throw std::runtime_error("Failed to initialize GLAD");
   }
   void render(const RenderLoop &loop_body,
               const LoopCondition &condition = {[]() -> bool { return true; }}) const {
@@ -39,8 +34,6 @@ struct OpenglGui : Resource {
     }
   }
   std::unique_ptr<Window> window{};
-  std::unique_ptr<ExtGuiWrapper> ext_gui{};
-  ~OpenglGui() = default;
 };
 
 }

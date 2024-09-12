@@ -1,6 +1,6 @@
 project(OglRender LANGUAGES CXX)
 
-option(BUILD_EXTERNAL_GUI "Build external GUI" ON)
+option(BUILD_EXTERNAL_GUI "Build external GUI" OFF)
 
 file(GLOB_RECURSE srcs CONFIGURE_DEPENDS src/*.cpp include/ogl-render/*.h src/*.cc)
 if (BUILD_EXTERNAL_GUI)
@@ -11,14 +11,11 @@ endif()
 
 add_definitions(-DOGL_RENDER_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
-add_library(ogl-render STATIC ${srcs} ${ext_srcs}
-        src/camera-controller.cc)
+add_library(ogl-render STATIC ${srcs} ${ext_srcs})
 target_link_libraries(ogl-render PUBLIC glad glfw ${EXTERNAL_GUI_LIBS})
 target_include_directories(ogl-render PUBLIC include ${EXTERNAL_PATH}/glm ${EXTERNAL_GUI_INCLUDE_DIR})
 
-add_executable(mesh-view apps/mesh-view.cc
-        include/ogl-render/platform.h
-        include/ogl-render/camera-controller.h)
+add_executable(mesh-view apps/mesh-view.cc)
 target_link_libraries(mesh-view PUBLIC ogl-render)
 
 add_executable(perf-lab apps/perf-lab.cc)

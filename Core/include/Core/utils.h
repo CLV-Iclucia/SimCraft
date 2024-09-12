@@ -5,7 +5,6 @@
 #ifndef SIMCRAFT_CORE_INCLUDE_CORE_UTILS_H_
 #define SIMCRAFT_CORE_INCLUDE_CORE_UTILS_H_
 #include <Core/core.h>
-#include <Core/cuda-utils.h>
 namespace core {
 constexpr Real PI = 3.141592653589793238462643383279502884197169399375105820974;
 constexpr Real PI_2 =
@@ -21,10 +20,11 @@ using glm::normalize;
 using glm::dot;
 
 template<typename T>
-CUDA_CALLABLE CUDA_FORCEINLINE T clamp(const T &x, const T &min, const T &max) {
 #ifndef __CUDA_ARCH__
+T clamp(const T &x, const T &min, const T &max) {
   return glm::clamp(x, min, max);
 #else
+CUDA_CALLABLE CUDA_FORCEINLINE T clamp(const T &x, const T &min, const T &max) {
   return fmaxf(min, fminf(x, max));
 #endif
 }

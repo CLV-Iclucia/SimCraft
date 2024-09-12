@@ -15,6 +15,7 @@ struct StrainEnergyDensity {
   virtual Matrix<T, 3, 3> computeEnergyGradient(const DeformationGradient<T, 3> &dg) const = 0;
   virtual Matrix<T, 9, 9> computeEnergyHessian(const DeformationGradient<T, 3> &dg) const = 0;
   virtual Matrix<T, 9, 9> filteredEnergyHessian(const DeformationGradient<T, 3> &dg) const = 0;
+  virtual ~StrainEnergyDensity() = default;
 };
 
 template<typename T>
@@ -37,10 +38,6 @@ struct StableNeoHookean final : StrainEnergyDensity<T> {
     auto I = isotropicInvariants(dg);
     return 0.5 * mu * (I(1) - 3.0) - mu * (I(2) - 1.0) + 0.5 * lambda * (I(2) - 1.0) * (I(2) - 1.0);
   }
-  // pEpIii = 0.5 * mu
-  // pEpIiii = -mu + lambda * (I(2) - 1.0)
-  // p2EpIii2 = 0
-  // p2EpIiii2 = lambda
   Matrix<T, 3, 3> computeEnergyGradient(const DeformationGradient<T, 3> &dg) const override {
     auto I = isotropicInvariants(dg);
     auto pIiipF = gradientIii<T>(dg);

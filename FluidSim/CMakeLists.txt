@@ -46,9 +46,9 @@ foreach(test_src ${test_srcs})
           ../Deform/include/Deform/strain-energy-density.h
           ../Deform/include/Deform/types.h
           ../Deform/apps/deform-explore.cc
-          ../FEM/apps/fem.cc
+          ../FEM/apps/ipc-fem.cc
           ../Maths/include/Maths/types.h
-          ../Maths/tests/test-tensor.cc
+          ../Maths/tests/test-sparse-builder.cc
           ../FEM/include/fem/types.h
           ../FEM/include/fem/integrator.h
           ../FEM/include/fem/tet-mesh.h

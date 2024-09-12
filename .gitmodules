@@ -7,3 +7,6 @@
 [submodule "external/imgui-cmake"]
 	path = external/imgui-cmake
 	url = git@github.com:CLV-Iclucia/imgui-cmake.git
+[submodule "external/cxxopts"]
+	path = external/cxxopts
+	url = git@github.com:jarro2783/cxxopts.git

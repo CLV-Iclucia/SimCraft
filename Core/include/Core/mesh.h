@@ -17,4 +17,4 @@ struct Mesh {
 bool myLoadObj(const std::string& path, Mesh* mesh);
 bool exportObj(const std::string& path, const Mesh& mesh);
 }// namespace core
-#endif // SIMCRAFT_CORE_INCLUDE_CORE_DATA_STRUCTURES_SDF_H_
+#endif // SIMCRAFT_CORE_INCLUDE_CORE_SURFACE_H_

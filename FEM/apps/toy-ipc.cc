@@ -1,11 +1,15 @@
 #include <Deform/types.h>
 #include <Deform/invariants.h>
 #include <Deform/strain-energy-density.h>
+#include <fem/tet-mesh.h>
+#include <ogl-render/camera-controller.h>
+#include <ogl-render/window.h>
 #include <Maths/svd.h>
 #include <Maths/tensor.h>
 #include <iostream>
 #include <format>
 using namespace deform;
+using namespace fem;
 
 template<typename T, int N, int M>
 std::string toString(const Eigen::Matrix<T, N, M> &A) {
@@ -61,14 +65,10 @@ Matrix<Real, 3, 3> tetDs(const Vector<Real, 12> &x) {
   return Ds;
 }
 
-void ipcImplicitEuler(const Vector<Real, 3> &a,
-                      const Vector<Real, 3> &b,
-                      const Vector<Real, 3> &c,
-                      const Vector<Real, 3> &d) {
+void ipcImplicitEuler(TetMesh& mesh) {
   DeformationGradient<Real, 3> dg(Matrix<Real, 3, 3>::Identity());
   StableNeoHookean<Real> energy(ElasticityParameters<Real>{1e4, 0.49});
-  Vector<Real, 12> x;
-  x << a, b, c, d;
+
   dg.updateCurrentConfig(tetDs(x));
   // one step
   Real E_prev = energy.computeEnergyDensity(dg);
@@ -105,7 +105,10 @@ void ipcImplicitEuler(const Vector<Real, 3> &a,
   }
 }
 int main() {
-  auto bunny = fem::readTetMeshFromTobj("bunny.tobj");
+  auto bunny = fem::readTetMeshFromTOBJ(ASSETS_DIR"/bunny.tobj");
+  if (bunny == nullptr) {
+    core::ERROR("Failed to load bunny.tobj");
+    std::exit(-1);
+  }
 
-  ipcImplicitEuler(a, b, c, d);
 }

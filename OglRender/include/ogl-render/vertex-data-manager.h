@@ -46,7 +46,8 @@ struct VertexDataManager : Resource {
   requires std::is_pod_v<typename Attribute::value_type>
   void initAttributeData(const std::string &attribute_name, std::span<const Attribute> data) {
     using ComponentType = typename Attribute::value_type;
-    initAttributeData<Usage, Attribute, ComponentType>(attribute_name, data);
+    constexpr int NumComponentPerAttribute = sizeof(Attribute) / sizeof(ComponentType);
+    initAttributeData<Usage, NumComponentPerAttribute, ComponentType>(attribute_name, data);
   }
 
  private:

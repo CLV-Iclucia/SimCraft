@@ -21,14 +21,14 @@ TEST(QuadraticSolveTest, ComplexRoots) {
 TEST(CubicSolveTest, SingleRoot) {
   CubicPolynomial poly{1, 0, 0, -1}; // x^3 - 1 = 0
   CubicEquationRoots roots = clampedCubicSolve(poly, -10, 10, 1e-9);
-  EXPECT_EQ(roots.num_roots, 1);
+  EXPECT_EQ(roots.numRoots, 1);
   EXPECT_NEAR(roots.roots[0], 1.0, 1e-9);
 }
 
 TEST(CubicSolveTest, TwoRoots) {
   CubicPolynomial poly{1, -4, 5, -2}; // (x-1)^2(x-2) = 0
   CubicEquationRoots roots = clampedCubicSolve(poly, -10, 10, 1e-9);
-  EXPECT_EQ(roots.num_roots, 3);  // Two of the roots are the same
+  EXPECT_EQ(roots.numRoots, 3);  // Two of the roots are the same
   EXPECT_NEAR(roots.roots[0], 1.0, 1e-7);
   EXPECT_NEAR(roots.roots[1], 1.0, 1e-7);
   EXPECT_NEAR(roots.roots[2], 2.0, 1e-7);
@@ -37,7 +37,7 @@ TEST(CubicSolveTest, TwoRoots) {
 TEST(CubicSolveTest, ThreeRoots) {
   CubicPolynomial poly{1, -6, 11, -6}; // (x-1)(x-2)(x-3) = 0
   CubicEquationRoots roots = clampedCubicSolve(poly, -10, 10, 1e-9);
-  EXPECT_EQ(roots.num_roots, 3);
+  EXPECT_EQ(roots.numRoots, 3);
   EXPECT_NEAR(roots.roots[0], 1.0, 1e-9);
   EXPECT_NEAR(roots.roots[1], 2.0, 1e-9);
   EXPECT_NEAR(roots.roots[2], 3.0, 1e-9);

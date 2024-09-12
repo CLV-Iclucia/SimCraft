@@ -2,9 +2,10 @@
 // Created by creeper on 10/25/23.
 //
 #include <ogl-render/shader-prog.h>
+#include <ogl-render/attribute-utils.h>
 
 namespace opengl {
-void ShaderProgram::initUniformHandles() {
+void ShaderProgram::initUniformVariables() {
   char name[256];
   glCheckError(glGetProgramiv(id, GL_ACTIVE_UNIFORMS, &uniform_count));
   for (int i = 0; i < uniform_count; i++) {
@@ -13,10 +14,11 @@ void ShaderProgram::initUniformHandles() {
     int size;
     glCheckError(glGetActiveUniform(id, i, 256, &length, &size, &type, name));
     glCheckError(uniform_handles[name] = glGetUniformLocation(id, name));
+    uniform_type_info[name] = {.type = glBasicType(type), .component_count = componentCount(type), .array_size = size};
   }
 }
+
 ShaderProgram::ShaderProgram(const ShaderProgramConfig &config) {
-  // 1. retrieve the vertex/fragment source code from filePath
   std::string vertexCode;
   std::string fragmentCode;
   std::string geometryCode;
@@ -27,8 +29,8 @@ ShaderProgram::ShaderProgram(const ShaderProgramConfig &config) {
   fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
   gShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
   try {
-    vShaderFile.open(config.vertex_shader_path);
-    fShaderFile.open(config.fragment_shader_path);
+    vShaderFile.open(config.vertexShaderPath);
+    fShaderFile.open(config.fragmentShaderPath);
     std::stringstream vShaderStream, fShaderStream;
     vShaderStream << vShaderFile.rdbuf();
     fShaderStream << fShaderFile.rdbuf();
@@ -82,9 +84,10 @@ ShaderProgram::ShaderProgram(const ShaderProgramConfig &config) {
     glDeleteShader(geometry);
   glGetProgramiv(id, GL_ACTIVE_UNIFORMS, &uniform_count);
   glGetProgramiv(id, GL_ACTIVE_ATTRIBUTES, &attribute_count);
-  initUniformHandles();
-  initActiveAttributeLayout();
+  initUniformVariables();
+  initActiveAttributeTable();
 }
+
 void ShaderProgram::checkCompileErrors(GLuint shader, const std::string &type) {
   GLint success;
   GLchar infoLog[1024];
@@ -108,17 +111,18 @@ void ShaderProgram::checkCompileErrors(GLuint shader, const std::string &type) {
     }
   }
 }
-void ShaderProgram::initActiveAttributeLayout() {
+
+void ShaderProgram::initActiveAttributeTable() {
   glCheckError(glGetProgramiv(id, GL_ACTIVE_ATTRIBUTES, &attribute_count));
   char name[256];
   GLint written, size, location;
   GLenum type;
-  std::unordered_map<GLuint, std::string> attribute_location_map;
+  std::unordered_map<GLuint, ShaderVariable> index_attribute_map;
   for (int i = 0; i < attribute_count; ++i) {
     glCheckError(glGetActiveAttrib(id, i, 256, &written, &size, &type, name));
     glCheckError(location = glGetAttribLocation(id, name));
-    attribute_location_map[location] = name;
+    index_attribute_map[location] = {OglTypeInfo{glBasicType(type), componentCount(type), size}, name};
   }
-  attribute_layout = AttributeLayout(attribute_location_map);
+  attribute_table = AttributeTable(index_attribute_map);
 }
 }

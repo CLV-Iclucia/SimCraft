@@ -14,7 +14,7 @@ struct HalfPlane {
   }
   Real signedDistance(const Vector<Real, 3>& x) const {
     return n.dot(x - p);
-  }
+}
 };
 }
 #endif //SIMCRAFT_MATHS_INCLUDE_MATHS_GEOMETRY_H_
