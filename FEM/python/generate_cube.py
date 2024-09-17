@@ -48,6 +48,6 @@ def generate_cube_tobj(size, resolution, filename):
             f.write(f"t {t[0]} {t[1]} {t[2]} {t[3]}\n")
 
 size = 2.0
-resolution = 50
+resolution = 10
 filename = 'cube' + str(resolution) + 'x' + str(resolution) + '.tobj'
 generate_cube_tobj(size, resolution, filename)

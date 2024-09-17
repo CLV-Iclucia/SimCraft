@@ -42,13 +42,13 @@ struct DeformationGradient {
       result.col(1).reshaped(3, 3).row(1) = Vector<T, Dim>(-s0, -s1, -s2);
       result.col(2).reshaped(3, 3).row(2) = Vector<T, Dim>(-s0, -s1, -s2);
       result.col(3).reshaped(3, 3).row(0) = r0;
-      result.col(4).reshaped(3, 3).row(0) = r1;
-      result.col(5).reshaped(3, 3).row(0) = r2;
-      result.col(6).reshaped(3, 3).row(1) = r0;
+      result.col(6).reshaped(3, 3).row(0) = r1;
+      result.col(9).reshaped(3, 3).row(0) = r2;
+      result.col(4).reshaped(3, 3).row(1) = r0;
       result.col(7).reshaped(3, 3).row(1) = r1;
-      result.col(8).reshaped(3, 3).row(1) = r2;
-      result.col(9).reshaped(3, 3).row(2) = r0;
-      result.col(10).reshaped(3, 3).row(2) = r1;
+      result.col(10).reshaped(3, 3).row(1) = r2;
+      result.col(5).reshaped(3, 3).row(2) = r0;
+      result.col(8).reshaped(3, 3).row(2) = r1;
       result.col(11).reshaped(3, 3).row(2) = r2;
       return result;
     } else

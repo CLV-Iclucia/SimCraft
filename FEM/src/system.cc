@@ -2,13 +2,12 @@
 // Created by creeper on 6/12/24.
 //
 #include <fem/system.h>
-
+#include <Deform/invariants.h>
 namespace fem {
 
-static void tetAssembleGlobal(VecXd &global, const VecXd &local, const TetrahedronTopology &tet) {
+static void tetAssembleGlobal(VecXd &global, const Vector<Real, 12> &local, const TetrahedronTopology &tet) {
   for (int i = 0; i < 4; i++)
-    for (int j = 0; j < 3; j++)
-      global(tet(i) * 3 + j) += local(i * 3 + j);
+    global.segment<3>(tet(i) * 3) += local.segment<3>(3 * i);
 }
 
 void System::spdProjectHessian(maths::SparseMatrixBuilder<Real> &builder) const {
@@ -17,7 +16,7 @@ void System::spdProjectHessian(maths::SparseMatrixBuilder<Real> &builder) const 
     auto &energy = primitives.meshEnergies[primitives.tetMeshIDs[i]];
     auto hessian_F = energy->filteredEnergyHessian(dg);
     auto p_F_p_x = dg.gradient();
-    auto hessian_x = p_F_p_x.transpose() * hessian_F * p_F_p_x;
+    auto hessian_x = p_F_p_x.transpose() * hessian_F * p_F_p_x * primitives.tetRefVolumes[i];
     builder.assembleBlock<12, 3>(hessian_x,
                                  primitives.tets(0, i),
                                  primitives.tets(1, i),
@@ -29,51 +28,52 @@ void System::spdProjectHessian(maths::SparseMatrixBuilder<Real> &builder) const 
 Real System::deformationEnergy() const {
   if (state != State::Simulation)
     core::ERROR("Cannot compute deformation energy in states other than simulation");
-  if (dg_dirty)
+  if (dgDirty)
     updateDeformationGradient();
-  else if (!E_dirty)
-    return E_cache;
-  assert(!dg_dirty);
+  else if (!energyDirty)
+    return cachedEnergy;
+  assert(!dgDirty);
   Real sum = 0;
   for (int i = 0; i < numTets(); i++) {
     auto &dg = primitives.tetDeformationGradients[i];
     auto &energy = primitives.meshEnergies[primitives.tetMeshIDs[i]];
-    sum += energy->computeEnergyDensity(dg);
+    sum += energy->computeEnergyDensity(dg) * primitives.tetRefVolumes[i];
   }
-  E_cache = sum;
-  E_dirty = false;
+  cachedEnergy = sum;
+  energyDirty = false;
   return sum;
 }
 
 System &System::updateCurrentConfig(const VecXd &x_nxt) {
   x = x_nxt;
-  dg_dirty = true;
-  E_dirty = true;
-  E_grad_dirty = true;
+  dgDirty = true;
+  energyDirty = true;
+  energyGradientDirty = true;
   return *this;
 }
 
 const VecXd &System::deformationEnergyGradient() const {
   if (state != State::Simulation)
     core::ERROR("Cannot compute deformation energy gradient in states other than simulation");
-  if (dg_dirty)
+  if (dgDirty)
     updateDeformationGradient();
-  else if (!E_grad_dirty)
-    return psi_grad;
-  psi_grad.setZero();
+  else if (!energyGradientDirty)
+    return energyGradient;
+  energyGradient.setZero();
   for (int i = 0; i < numTets(); i++) {
     auto &dg = primitives.tetDeformationGradients[i];
     auto &energy = primitives.meshEnergies[primitives.tetMeshIDs[i]];
     auto grad = energy->computeEnergyGradient(dg);
     auto p_F_p_x = dg.gradient();
-    auto grad_x = p_F_p_x.transpose() * vectorize(grad);
-    tetAssembleGlobal(psi_grad, grad_x, primitives.tets.col(i));
+    Vector<Real, 12> grad_x = p_F_p_x.transpose() * vectorize(grad) * primitives.tetRefVolumes[i];
+    tetAssembleGlobal(energyGradient, grad_x, primitives.tets.col(i));
   }
-  return psi_grad;
+  energyGradientDirty = false;
+  return energyGradient;
 }
 
 void System::updateDeformationGradient() const {
-  if (!dg_dirty) return;
+  if (!dgDirty) return;
   for (int i = 0; i < numTets(); i++) {
     auto &dg = primitives.tetDeformationGradients[i];
     Matrix<Real, 3, 3> local_x;
@@ -81,7 +81,17 @@ void System::updateDeformationGradient() const {
       local_x.col(j) = currentPos(primitives.tets(j + 1, i)) - currentPos(primitives.tets(0, i));
     dg.updateCurrentConfig(local_x);
   }
-  dg_dirty = false;
+  dgDirty = false;
+}
+
+void System::saveSurfaceObjFile(const std::filesystem::path &path) const {
+  std::ofstream out(path);
+  for (int i = 0; i < numVertices(); i++)
+    out << "v " << currentPos(i).transpose() << std::endl;
+  for (int i = 0; i < primitives.surfaces.cols(); i++)
+    out << "f " << primitives.surfaces(0, i) + 1 << " " << primitives.surfaces(1, i) + 1 << " "
+        << primitives.surfaces(2, i) + 1 << std::endl;
+  out.close();
 }
 
 System &System::addPrimitive(PrimitiveConfig &&config) {
@@ -118,8 +128,12 @@ System &System::addPrimitive(PrimitiveConfig &&config) {
   }
 
   primitives.edges.conservativeResize(Eigen::NoChange, primitives.edges.cols() + added_num_edges);
-  for (int i = 0; i < added_num_edges; i++)
-    primitives.edges.col(current_num_edges + i) = mesh->surfaceEdges.col(i) + Vector<int, 2>::Constant(current_num_edges);
+  for (int i = 0; i < added_num_edges; i++) {
+    Real length = (currentPos(mesh->surfaceEdges(0, i)) - currentPos(mesh->surfaceEdges(1, i))).norm();
+    m_meshLengthScale = std::min(m_meshLengthScale, length);
+    primitives.edges.col(current_num_edges + i) =
+        mesh->surfaceEdges.col(i) + Vector<int, 2>::Constant(current_num_vertices);
+  }
 
   primitives.tets.conservativeResize(Eigen::NoChange, current_num_tets + mesh->tets.cols());
   for (int i = 0; i < added_num_tets; i++)
@@ -127,7 +141,8 @@ System &System::addPrimitive(PrimitiveConfig &&config) {
 
   primitives.surfaces.conservativeResize(Eigen::NoChange, current_num_triangles + mesh->surfaces.cols());
   for (int i = 0; i < added_num_triangles; i++)
-    primitives.surfaces.col(current_num_triangles + i) = mesh->surfaces.col(i) + Vector<int, 3>::Constant(current_num_vertices);
+    primitives.surfaces.col(current_num_triangles + i) =
+        mesh->surfaces.col(i) + Vector<int, 3>::Constant(current_num_vertices);
 
   primitives.tetDeformationGradients.reserve(primitives.tets.cols());
   primitives.tetRefVolumes.reserve(primitives.tets.cols());
@@ -152,15 +167,37 @@ void System::buildMassMatrix(maths::SparseMatrixBuilder<Real> &builder) const {
     Real density = primitives.meshDensities[primitives.tetMeshIDs[i]];
     Real volume = primitives.tetRefVolumes[i];
     Matrix<Real, 12, 12> localMass;
+    localMass.setZero();
     for (int j = 0; j < 4; j++)
       for (int k = 0; k < 4; k++)
-        localMass.block<3, 3>(j * 3, k * 3) = density * volume * (j == k ? 0.1 : 0.05) * Matrix<Real, 3, 3>::Identity();
+        localMass.block<3, 3>(j * 3, k * 3) +=
+            density * volume * (j == k ? 0.1 : 0.05) * Matrix<Real, 3, 3>::Identity();
     builder.assembleBlock<12, 3>(localMass,
-                                  primitives.tets(0, i),
-                                  primitives.tets(1, i),
-                                  primitives.tets(2, i),
-                                  primitives.tets(3, i));
+                                 primitives.tets(0, i),
+                                 primitives.tets(1, i),
+                                 primitives.tets(2, i),
+                                 primitives.tets(3, i));
   }
 }
 
+VecXd symbolicDeformationEnergyGradient(System &system) {
+  return system.deformationEnergyGradient();
+}
+
+VecXd numericalDeformationEnergyGradient(System &system) {
+  VecXd grad(system.dof());
+  Real dx = 1e-7;
+  VecXd current = system.currentConfig();
+  for (int i = 0; i < system.dof(); i++) {
+    VecXd x_plus = current;
+    x_plus(i) += dx;
+    VecXd x_minus = current;
+    x_minus(i) -= dx;
+    Real E_plus = system.updateCurrentConfig(x_plus).deformationEnergy() / (2 * dx);
+    Real E_minus = system.updateCurrentConfig(x_minus).deformationEnergy() / (2 * dx);
+    grad(i) = (E_plus - E_minus);
+  }
+  system.updateCurrentConfig(current);
+  return grad;
+}
 }

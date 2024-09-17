@@ -24,6 +24,10 @@ struct PrimitiveConfig {
   Real density{};
 };
 
+struct SystemUpdateListener {
+  virtual void onSystemUpdate(const System& system) = 0;
+};
+
 struct System {
   auto currentPos(int i) const {
     return x.segment<3>(i * 3);
@@ -35,9 +39,9 @@ struct System {
 
  private:
   VecXd x;
-  mutable bool E_dirty{false}, dg_dirty{false}, E_grad_dirty{false};
-  mutable VecXd psi_grad;
-  mutable Real E_cache{};
+  mutable bool energyDirty{false}, dgDirty{false}, energyGradientDirty{false};
+  mutable VecXd energyGradient;
+  mutable Real cachedEnergy{};
   struct Primitives {
     Matrix<int, 3, Dynamic> surfaces;
     Matrix<int, 4, Dynamic> tets;
@@ -53,10 +57,9 @@ struct System {
     Simulation,
   };
   State state{State::Initialization};
-  std::vector<int> m_vertices{};
   Eigen::SparseMatrix<Real> m_mass;
   Eigen::SimplicialLDLT<SparseMatrix<Real>> m_massLDLT;
-
+  Real m_meshLengthScale{std::numeric_limits<Real>::infinity()};
 
   void updateDeformationGradient() const;
 
@@ -64,8 +67,8 @@ struct System {
  public:
   VecXd xdot{}, X{}, f_ext{};
 
-  const std::vector<int> &vertices() const {
-    return m_vertices;
+  Real meshLengthScale() const {
+    return m_meshLengthScale;
   }
 
   const Matrix<int, 3, Dynamic> &surfaces() const {
@@ -76,11 +79,11 @@ struct System {
     return primitives.edges;
   }
 
-  const SparseMatrix<Real>& mass() const {
+  const SparseMatrix<Real> &mass() const {
     return m_mass;
   }
 
-  const Eigen::SimplicialLDLT<SparseMatrix<Real>>& massLDLT() const {
+  const Eigen::SimplicialLDLT<SparseMatrix<Real>> &massLDLT() const {
     return m_massLDLT;
   }
 
@@ -111,7 +114,12 @@ struct System {
   }
 
   size_t dof() const {
-    return 3 * m_vertices.size();
+    return x.size();
+  }
+
+  [[nodiscard]] int numVertices() const {
+    assert(x.size() % 3 == 0);
+    return static_cast<int>(x.size() / 3);
   }
 
   bool checkEdgeAdjacent(int ia, int ib) const {
@@ -136,17 +144,46 @@ struct System {
     auto massBuilder = maths::SparseMatrixBuilder<Real>(dof(), dof());
     buildMassMatrix(massBuilder);
     m_mass = massBuilder.build();
+    std::cout << "mass built" << std::endl;
+    std::cout << m_mass.rows() << " " << m_mass.cols() << std::endl;
     m_massLDLT.compute(m_mass);
+    std::cout << "mass inverse computed" << std::endl;
     if (m_massLDLT.info() != Eigen::Success)
       core::ERROR("Failed to compute mass matrix LDLT decomposition");
+    f_ext.resize(static_cast<Eigen::Index>(dof()));
+    f_ext.setZero();
+    energyGradient.resize(static_cast<Eigen::Index>(dof()));
+    dgDirty = true;
+    energyDirty = true;
+    energyGradientDirty = true;
     return *this;
+  }
+
+  Real kineticEnergy() const {
+    return 0.5 * xdot.dot(m_mass * xdot);
+  }
+
+  Real potentialEnergy() const {
+    return deformationEnergy();
+  }
+
+  Real totalEnergy() const {
+    return kineticEnergy() + potentialEnergy();
   }
 
   const VecXd &currentConfig() const {
     return x;
   }
 
-  System &addPrimitive(PrimitiveConfig&& config);
+  System &addPrimitive(PrimitiveConfig &&config);
+
+  void saveSurfaceObjFile(const std::filesystem::path &path) const;
+
+  friend VecXd symbolicDeformationEnergyGradient(System &system);
+  friend VecXd numericalDeformationEnergyGradient(System &system);
 };
+
+VecXd symbolicDeformationEnergyGradient(System &system);
+VecXd numericalDeformationEnergyGradient(System &system);
 }
 #endif //SIMCRAFT_FEM_INCLUDE_FEM_SYSTEM_H_

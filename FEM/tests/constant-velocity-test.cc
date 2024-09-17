@@ -1,3 +1,6 @@
+//
+// Created by creeper on 9/12/24.
+//
 #include <Deform/strain-energy-density.h>
 #include <fem/tet-mesh.h>
 #include <fem/system.h>
@@ -25,35 +28,27 @@ struct Material {
 PrimitiveConfig alicePrimitive() {
   std::unique_ptr<StrainEnergyDensity<Real>> energy = std::make_unique<StableNeoHookean<Real>>(Material{}.params);
   auto alice = readTetMeshFromTOBJ(FEM_TETS_DIR "/cube10x10.tobj");
+  for (int i = 0; i < alice->vertices.cols(); ++i)
+    alice->vertices.col(i) -= fem::Vector<Real, 3>(0.25, 0.0, 0.0);
   fem::Matrix<Real, 3, Eigen::Dynamic> velocities(3, alice->vertices.cols());
   for (int i = 0; i < velocities.cols(); ++i)
     velocities.col(i) = fem::Vector<Real, 3>(10.0, 0.0, 0.0);
   return {std::move(alice), std::move(velocities), std::move(energy), Material{}.density};
 }
 
-PrimitiveConfig bobPrimitive() {
-  std::unique_ptr<StrainEnergyDensity<Real>> energy = std::make_unique<StableNeoHookean<Real>>(Material{}.params);
-  auto bob = readTetMeshFromTOBJ(FEM_TETS_DIR "/cube10x10.tobj");
-  for (int i = 0; i < bob->vertices.cols(); ++i)
-    bob->vertices.col(i) += fem::Vector<Real, 3>(2.5, 0.0, 0.0);
-  fem::Matrix<Real, 3, Eigen::Dynamic> velocities(3, bob->vertices.cols());
-  for (int i = 0; i < velocities.cols(); ++i)
-    velocities.col(i) = fem::Vector<Real, 3>(-10.0, 0.0, 0.0);
-  return {std::move(bob), std::move(velocities), std::move(energy), Material{}.density};
-}
-
 int main() {
   auto system = std::make_unique<System>();
   system->addPrimitive(alicePrimitive());
-  system->addPrimitive(bobPrimitive());
   system->startSimulationPhase();
   auto integrator = std::make_unique<IpcImplicitEuler>(*system);
-  Real t = 0.0, dt = 0.001;
+  Real t = 0.0, dt = 0.01;
   std::cout << std::format("total energy: {:f} = {:f} (T) + {:f} (V)\n", system->totalEnergy(), system->kineticEnergy(), system->potentialEnergy());
-  while (t < 1.0) {
+  while (t < 0.4) {
     integrator->step(dt);
     t += dt;
     std::cout << std::format("----------------------- t = {:f} -----------------\n", t);
     std::cout << std::format("total energy: {:f} = {:f} (T) + {:f} (V)\n", system->totalEnergy(), system->kineticEnergy(), system->potentialEnergy());
+    // print all the velocities
+    std::cout << system->xdot.transpose() << std::endl;
   }
 }

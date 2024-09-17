@@ -8,10 +8,6 @@
 using namespace fem;
 using namespace opengl;
 
-struct SystemGui {
-
-};
-
 void checkArgs(const cxxopts::ParseResult &result) {
   if (!result.count("input")) {
     std::cerr << "Please specify input file" << std::endl;

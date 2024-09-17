@@ -11,49 +11,6 @@ namespace fem::ipc {
 using spatify::parallel_for;
 using maths::mixedProduct;
 
-struct Trajectory {
-  const System &system;
-  const VecXd &p;
-  Real toi = 1.0;
-  int idx{};
-};
-
-static BBox<Real, 3> computeTrajectoryBBox(const Trajectory &trajectory) {
-  const auto &[system, p, toi, idx] = trajectory;
-  BBox<Real, 3> box;
-  for (int i = 0; i < 3; i++) {
-    auto pos = system.currentPos(system.surfaces()(i, idx));
-    auto u = p.segment<3>(3 * system.surfaces()(i, idx)) * toi;
-    auto pos_next = pos + u;
-    box.expand({pos(0), pos(1), pos(2)}).expand({pos_next(0), pos_next(1), pos_next(2)});
-  }
-  return box;
-}
-
-struct SystemTrajectoryAccessor {
-  const VecXd &x;
-  const System &system;
-  const VecXd &p;
-  using CoordType = Real;
-
-  [[nodiscard]]
-  size_t size() const {
-    return system.numTriangles();
-  }
-  [[nodiscard]] BBox<Real, 3> bbox(int idx) const {
-    return computeTrajectoryBBox({.system = system, .p = p, .idx = idx});
-  }
-};
-
-static BBox<Real, 3> computeTriangleBBox(const System &system, int idx) {
-  BBox<Real, 3> box;
-  for (int i = 0; i < 3; i++) {
-    auto pos = system.currentPos(system.surfaces()(i, idx));
-    box.expand({pos(0), pos(1), pos(2)});
-  }
-  return box;
-}
-
 maths::CubicEquationRoots solveCoplanarTime(const CCDQuery &query, Real toi) {
   const auto &[x1, x2_x1, x3_x1, x4_x1, u1, u2_u1, u3_u1, u4_u1] = query;
   Real a = mixedProduct(u2_u1, u3_u1, u4_u1);
@@ -171,11 +128,9 @@ std::optional<Real> CollisionDetector::runACCDReserved(CCDMode mode,
                                                        Real toi,
                                                        Real reservedDistance) const {
   auto computeSquaredDistance = [&]() -> Real {
-    Real dist = 0.0;
     if (mode == CCDMode::EE)
-      dist = distanceEdgeEdge(x[0], x[1], x[2], x[3]);
-    else dist = distancePointTriangle(x[0], x[1], x[2], x[3]);
-    return dist * dist;
+      return distanceSqrEdgeEdge(x[0], x[1], x[2], x[3]);
+    return distanceSqrPointTriangle(x[0], x[1], x[2], x[3]);
   };
   Real lp = 0.0;
   if (mode == CCDMode::EE)
@@ -207,9 +162,9 @@ std::optional<Real> CollisionDetector::runACCD(CCDMode mode,
                                                Real toi) const {
   auto computeDistance = [&]() -> Real {
     if (mode == CCDMode::EE)
-      return distanceEdgeEdge(x[0], x[1], x[2], x[3]);
+      return std::sqrt(distanceSqrEdgeEdge(x[0], x[1], x[2], x[3]));
     else
-      return distancePointTriangle(x[0], x[1], x[2], x[3]);
+      return std::sqrt(distanceSqrPointTriangle(x[0], x[1], x[2], x[3]));
   };
   Real lp = 0.0;
   if (mode == CCDMode::EE)
@@ -306,8 +261,7 @@ std::optional<Real> CollisionDetector::trianglePairCCD(const TrianglePairCCDQuer
 }
 
 std::optional<Real> CollisionDetector::detect(const System &system, const VecXd &p) {
-  const auto &x = system.currentConfig();
-  m_bvh->update(SystemTrajectoryAccessor{x, system, p});
+  m_bvh->update(SystemTriangleTrajectoryAccessor{system, p});
   std::atomic<Real> toi = 1.0;
   std::atomic<bool> hasContact{false};
   tbb::parallel_for (0, system.numTriangles(), [&](int i) {

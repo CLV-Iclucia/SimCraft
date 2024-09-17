@@ -8,6 +8,7 @@
 #include <Spatify/lbvh.h>
 #include <fem/types.h>
 #include <fem/tet-mesh.h>
+#include <fem/system.h>
 #include <Core/utils.h>
 #include <Maths/equations.h>
 #include <Maths/inclusion-root-finder.h>
@@ -30,6 +31,40 @@ struct CCDQuery {
   Vector<Real, 3> u4;
 };
 
+struct Trajectory {
+  const System &system;
+  const VecXd &p;
+  Real toi = 1.0;
+  int idx{};
+};
+
+inline BBox<Real, 3> computeTrajectoryBBox(const Trajectory &trajectory) {
+  const auto &[system, p, toi, idx] = trajectory;
+  BBox<Real, 3> box;
+  for (int i = 0; i < 3; i++) {
+    auto pos = system.currentPos(system.surfaces()(i, idx));
+    auto u = p.segment<3>(3 * system.surfaces()(i, idx)) * toi;
+    auto posNext = pos + u;
+    box.expand({pos(0), pos(1), pos(2)}).expand({posNext(0), posNext(1), posNext(2)});
+  }
+  return box;
+}
+
+struct SystemTriangleTrajectoryAccessor {
+  const System &system;
+  const VecXd &p;
+  Real toi = 1.0;
+  using CoordType = Real;
+
+  [[nodiscard]]
+  size_t size() const {
+    return system.numTriangles();
+  }
+  [[nodiscard]] BBox<Real, 3> bbox(int idx) const {
+    return computeTrajectoryBBox({.system = system, .p = p, .toi = toi, .idx = idx});
+  }
+};
+// reserved for TCCD implementation
 struct VertexTriangleQuery {
   const std::array<Vector<Real, 3>, 4> &x;
   const std::array<Vector<Real, 3>, 4> &p;

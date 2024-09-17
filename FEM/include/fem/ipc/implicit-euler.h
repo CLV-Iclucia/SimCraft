@@ -23,66 +23,121 @@ struct ConstraintSet {
   std::vector<ipc::EdgeEdgeConstraint> eeConstraints{};
 };
 
-class IpcIntegrator : public Integrator {
- public:
-  struct Config {
-    Real dHat;
-    Real eps;
-  } config;
-
-  explicit IpcIntegrator(System &system, const Config& config) : Integrator(system), config(config) {}
- protected:
-  ConstraintSet constraintSet;
-  std::unique_ptr<ipc::CollisionDetector> collisionDetector{};
-};
-
-inline Real unconstrainedLinfNorm(const VecXd &p, const std::vector<bool> &constrained) {
-  Real norm = 0.0;
-  for (int i = 0; i < p.size(); i++)
-    if (!constrained[i])
-      norm = std::max(norm, std::abs(p[i]));
-  return norm;
-}
-
 struct ConstraintSetPrecomputeRequest {
-  const VecXd &currentConfig;
   const VecXd &descentDir;
-  Real alpha;
+  Real toi;
   Real dHat;
 };
 
+class IpcIntegrator : public Integrator {
+ public:
+  struct Config {
+    Real dHat = 1e-3;
+    Real eps = 1e-2;
+    Real contactStiffness = 1e10;
+  } config;
+
+  explicit IpcIntegrator(System &system, const Config &config)
+      : Integrator(system), config(config), barrier(config.dHat) {}
+ protected:
+  ConstraintSet constraintSet;
+  std::unique_ptr<ipc::CollisionDetector> collisionDetector{};
+  ipc::LogBarrier barrier;
+  core::Logger logger;
+};
+
 struct IpcImplicitEuler : public IpcIntegrator {
-  explicit IpcImplicitEuler(System &system, const Config& config);
+  explicit IpcImplicitEuler(System &system, const Config &config = {});
   void step(Real dt) override;
  private:
-  SparseMatrix<Real> spdProjectHessian();
-  Real incrementalPotentialEnergy(const VecXd &x_t, Real h) const;
+  SparseMatrix<Real> spdProjectHessian(Real h);
+
+  Real barrierEnergy() {
+    if (constraintsDirty) {
+      updateConstraintStatus();
+      constraintsDirty = false;
+    }
+    Real barrierEnergy = 0.0;
+    Real kappa = config.contactStiffness;
+    for (const auto &c : constraintSet.vtConstraints)
+      barrierEnergy += barrier(c.distanceSqr());
+    for (const auto &c : constraintSet.eeConstraints)
+      barrierEnergy += c.mollifier() * barrier(c.distanceSqr());
+    return kappa * barrierEnergy;
+  }
+
+  VecXd barrierEnergyGradient() {
+    if (constraintsDirty) {
+      updateConstraintStatus();
+      constraintsDirty = false;
+    }
+    VecXd gradient = VecXd::Zero(system().dof());
+    gradient.setZero();
+    Real kappa = config.contactStiffness;
+    VecXd current = system().currentConfig();
+    for (const auto &c : constraintSet.vtConstraints) {
+      c.assembleBarrierGradient(barrier, gradient, kappa);
+    }
+    for (const auto &c : constraintSet.eeConstraints) {
+      c.assembleMollifiedBarrierGradient(barrier, gradient, kappa);
+    }
+    return gradient;
+  }
+
+  Real incrementalPotentialKinematicEnergy(const VecXd &x_t, Real h) const;
+
   // for now, do not consider dissipative friction forces
   Real barrierAugmentedIncrementalPotentialEnergy(const VecXd &x_t, Real h);
-  auto incrementalPotentialEnergyGradient(const VecXd &x_t, Real h);
+
+  VecXd incrementalPotentialKinematicEnergyGradient(const VecXd &x_t, Real h);
+
   VecXd barrierAugmentedIncrementalPotentialEnergyGradient(const VecXd &x_t, Real h);
+
   void updateCandidateSolution(const VecXd &x) {
     system().updateCurrentConfig(x);
-    constraints_dirty = true;
+    constraintsDirty = true;
   }
-  void updateConstraintStatus();
-  Real computeStepSizeUpperBound(const VecXd &p) const;
-  void precomputeConstraintSet(const ConstraintSetPrecomputeRequest &config);
-  void computeVertexTriangleConstraints(const ConstraintSetPrecomputeRequest &config);
-  void computeEdgeEdgeConstraints(const ConstraintSetPrecomputeRequest &config);
-  void adaptStiffness() {
 
+  Real barrierAugmentedPotentialEnergy() {
+    return system().potentialEnergy() + barrierEnergy();
   }
-  maths::SparseMatrixBuilder<Real> sparseBuilder;
-  Eigen::SimplicialLDLT<SparseMatrix<Real>> ldlt;
-  std::unique_ptr<spatify::LBVH<Real>> edgesBVH;
-  ipc::LogBarrier barrier;
-  Real kappa{};
-  core::Logger logger;
-  VecXd x_prev, x_t_buf;
+
+  VecXd barrierAugmentedPotentialEnergyGradient() {
+    return system().deformationEnergyGradient() + barrierEnergyGradient();
+  }
+
+  void updateConstraintStatus();
+
+  Real computeStepSizeUpperBound(const VecXd &p) const;
+
+  void precomputeConstraintSet(const ConstraintSetPrecomputeRequest &config);
+
+  void computeVertexTriangleConstraints(const ConstraintSetPrecomputeRequest &config);
+
+  void computeEdgeEdgeConstraints(const ConstraintSetPrecomputeRequest &config);
+
+  int activeConstraints() {
+    if (constraintsDirty) {
+      updateConstraintStatus();
+      constraintsDirty = false;
+    }
+    int active = 0;
+    for (const auto &c : constraintSet.vtConstraints)
+      active += (c.distanceSqr() < barrier.dHatSqr());
+    for (const auto &c : constraintSet.eeConstraints)
+      active += (c.distanceSqr() < barrier.dHatSqr());
+    return active;
+  }
+
+  maths::SparseMatrixBuilder<Real> sparseBuilder{};
+  Eigen::SimplicialLDLT<SparseMatrix<Real>> ldlt{};
+  std::unique_ptr<spatify::LBVH<Real>> edgesBVH{};
+  std::unique_ptr<spatify::LBVH<Real>> trianglesBVH{};
+  VecXd x_prev;
   VecXd g;
-  std::vector<bool> constrained_cache;
-  bool constraints_dirty{false};
+  bool constraintsDirty{false};
+  friend VecXd symbolicIncrementalPotentialEnergyGradient(IpcImplicitEuler &euler, const VecXd &x_t, Real h);
+  friend VecXd numericalIncrementalPotentialEnergyGradient(IpcImplicitEuler &euler, const VecXd &x_t, Real h);
 };
 
 }
