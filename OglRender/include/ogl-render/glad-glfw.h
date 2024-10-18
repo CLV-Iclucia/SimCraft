@@ -1,0 +1,9 @@
+//
+// Created by creeper on 6/17/24.
+//
+
+#ifndef SIMCRAFT_OGLRENDER_INCLUDE_OGL_RENDER_GLAD_GLFW_H_
+#define SIMCRAFT_OGLRENDER_INCLUDE_OGL_RENDER_GLAD_GLFW_H_
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+#endif //SIMCRAFT_OGLRENDER_INCLUDE_OGL_RENDER_GLAD_GLFW_H_

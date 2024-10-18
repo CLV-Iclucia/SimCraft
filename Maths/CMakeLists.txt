@@ -1,0 +1,21 @@
+project(Maths LANGUAGES CXX)
+file(GLOB_RECURSE srcs CONFIGURE_DEPENDS src/*.cc src/*.cpp include/*.h)
+add_library(Maths STATIC ${srcs})
+target_include_directories(Maths PUBLIC include ${EIGEN3_INCLUDE_DIR})
+target_link_libraries(Maths PUBLIC Eigen3::Eigen Core)
+
+file(GLOB_RECURSE test_srcs CONFIGURE_DEPENDS tests/*.cc)
+
+foreach(test_src ${test_srcs})
+    get_filename_component(test_name ${test_src} NAME_WE)
+    add_executable(${test_name} ${test_src})
+    target_link_libraries(${test_name} PUBLIC Maths gtest gtest_main)
+    add_test(NAME ${test_name} CONFIGURATIONS Release COMMAND ${test_name})
+endforeach()
+
+file(GLOB apps CONFIGURE_DEPENDS apps/*.cc)
+foreach (app ${apps})
+    get_filename_component(app_name ${app} NAME_WE)
+    add_executable(${app_name} ${app})
+    target_link_libraries(${app_name} PUBLIC Maths)
+endforeach()
