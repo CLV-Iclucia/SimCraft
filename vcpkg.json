@@ -1,9 +1,0 @@
-{
-  "name": "sim-craft",
-  "version": "1.0.0",
-  "dependencies": [
-    "eigen",
-    "glfw3",
-    "tbb"
-  ]
-}
