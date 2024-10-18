@@ -1,6 +1,7 @@
 //
 // Created by creeper on 6/12/24.
 //
+#include <fstream>
 #include <fem/system.h>
 #include <Deform/invariants.h>
 namespace fem {
@@ -27,53 +28,23 @@ void System::spdProjectHessian(maths::SparseMatrixBuilder<Real> &builder) const 
 
 Real System::deformationEnergy() const {
   if (state != State::Simulation)
-    core::ERROR("Cannot compute deformation energy in states other than simulation");
-  if (dgDirty)
-    updateDeformationGradient();
-  else if (!energyDirty)
-    return cachedEnergy;
-  assert(!dgDirty);
-  Real sum = 0;
-  for (int i = 0; i < numTets(); i++) {
-    auto &dg = primitives.tetDeformationGradients[i];
-    auto &energy = primitives.meshEnergies[primitives.tetMeshIDs[i]];
-    sum += energy->computeEnergyDensity(dg) * primitives.tetRefVolumes[i];
-  }
-  cachedEnergy = sum;
-  energyDirty = false;
-  return sum;
+    throw std::runtime_error("Cannot compute deformation energy in states other than simulation");
+  return cachedEnergy;
 }
 
 System &System::updateCurrentConfig(const VecXd &x_nxt) {
   x = x_nxt;
-  dgDirty = true;
-  energyDirty = true;
-  energyGradientDirty = true;
+  updateDeformationGradient();
   return *this;
 }
 
 const VecXd &System::deformationEnergyGradient() const {
   if (state != State::Simulation)
-    core::ERROR("Cannot compute deformation energy gradient in states other than simulation");
-  if (dgDirty)
-    updateDeformationGradient();
-  else if (!energyGradientDirty)
-    return energyGradient;
-  energyGradient.setZero();
-  for (int i = 0; i < numTets(); i++) {
-    auto &dg = primitives.tetDeformationGradients[i];
-    auto &energy = primitives.meshEnergies[primitives.tetMeshIDs[i]];
-    auto grad = energy->computeEnergyGradient(dg);
-    auto p_F_p_x = dg.gradient();
-    Vector<Real, 12> grad_x = p_F_p_x.transpose() * vectorize(grad) * primitives.tetRefVolumes[i];
-    tetAssembleGlobal(energyGradient, grad_x, primitives.tets.col(i));
-  }
-  energyGradientDirty = false;
+    throw std::runtime_error("Cannot compute deformation energy gradient in states other than simulation");
   return energyGradient;
 }
 
-void System::updateDeformationGradient() const {
-  if (!dgDirty) return;
+void System::updateDeformationGradient() {
   for (int i = 0; i < numTets(); i++) {
     auto &dg = primitives.tetDeformationGradients[i];
     Matrix<Real, 3, 3> local_x;
@@ -81,7 +52,8 @@ void System::updateDeformationGradient() const {
       local_x.col(j) = currentPos(primitives.tets(j + 1, i)) - currentPos(primitives.tets(0, i));
     dg.updateCurrentConfig(local_x);
   }
-  dgDirty = false;
+  updateDeformationEnergy();
+  updateDeformationEnergyGradient();
 }
 
 void System::saveSurfaceObjFile(const std::filesystem::path &path) const {
@@ -94,14 +66,13 @@ void System::saveSurfaceObjFile(const std::filesystem::path &path) const {
   out.close();
 }
 
-System &System::addPrimitive(PrimitiveConfig &&config) {
+System &System::addPrimitive(TetPrimitiveConfig &&config) {
   auto &&mesh = std::move(config.mesh);
   auto &&energy = std::move(config.energy);
   Real density = config.density;
-  if (state != State::Initialization) {
-    core::ERROR("Cannot add tet mesh after initialization");
-    return *this;
-  }
+  if (state != State::Initialization)
+    throw std::runtime_error("Cannot add tet mesh after initialization");
+
   int current_num_vertices = static_cast<int>(X.rows() / 3);
   int current_num_tets = static_cast<int>(primitives.tets.cols());
   int current_num_triangles = static_cast<int>(primitives.surfaces.cols());
@@ -200,4 +171,40 @@ VecXd numericalDeformationEnergyGradient(System &system) {
   system.updateCurrentConfig(current);
   return grad;
 }
+
+void System::updateDeformationEnergy() {
+  cachedEnergy = 0.0;
+  for (int i = 0; i < numTets(); i++) {
+    auto &dg = primitives.tetDeformationGradients[i];
+    auto &energy = primitives.meshEnergies[primitives.tetMeshIDs[i]];
+    cachedEnergy += energy->computeEnergyDensity(dg) * primitives.tetRefVolumes[i];
+  }
+}
+void System::updateDeformationEnergyGradient() {
+  energyGradient.setZero();
+  for (int i = 0; i < numTets(); i++) {
+    auto &dg = primitives.tetDeformationGradients[i];
+    auto &energy = primitives.meshEnergies[primitives.tetMeshIDs[i]];
+    auto grad = energy->computeEnergyGradient(dg);
+    auto p_F_p_x = dg.gradient();
+    Vector<Real, 12> grad_x = p_F_p_x.transpose() * vectorize(grad) * primitives.tetRefVolumes[i];
+    tetAssembleGlobal(energyGradient, grad_x, primitives.tets.col(i));
+  }
+}
+
+System &System::startSimulationPhase() {
+  state = State::Simulation;
+  auto massBuilder = maths::SparseMatrixBuilder<Real>(dof(), dof());
+  buildMassMatrix(massBuilder);
+  m_mass = massBuilder.build();
+  m_massLDLT.compute(m_mass);
+  if (m_massLDLT.info() != Eigen::Success)
+    throw std::runtime_error("Failed to compute mass matrix LDLT decomposition");
+  f_ext.resize(static_cast<Eigen::Index>(dof()));
+  f_ext.setZero();
+  energyGradient.resize(static_cast<Eigen::Index>(dof()));
+  updateDeformationGradient();
+  return *this;
+}
+
 }

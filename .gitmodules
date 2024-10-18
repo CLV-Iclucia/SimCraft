@@ -10,3 +10,6 @@
 [submodule "external/cxxopts"]
 	path = external/cxxopts
 	url = git@github.com:jarro2783/cxxopts.git
+[submodule "external/minilog"]
+	path = external/minilog
+	url = git@github.com:CLV-Iclucia/minilog.git

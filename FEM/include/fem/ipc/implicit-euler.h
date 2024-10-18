@@ -39,11 +39,11 @@ class IpcIntegrator : public Integrator {
 
   explicit IpcIntegrator(System &system, const Config &config)
       : Integrator(system), config(config), barrier(config.dHat) {}
+
  protected:
   ConstraintSet constraintSet;
   std::unique_ptr<ipc::CollisionDetector> collisionDetector{};
   ipc::LogBarrier barrier;
-  core::Logger logger;
 };
 
 struct IpcImplicitEuler : public IpcIntegrator {
@@ -53,10 +53,6 @@ struct IpcImplicitEuler : public IpcIntegrator {
   SparseMatrix<Real> spdProjectHessian(Real h);
 
   Real barrierEnergy() {
-    if (constraintsDirty) {
-      updateConstraintStatus();
-      constraintsDirty = false;
-    }
     Real barrierEnergy = 0.0;
     Real kappa = config.contactStiffness;
     for (const auto &c : constraintSet.vtConstraints)
@@ -67,20 +63,14 @@ struct IpcImplicitEuler : public IpcIntegrator {
   }
 
   VecXd barrierEnergyGradient() {
-    if (constraintsDirty) {
-      updateConstraintStatus();
-      constraintsDirty = false;
-    }
     VecXd gradient = VecXd::Zero(system().dof());
     gradient.setZero();
     Real kappa = config.contactStiffness;
     VecXd current = system().currentConfig();
-    for (const auto &c : constraintSet.vtConstraints) {
+    for (const auto &c : constraintSet.vtConstraints)
       c.assembleBarrierGradient(barrier, gradient, kappa);
-    }
-    for (const auto &c : constraintSet.eeConstraints) {
+    for (const auto &c : constraintSet.eeConstraints)
       c.assembleMollifiedBarrierGradient(barrier, gradient, kappa);
-    }
     return gradient;
   }
 
@@ -95,7 +85,7 @@ struct IpcImplicitEuler : public IpcIntegrator {
 
   void updateCandidateSolution(const VecXd &x) {
     system().updateCurrentConfig(x);
-    constraintsDirty = true;
+    updateConstraintStatus();
   }
 
   Real barrierAugmentedPotentialEnergy() {
@@ -117,10 +107,6 @@ struct IpcImplicitEuler : public IpcIntegrator {
   void computeEdgeEdgeConstraints(const ConstraintSetPrecomputeRequest &config);
 
   int activeConstraints() {
-    if (constraintsDirty) {
-      updateConstraintStatus();
-      constraintsDirty = false;
-    }
     int active = 0;
     for (const auto &c : constraintSet.vtConstraints)
       active += (c.distanceSqr() < barrier.dHatSqr());
@@ -134,8 +120,7 @@ struct IpcImplicitEuler : public IpcIntegrator {
   std::unique_ptr<spatify::LBVH<Real>> edgesBVH{};
   std::unique_ptr<spatify::LBVH<Real>> trianglesBVH{};
   VecXd x_prev;
-  VecXd g;
-  bool constraintsDirty{false};
+
   friend VecXd symbolicIncrementalPotentialEnergyGradient(IpcImplicitEuler &euler, const VecXd &x_t, Real h);
   friend VecXd numericalIncrementalPotentialEnergyGradient(IpcImplicitEuler &euler, const VecXd &x_t, Real h);
 };

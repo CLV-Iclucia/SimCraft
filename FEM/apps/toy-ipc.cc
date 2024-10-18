@@ -22,7 +22,7 @@ struct Material {
   Real density{1150.0};
 };
 
-PrimitiveConfig alicePrimitive() {
+TetPrimitiveConfig alicePrimitive() {
   std::unique_ptr<StrainEnergyDensity<Real>> energy = std::make_unique<StableNeoHookean<Real>>(Material{}.params);
   auto alice = readTetMeshFromTOBJ(FEM_TETS_DIR "/cube10x10.tobj");
   fem::Matrix<Real, 3, Eigen::Dynamic> velocities(3, alice->vertices.cols());
@@ -31,7 +31,7 @@ PrimitiveConfig alicePrimitive() {
   return {std::move(alice), std::move(velocities), std::move(energy), Material{}.density};
 }
 
-PrimitiveConfig bobPrimitive() {
+TetPrimitiveConfig bobPrimitive() {
   std::unique_ptr<StrainEnergyDensity<Real>> energy = std::make_unique<StableNeoHookean<Real>>(Material{}.params);
   auto bob = readTetMeshFromTOBJ(FEM_TETS_DIR "/cube10x10.tobj");
   for (int i = 0; i < bob->vertices.cols(); ++i)
@@ -50,10 +50,15 @@ int main() {
   auto integrator = std::make_unique<IpcImplicitEuler>(*system);
   Real t = 0.0, dt = 0.001;
   std::cout << std::format("total energy: {:f} = {:f} (T) + {:f} (V)\n", system->totalEnergy(), system->kineticEnergy(), system->potentialEnergy());
-  while (t < 1.0) {
+  int frame = 0;
+  while (t < 0.5) {
     integrator->step(dt);
     t += dt;
+    frame++;
     std::cout << std::format("----------------------- t = {:f} -----------------\n", t);
     std::cout << std::format("total energy: {:f} = {:f} (T) + {:f} (V)\n", system->totalEnergy(), system->kineticEnergy(), system->potentialEnergy());
+    if (frame % 10 == 0) {
+      system->saveSurfaceObjFile(std::format("frame{:04d}.obj", frame));
+    }
   }
 }

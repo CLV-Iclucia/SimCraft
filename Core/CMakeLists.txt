@@ -4,7 +4,7 @@ add_library(Core STATIC ${srcs})
 target_include_directories(Core PUBLIC include)
 target_include_directories(Core PUBLIC ${EXTERNAL_PATH}/glm)
 target_include_directories(Core PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-target_link_libraries(Core PUBLIC)
+target_link_libraries(Core PUBLIC minilog)
 
 enable_testing()
 # for all the files in tests, build test executables

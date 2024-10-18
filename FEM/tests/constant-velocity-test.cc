@@ -25,7 +25,7 @@ struct Material {
   Real density{1150.0};
 };
 
-PrimitiveConfig alicePrimitive() {
+TetPrimitiveConfig alicePrimitive() {
   std::unique_ptr<StrainEnergyDensity<Real>> energy = std::make_unique<StableNeoHookean<Real>>(Material{}.params);
   auto alice = readTetMeshFromTOBJ(FEM_TETS_DIR "/cube10x10.tobj");
   for (int i = 0; i < alice->vertices.cols(); ++i)

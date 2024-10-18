@@ -20,15 +20,17 @@ void IpcImplicitEuler::step(Real dt) {
   Real h = dt;
   Real E_prev = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
   VecXd p(system().dof());
+  VecXd g(system().dof());
   int iter = 0;
   while (true) {
     g = barrierAugmentedIncrementalPotentialEnergyGradient(x_t, h);
     auto H = spdProjectHessian(h);
-    if (ldlt.compute(H).info() != Eigen::Success)
-      core::ERROR("Failed to perform LDLT decomposition");
-    p = ldlt.solve(-g);
+//    if (ldlt.compute(H).info() != Eigen::Success)
+//      core::ERROR("Failed to perform LDLT decomposition");
+//    p = ldlt.solve(-g);
+    p = Eigen::ConjugateGradient<SparseMatrix<Real>>(H).solve(-g);
     if (ldlt.info() != Eigen::Success)
-      core::ERROR("Failed to solve triangular systems");
+      throw std::runtime_error("Failed to solve triangular systems");
     if (p.lpNorm<Eigen::Infinity>() < config.eps * system().meshLengthScale() * h)
       break;
     Real alpha = kStepSizeScale * std::min(1.0, computeStepSizeUpperBound(p));
@@ -52,10 +54,6 @@ void IpcImplicitEuler::step(Real dt) {
 }
 
 SparseMatrix<Real> IpcImplicitEuler::spdProjectHessian(Real h) {
-  if (constraintsDirty) {
-    updateConstraintStatus();
-    constraintsDirty = false;
-  }
   sparseBuilder.clear().setRows(system().dof()).setColumns(system().dof());
   system().spdProjectHessian(sparseBuilder);
   Real kappa = config.contactStiffness;
@@ -186,9 +184,7 @@ VecXd IpcImplicitEuler::barrierAugmentedIncrementalPotentialEnergyGradient(const
 
 Real IpcImplicitEuler::computeStepSizeUpperBound(const VecXd &p) const {
   auto t = collisionDetector->detect(system(), p);
-  if (!t)
-    return 1.0;
-  return *t;
+  return t.value_or(1.0);
 }
 
 VecXd symbolicIncrementalPotentialEnergyGradient(IpcImplicitEuler &euler, const VecXd &x_t, Real h) {

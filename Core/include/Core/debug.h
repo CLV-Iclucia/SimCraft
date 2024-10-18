@@ -5,15 +5,13 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 #include <iostream>
-#include <Core/log.h>
 #include <functional>
-#include <Core/properties.h>
 #include <type_traits>
+#include <format>
+#include <source_location>
+#include <Core/properties.h>
+#include <Core/log.h>
 namespace core {
-template<typename... Args>
-void ERROR(details::with_source_location<std::format_string<Args...>> fmt, Args &&... args) {
-  details::generic_log_terminal(LogLevel::Error, LogLevel::Error, std::move(fmt), std::forward<Args>(args)...);
-}
 inline void do_nothing() {};
 // only support single thread for now
 class Debugger {

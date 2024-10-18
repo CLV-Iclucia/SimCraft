@@ -52,7 +52,7 @@ struct DeformationGradient {
       result.col(11).reshaped(3, 3).row(2) = r2;
       return result;
     } else
-      core::ERROR("Sorry, gradient of deformation gradient is not implemented for dimension other than 3");
+      throw std::runtime_error("Sorry, gradient of deformation gradient is not implemented for dimension other than 3");
   }
   const Matrix<T, Dim, Dim> &U() const {
     return m_U;

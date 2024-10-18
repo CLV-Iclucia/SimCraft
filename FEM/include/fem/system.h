@@ -17,15 +17,11 @@ using maths::vectorize;
 using deform::DeformationGradient;
 using deform::StrainEnergyDensity;
 
-struct PrimitiveConfig {
+struct TetPrimitiveConfig {
   std::unique_ptr<TetMesh> mesh{};
   Matrix<Real, 3, Dynamic> velocities{};
   std::unique_ptr<StrainEnergyDensity<Real>> energy{};
   Real density{};
-};
-
-struct SystemUpdateListener {
-  virtual void onSystemUpdate(const System& system) = 0;
 };
 
 struct System {
@@ -39,9 +35,9 @@ struct System {
 
  private:
   VecXd x;
-  mutable bool energyDirty{false}, dgDirty{false}, energyGradientDirty{false};
-  mutable VecXd energyGradient;
-  mutable Real cachedEnergy{};
+  VecXd energyGradient;
+  Real cachedEnergy{};
+
   struct Primitives {
     Matrix<int, 3, Dynamic> surfaces;
     Matrix<int, 4, Dynamic> tets;
@@ -52,16 +48,18 @@ struct System {
     std::vector<std::unique_ptr<StrainEnergyDensity<Real>>> meshEnergies;
     std::vector<Real> meshDensities;
   } primitives;
+
   enum class State : uint8_t {
     Initialization,
     Simulation,
   };
+
   State state{State::Initialization};
   Eigen::SparseMatrix<Real> m_mass;
   Eigen::SimplicialLDLT<SparseMatrix<Real>> m_massLDLT;
   Real m_meshLengthScale{std::numeric_limits<Real>::infinity()};
 
-  void updateDeformationGradient() const;
+  void updateDeformationGradient();
 
   void buildMassMatrix(maths::SparseMatrixBuilder<Real> &builder) const;
  public:
@@ -88,6 +86,10 @@ struct System {
   }
 
   void spdProjectHessian(maths::SparseMatrixBuilder<Real> &builder) const;
+
+  void updateDeformationEnergy();
+
+  void updateDeformationEnergyGradient();
 
   [[nodiscard]] Real deformationEnergy() const;
 
@@ -131,33 +133,14 @@ struct System {
   }
 
   bool checkTriangleAdjacent(int ia, int ib) const {
-    int count = 0;
     for (int i = 0; i < 3; i++)
       for (int j = 0; j < 3; j++)
         if (triangleVertexIndex(ia, i) == triangleVertexIndex(ib, j))
-          count++;
-    return count > 0;
+          return true;
+    return false;
   }
 
-  System &startSimulationPhase() {
-    state = State::Simulation;
-    auto massBuilder = maths::SparseMatrixBuilder<Real>(dof(), dof());
-    buildMassMatrix(massBuilder);
-    m_mass = massBuilder.build();
-    std::cout << "mass built" << std::endl;
-    std::cout << m_mass.rows() << " " << m_mass.cols() << std::endl;
-    m_massLDLT.compute(m_mass);
-    std::cout << "mass inverse computed" << std::endl;
-    if (m_massLDLT.info() != Eigen::Success)
-      core::ERROR("Failed to compute mass matrix LDLT decomposition");
-    f_ext.resize(static_cast<Eigen::Index>(dof()));
-    f_ext.setZero();
-    energyGradient.resize(static_cast<Eigen::Index>(dof()));
-    dgDirty = true;
-    energyDirty = true;
-    energyGradientDirty = true;
-    return *this;
-  }
+  System &startSimulationPhase();
 
   Real kineticEnergy() const {
     return 0.5 * xdot.dot(m_mass * xdot);
@@ -175,7 +158,7 @@ struct System {
     return x;
   }
 
-  System &addPrimitive(PrimitiveConfig &&config);
+  System &addPrimitive(TetPrimitiveConfig &&config);
 
   void saveSurfaceObjFile(const std::filesystem::path &path) const;
 
