@@ -8,43 +8,12 @@
 #include <fem/ipc/constraint.h>
 #include <fem/ipc/collision-detector.h>
 #include <fem/ipc/barrier-functions.h>
+#include <fem/ipc/integrator.h>
 #include <tbb/concurrent_vector.h>
 #include <Core/log.h>
 #include <Core/debug.h>
 #include <Maths/sparse-matrix-builder.h>
 namespace fem {
-
-struct ConstraintSet {
-  void clear() {
-    vtConstraints.clear();
-    eeConstraints.clear();
-  }
-  std::vector<ipc::VertexTriangleConstraint> vtConstraints{};
-  std::vector<ipc::EdgeEdgeConstraint> eeConstraints{};
-};
-
-struct ConstraintSetPrecomputeRequest {
-  const VecXd &descentDir;
-  Real toi;
-  Real dHat;
-};
-
-class IpcIntegrator : public Integrator {
- public:
-  struct Config {
-    Real dHat = 1e-3;
-    Real eps = 1e-2;
-    Real contactStiffness = 1e10;
-  } config;
-
-  explicit IpcIntegrator(System &system, const Config &config)
-      : Integrator(system), config(config), barrier(config.dHat) {}
-
- protected:
-  ConstraintSet constraintSet;
-  std::unique_ptr<ipc::CollisionDetector> collisionDetector{};
-  ipc::LogBarrier barrier;
-};
 
 struct IpcImplicitEuler : public IpcIntegrator {
   explicit IpcImplicitEuler(System &system, const Config &config = {});
@@ -52,30 +21,11 @@ struct IpcImplicitEuler : public IpcIntegrator {
  private:
   SparseMatrix<Real> spdProjectHessian(Real h);
 
-  Real barrierEnergy() {
-    Real barrierEnergy = 0.0;
-    Real kappa = config.contactStiffness;
-    for (const auto &c : constraintSet.vtConstraints)
-      barrierEnergy += barrier(c.distanceSqr());
-    for (const auto &c : constraintSet.eeConstraints)
-      barrierEnergy += c.mollifier() * barrier(c.distanceSqr());
-    return kappa * barrierEnergy;
-  }
-
-  VecXd barrierEnergyGradient() {
-    VecXd gradient = VecXd::Zero(system().dof());
-    gradient.setZero();
-    Real kappa = config.contactStiffness;
-    VecXd current = system().currentConfig();
-    for (const auto &c : constraintSet.vtConstraints)
-      c.assembleBarrierGradient(barrier, gradient, kappa);
-    for (const auto &c : constraintSet.eeConstraints)
-      c.assembleMollifiedBarrierGradient(barrier, gradient, kappa);
-    return gradient;
-  }
-
   Real incrementalPotentialKinematicEnergy(const VecXd &x_t, Real h) const;
 
+  void velocityUpdate(const VecXd& x_t, Real h) {
+    system().xdot = (system().currentConfig() - x_t) / h;
+  }
   // for now, do not consider dissipative friction forces
   Real barrierAugmentedIncrementalPotentialEnergy(const VecXd &x_t, Real h);
 

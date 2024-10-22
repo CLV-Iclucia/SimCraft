@@ -1,0 +1,14 @@
+//
+// Created by creeper on 10/22/24.
+//
+
+#ifndef SIMCRAFT_FEM_INCLUDE_FEM_PRIMITIVES_ELASTIC_SPHERE_H_
+#define SIMCRAFT_FEM_INCLUDE_FEM_PRIMITIVES_ELASTIC_SPHERE_H_
+namespace fem {
+
+struct ElasticSphere {
+
+};
+
+}
+#endif //SIMCRAFT_FEM_INCLUDE_FEM_PRIMITIVES_ELASTIC_SPHERE_H_

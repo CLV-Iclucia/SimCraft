@@ -12,6 +12,8 @@ template <typename T, int Rows, int Cols>
 using Matrix = Eigen::Matrix<T, Rows, Cols>;
 template <typename T, int Dim>
 using Vector = Eigen::Matrix<T, Dim, 1>;
+template <typename T, int Dim>
+using VecView = Eigen::Map<Vector<T, Dim>>;
 template <typename T>
 using SparseMatrix = Eigen::SparseMatrix<T>;
 using Real = double;

@@ -50,7 +50,7 @@ void IpcImplicitEuler::step(Real dt) {
     x_prev = system().currentConfig();
     E_prev = E;
   }
-  system().xdot = (system().currentConfig() - x_t) / h;
+  velocityUpdate(x_t, h);
 }
 
 SparseMatrix<Real> IpcImplicitEuler::spdProjectHessian(Real h) {

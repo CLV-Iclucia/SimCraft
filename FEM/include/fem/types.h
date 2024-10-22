@@ -14,9 +14,12 @@ template <typename T, int Rows, int Cols>
 using Matrix = maths::Matrix<T, Rows, Cols>;
 template <typename T, int Dim>
 using Vector = maths::Vector<T, Dim>;
+template <typename T, int Dim>
+using VecView = maths::VecView<T, Dim>;
 template <typename T>
 using SparseMatrix = Eigen::SparseMatrix<T>;
 using Real = double;
+using Index = uint32_t;
 using Vec3d = Vector<Real, 3>;
 using Vec3i = Vector<int, 3>;
 using Vec4i = Vector<int, 4>;
