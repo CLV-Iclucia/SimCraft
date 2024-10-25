@@ -5,6 +5,8 @@
 #ifndef SIMCRAFT_CORE_INCLUDE_CORE_STATIC_REFLECTION_H_
 #define SIMCRAFT_CORE_INCLUDE_CORE_STATIC_REFLECTION_H_
 
+#include <map>
+#include <type_traits>
 namespace core {
 #define REPLACE_FOR_EACH_1(what, _1) what(_1)
 #define REPLACE_FOR_EACH_2(what, _1, _2) what(_1) what(_2)
@@ -46,16 +48,25 @@ namespace core {
 #define STRING(x) #x
 #define CONCAT_EVAL(x, y) CONCAT(x, y)
 #define REPLACE_FOR_EACH(what, ...) CONCAT_EVAL(REPLACE_FOR_EACH_, NARGS(__VA_ARGS__))(what, __VA_ARGS__)
-
-#define REFLECT(...) \
-  REPLACE_FOR_EACH(REFLECT_IMPL, __VA_ARGS__)
+#define REFLECTION_IMPL(name) func(#name, t.name);
 
 namespace details {
-template <typename T>
+template<typename T>
 struct reflect_traits {
   static constexpr bool is_reflectable = false;
 };
 
+#define REFLECT(T, ...) \
+   template <>          \
+   struct details::reflect_traits <std::remove_cv_t<T>> { \
+        static constexpr bool is_reflectable = true; \
+        template <typename Func>                     \
+        static constexpr void forEachMember(T& t, Func&& func) { \
+          REPLACE_FOR_EACH(REFLECTION_IMPL, __VA_ARGS__)              \
+        }\
+   };
 }
+template <typename T>
+using reflect = details::reflect_traits<T>;
 }
 #endif //SIMCRAFT_CORE_INCLUDE_CORE_STATIC_REFLECTION_H_

@@ -78,10 +78,10 @@ struct FluidSimulator final : core::Animation {
     if (!scene)
       scene = std::make_unique<Scene>();
     if (!myLoadObj(collider_path, &scene->collider_mesh)) {
-      ERROR("Failed to load fluidRegion mesh");
+      throw std::runtime_error("Failed to load fluidRegion mesh");
     }
     if (!myLoadObj(fluid_path, &scene->fluid_init_mesh)) {
-      ERROR("Failed to load fluid mesh");
+      throw std::runtime_error("Failed to load fluid mesh");
     }
   }
 

@@ -6,16 +6,18 @@
 #define SIMCRAFT_FEM_INCLUDE_FEM_SYSTEM_H_
 #include <fem/types.h>
 #include <fem/tet-mesh.h>
-#include <Maths/geometry.h>
 #include <Core/debug.h>
 #include <Core/zip.h>
 #include <Deform/strain-energy-density.h>
 #include <Maths/sparse-matrix-builder.h>
 namespace fem {
-using maths::HalfPlane;
 using maths::vectorize;
 using deform::DeformationGradient;
 using deform::StrainEnergyDensity;
+
+namespace core {
+struct JsonNode;
+}
 
 struct TetPrimitiveConfig {
   std::unique_ptr<TetMesh> mesh{};

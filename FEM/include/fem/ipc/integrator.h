@@ -4,7 +4,15 @@
 
 #ifndef SIMCRAFT_FEM_INCLUDE_FEM_IPC_INTEGRATOR_H_
 #define SIMCRAFT_FEM_INCLUDE_FEM_IPC_INTEGRATOR_H_
+#include <Maths/sparse-matrix-builder.h>
+#include <Core/debug.h>
+#include <tbb/concurrent_vector.h>
+#include <fem/ipc/integrator.h>
 #include <fem/integrator.h>
+#include <fem/ipc/constraint.h>
+#include <fem/ipc/collision-detector.h>
+#include <fem/ipc/barrier-functions.h>
+
 namespace fem {
 
 struct ConstraintSet {
@@ -35,31 +43,53 @@ class IpcIntegrator : public Integrator {
 
  protected:
 
-  Real barrierEnergy() {
-    Real barrierEnergy = 0.0;
-    Real kappa = config.contactStiffness;
-    for (const auto &c : constraintSet.vtConstraints)
-      barrierEnergy += barrier(c.distanceSqr());
-    for (const auto &c : constraintSet.eeConstraints)
-      barrierEnergy += c.mollifier() * barrier(c.distanceSqr());
-    return kappa * barrierEnergy;
+  [[nodiscard]] Real barrierEnergy() const;
+
+  [[nodiscard]] VecXd barrierEnergyGradient() const;
+
+  virtual void velocityUpdate(const VecXd &x_t, Real h) const = 0;
+  [[nodiscard]] virtual Real incrementalPotentialKinematicEnergy(const VecXd &x_t, Real h) const = 0;
+  [[nodiscard]] virtual VecXd incrementalPotentialKinematicEnergyGradient(const VecXd &x_t, Real h) const = 0;
+
+  [[nodiscard]] Real barrierAugmentedPotentialEnergy() const {
+    return system().potentialEnergy() + barrierEnergy();
   }
 
-  VecXd barrierEnergyGradient() {
-    VecXd gradient = VecXd::Zero(system().dof());
-    gradient.setZero();
-    Real kappa = config.contactStiffness;
-    VecXd current = system().currentConfig();
-    for (const auto &c : constraintSet.vtConstraints)
-      c.assembleBarrierGradient(barrier, gradient, kappa);
-    for (const auto &c : constraintSet.eeConstraints)
-      c.assembleMollifiedBarrierGradient(barrier, gradient, kappa);
-    return gradient;
+  [[nodiscard]] VecXd barrierAugmentedPotentialEnergyGradient() const {
+    return system().deformationEnergyGradient() + barrierEnergyGradient();
   }
+
+  [[nodiscard]] Real barrierAugmentedIncrementalPotentialEnergy(const VecXd &x_t, Real h) const {
+    return incrementalPotentialKinematicEnergy(x_t, h) + h * h * barrierAugmentedPotentialEnergy();
+  }
+
+  [[nodiscard]] VecXd barrierAugmentedIncrementalPotentialEnergyGradient(const VecXd &x_t, Real h) const {
+    return incrementalPotentialKinematicEnergyGradient(x_t, h)
+        + h * h * barrierAugmentedPotentialEnergyGradient();
+  }
+
+  void updateCandidateSolution(const VecXd &x) {
+    system().updateCurrentConfig(x);
+    updateConstraintStatus();
+  }
+
+  [[nodiscard]] Real computeStepSizeUpperBound(const VecXd &p) const {
+    auto t = collisionDetector->detect(system(), p);
+    return t.value_or(1.0);
+  }
+
+  SparseMatrix<Real> spdProjectHessian(Real h);
+  void updateConstraintStatus();
+  void precomputeConstraintSet(const ConstraintSetPrecomputeRequest &config);
+  void computeVertexTriangleConstraints(const ConstraintSetPrecomputeRequest &config);
+  void computeEdgeEdgeConstraints(const ConstraintSetPrecomputeRequest &config);
 
   ConstraintSet constraintSet;
   std::unique_ptr<ipc::CollisionDetector> collisionDetector{};
   ipc::LogBarrier barrier;
+  std::unique_ptr<spatify::LBVH<Real>> edgesBVH{};
+  std::unique_ptr<spatify::LBVH<Real>> trianglesBVH{};
+  maths::SparseMatrixBuilder<Real> sparseBuilder{};
 };
 
 }

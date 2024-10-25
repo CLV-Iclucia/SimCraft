@@ -115,9 +115,9 @@ class CgSolver3D final : public CompressedSolver3D {
       preconditioner = std::make_unique<ModifiedIncompleteCholesky3D>(
           r.width(), r.height(), r.depth());
     } else if (precond_method == PreconditionerMethod::Multigrid) {
-      ERROR("Not supported yet!");
+      throw std::runtime_error("Not supported yet!");
     } else
-      ERROR("Unknown preconditioner type");
+      throw std::runtime_error("Unknown preconditioner type");
   }
 
   ~CgSolver3D() override = default;
@@ -168,7 +168,7 @@ class FvmSolver3D final : public ProjectionSolver3D {
       cg_solver->setPreconditioner(precond_method);
       solver = std::move(cg_solver);
     } else
-      ERROR("Unknown solver type");
+      throw std::runtime_error("Unknown solver type");
   }
 
   ~FvmSolver3D() override = default;

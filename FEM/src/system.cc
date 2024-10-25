@@ -4,6 +4,7 @@
 #include <fstream>
 #include <fem/system.h>
 #include <Deform/invariants.h>
+#include <Core/json.h>
 namespace fem {
 
 static void tetAssembleGlobal(VecXd &global, const Vector<Real, 12> &local, const TetrahedronTopology &tet) {
@@ -207,4 +208,5 @@ System &System::startSimulationPhase() {
   return *this;
 }
 
+using core::JsonNode;
 }

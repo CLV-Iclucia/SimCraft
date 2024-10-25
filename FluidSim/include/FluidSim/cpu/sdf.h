@@ -200,7 +200,7 @@ class NaiveReconstructor<
       sdfValid.fill(false);
       sdf.grid.parallelForEach([&](int i, int j, int k) {
         Vector<T, 3> p = sdf.grid.indexToCoord(i, j, k);
-        ns.forNeighbours(p, particles, 4 * radius, [&](int idx) {
+        ns.forNeighbours(p, std::span(particles), 4 * radius, [&](int idx) {
           Real dis = glm::distance(p, particles[idx]);
           assert(dis < 4 * radius);
           sdf(i, j, k) = std::min(sdf(i, j, k), dis - radius);

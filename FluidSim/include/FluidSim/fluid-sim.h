@@ -26,6 +26,5 @@ using core::Matrix;
 using core::Mesh;
 using spatify::BBox;
 using core::uint;
-using core::ERROR;
 };
 #endif // SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_CORE_H_

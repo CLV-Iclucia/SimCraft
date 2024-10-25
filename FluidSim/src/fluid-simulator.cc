@@ -8,7 +8,7 @@ void FluidSimulator::setBackend(Backend backend_type) {
   } else if (backend_type == Backend::CUDA) {
 //    backend = std::make_unique<cuda::FluidSimulator>(config.nParticles, config.size, config.resolution);
   } else
-    ERROR("Invalid backend");
+    throw std::runtime_error("Invalid backend");
 }
 //void cuda::FluidSimulator::setInitialFluid(const Mesh &fluid_mesh) {
 //

@@ -4,8 +4,9 @@
 
 #ifndef SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_FLUID_SIMULATOR_H_
 #define SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_FLUID_SIMULATOR_H_
+
+#include <memory>
 #include <Core/animation.h>
-#include <Core/timer.h>
 #include <Core/rand-gen.h>
 #include <Core/debug.h>
 #include <Spatify/grids.h>
@@ -14,7 +15,6 @@
 #include <FluidSim/cpu/sdf.h>
 #include <FluidSim/cpu/advect-solver.h>
 #include <FluidSim/cpu/project-solver.h>
-#include <memory>
 #include <FluidSim/fluid-simulator.h>
 
 namespace fluid::cpu {
@@ -25,7 +25,6 @@ using spatify::PaddedCellCentredGrid;
 
 class FluidSimulator final : public FluidComputeBackend {
  public:
-  core::CpuTimer timer;
   FluidSimulator(int n, const Vec3d &size, const Vec3i &resolution)
       : nParticles(n), uw(resolution + Vec3i(1, 0, 0)),
         vw(resolution + Vec3i(0, 1, 0)), ww(resolution + Vec3i(0, 0, 1)),
@@ -79,7 +78,7 @@ class FluidSimulator final : public FluidComputeBackend {
                                                  pg.height(), pg.depth());
       return;
     }
-    ERROR("Unknown advection solver");
+    throw std::runtime_error("Unknown advection solver");
   }
 
   void setProjector(ProjectSolver project_solver) override {
@@ -88,7 +87,7 @@ class FluidSimulator final : public FluidComputeBackend {
                                                 pg.depth());
       return;
     }
-    ERROR("Unknown projection solver");
+    throw std::runtime_error("Unknown projection solver");
   }
   void setParticleReconstructor(ReconstructionMethod reconstruction_method) override {
     if (reconstruction_method == ReconstructionMethod::Naive) {
@@ -97,7 +96,7 @@ class FluidSimulator final : public FluidComputeBackend {
       fluidSurfaceReconstructor =
           std::make_unique<NaiveReconstructor<Real, 3>>(nParticles, pg.width(), pg.height(), pg.depth(), size);
     } else
-      ERROR("Unknown particle reconstructor");
+      throw std::runtime_error("Unknown reconstruction method");
   }
   void setCompressedSolver(CompressedSolverMethod solver_method,
                            PreconditionerMethod
