@@ -4,16 +4,13 @@ SimCraft is my personal physics based simulation playground, where I implement a
 
 ## Now it includes
 
-The following projects have usable apps
+The following projects have usable apps and libraries
 - Hybrid style fluid simulation 
-
-The following projects are under construction
-
-- Some rendering tools
+- FEM soft body simulator using IPC (Incremental Potential Contact) method
 - Deformation energy computing tools
-- FEM simulator based on incremental potential contact
+- A suite of tiny OpenGL GUI tools
 
-The following projects will be implemented in the future
+More features are under construction, and I will update this README when they are ready.
 
-- Hair simulation
-- Material point method
+- Complete Support for CUDA fluid simulation
+- More advanced and flexible FEM soft body simulator

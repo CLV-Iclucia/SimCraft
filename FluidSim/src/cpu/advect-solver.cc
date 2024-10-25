@@ -1,36 +1,21 @@
-#include <Core/transfer-stencil.h>
+#include <FluidSim/cpu/stencil.h>
 #include <FluidSim/cpu/util.h>
 #include <FluidSim/cpu/advect-solver.h>
 
 namespace fluid::cpu {
-using core::CubicKernel;
-void PicAdvector3D::solveG2P(const std::span<Vec3d> pos,
-                             const FaceCentredGrid<Real, Real, 3, 0>& ug,
-                             const FaceCentredGrid<Real, Real, 3, 1>& vg,
-                             const FaceCentredGrid<Real, Real, 3, 2>& wg,
-                             const SDF<3>& collider_sdf,
-                             Real dt) {
+void PicAdvector3D::solveGtoP(const GtoPDetails &details) {
+  auto &&[pos, ug, vg, wg, collider_sdf, dt] = details;
   int n = pos.size();
   for (int i = 0; i < n; i++) {
     vel(i) = sampleVelocity(pos[i], ug, vg, wg);
   }
 }
-void PicAdvector3D::solveP2G(const std::span<Vec3d> pos,
-                             FaceCentredGrid<Real, Real, 3, 0>& ug,
-                             FaceCentredGrid<Real, Real, 3, 1>& vg,
-                             FaceCentredGrid<Real, Real, 3, 2>& wg,
-                             const SDF<3>& collider_sdf,
-                             Array3D<Real>& uw,
-                             Array3D<Real>& vw,
-                             Array3D<Real>& ww,
-                             Array3D<char>& uValid,
-                             Array3D<char>& vValid,
-                             Array3D<char>& wValid,
-                             Real dt) {
+void PicAdvector3D::solvePtoG(const PtoGDetails &details) {
+  auto &&[pos, ug, vg, wg, collider_sdf, uw, vw, ww, uValid, vValid, wValid, dt] = details;
   int n = pos.size();
   for (int idx = 0; idx < n; idx++) {
-    auto& p = pos[idx];
-    auto& h = ug.gridSpacing();
+    auto &p = pos[idx];
+    auto &h = ug.gridSpacing();
     Vec3i u_idx = ug.nearest(p);
     Vec3i v_idx = vg.nearest(p);
     Vec3i w_idx = wg.nearest(p);
@@ -97,8 +82,8 @@ void PicAdvector3D::solveP2G(const std::span<Vec3d> pos,
   });
 }
 
-void PicAdvector3D::handleCollision(const SDF<3>& collider_sdf, Vec3d& p,
-                                    Vec3d& v) const {
+void PicAdvector3D::handleCollision(const SDF<3> &collider_sdf, Vec3d &p,
+                                    Vec3d &v) const {
   Real d = collider_sdf.eval(p);
   if (d < 0.0) {
     Vec3d normal = normalize(collider_sdf.grad(p));
@@ -135,15 +120,11 @@ void PicAdvector3D::handleCollision(const SDF<3>& collider_sdf, Vec3d& p,
       v.z = 0.0;
   }
 }
-void PicAdvector3D::advect(const std::span<Vec3d> pos,
-                           const FaceCentredGrid<Real, Real, 3, 0>& ug,
-                           const FaceCentredGrid<Real, Real, 3, 1>& vg,
-                           const FaceCentredGrid<Real, Real, 3, 2>& wg,
-                           const SDF<3>& collider_sdf,
-                           Real dt) {
+void PicAdvector3D::advect(const AdvectDetails &details) {
+  auto&& [pos, ug, vg, wg, collider_sdf, dt] = details;
   int n = pos.size();
   for (int i = 0; i < n; i++) {
-    auto& p = pos[i];
+    auto &p = pos[i];
     Vec3d mid_p = p + 0.5 * vel(i) * dt;
     handleCollision(collider_sdf, p, vel(i));
     Vec3d mid_v = sampleVelocity(mid_p, ug, vg, wg);

@@ -6,7 +6,10 @@
 #define SIMCRAFT_CORE_INCLUDE_CORE_CORE_H_
 #include <glm/glm.hpp>
 #include <vector>
+// if it is windows, define NOMINMAX to avoid conflict with std::min and std::max
+#ifdef _WIN32
 #define NOMINMAX
+#endif
 namespace core {
 using Real = double;
 using Index = int;

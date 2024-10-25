@@ -7,11 +7,10 @@
 #include <Spatify/arrays.h>
 #include <Spatify/grids.h>
 #include <FluidSim/cpu/sdf.h>
+#include <FluidSim/fluid-simulator.h>
 #include <Core/debug.h>
 #include <array>
 #include <memory>
-
-#include <FluidSim/fluid-simulator.h>
 
 namespace fluid::cpu {
 using spatify::Array3D;

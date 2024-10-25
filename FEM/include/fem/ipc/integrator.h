@@ -36,11 +36,14 @@ class IpcIntegrator : public Integrator {
     Real dHat = 1e-3;
     Real eps = 1e-2;
     Real contactStiffness = 1e10;
+    Real stepSizeScale = 0.9;
   } config;
 
   explicit IpcIntegrator(System &system, const Config &config)
       : Integrator(system), config(config), barrier(config.dHat) {}
 
+  void step(Real dt) override;
+  Eigen::SimplicialLDLT<SparseMatrix<Real>> ldlt{};
  protected:
 
   [[nodiscard]] Real barrierEnergy() const;
@@ -90,6 +93,7 @@ class IpcIntegrator : public Integrator {
   std::unique_ptr<spatify::LBVH<Real>> edgesBVH{};
   std::unique_ptr<spatify::LBVH<Real>> trianglesBVH{};
   maths::SparseMatrixBuilder<Real> sparseBuilder{};
+  VecXd x_prev;
 };
 
 }

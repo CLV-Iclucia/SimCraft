@@ -4,9 +4,9 @@
 
 #ifndef SIMCRAFT_MPM_INCLUDE_MPM_TRANSFER_STENCIL_H_
 #define SIMCRAFT_MPM_INCLUDE_MPM_TRANSFER_STENCIL_H_
-#include <Core/core.h>
 #include <Core/utils.h>
-namespace core {
+#include <FluidSim/fluid-sim.h>
+namespace fluid {
 struct CubicKernel {
   constexpr static Real kSupportRadius = 2.0;
   static Real N(Real x) {

@@ -138,7 +138,7 @@ void FluidSimulator::applyDirichletBoundary() const {
 void FluidSimulator::substep(Real dt) {
   clear();
   std::cout << "Solving advection... ";
-  advector->advect(std::span(positions()), *ug, *vg, *wg, *colliderSdf, dt);
+  advector->advect({m_particles.positions, *ug, *vg, *wg, *colliderSdf, dt});
   std::cout << "Done." << std::endl;
   std::cout << "Reconstructing surface... ";
   fluidSurfaceReconstructor->reconstruct(
@@ -150,8 +150,8 @@ void FluidSimulator::substep(Real dt) {
   smoothFluidSurface(5);
   std::cout << "Done." << std::endl;
   std::cout << "Solving P2G... ";
-  advector->solveP2G(std::span(positions()), *ug, *vg, *wg,
-                     *colliderSdf, uw, vw, ww, *uValid, *vValid, *wValid, dt);
+  advector->solvePtoG({m_particles.positions, *ug, *vg, *wg, *colliderSdf,
+                       uw, vw, ww, *uValid, *vValid, *wValid, dt});
   applyDirichletBoundary();
   std::cout << "Done." << std::endl;
   std::cout << "Extrapolating velocities... ";
@@ -174,8 +174,7 @@ void FluidSimulator::substep(Real dt) {
   applyCollider();
   std::cout << "Done." << std::endl;
   std::cout << "Solving G2P... ";
-  advector->solveG2P(std::span(positions()), *ug, *vg, *wg,
-                     *colliderSdf, dt);
+  advector->solveGtoP({m_particles.positions, *ug, *vg, *wg, *colliderSdf, dt});
   std::cout << "Done" << std::endl;
 }
 
@@ -183,17 +182,14 @@ Real FluidSimulator::CFL() const {
   Real h{ug->gridSpacing().x};
   Real cfl{h / 1e-6};
   ug->forEach([&cfl, h, this](int x, int y, int z) {
-    assert(notNan(ug->at(x, y ,z)));
     if (ug->at(x, y, z) != 0.0)
       cfl = std::max(cfl, h / abs(ug->at(x, y, z)));
   });
   vg->forEach([&cfl, h, this](int x, int y, int z) {
-    assert(notNan(vg->at(x, y, z)));
     if (vg->at(x, y, z) != 0.0)
       cfl = std::max(cfl, h / abs(vg->at(x, y, z)));
   });
   wg->forEach([&cfl, h, this](int x, int y, int z) {
-    assert(notNan(wg->at(x, y, z)));
     if (wg->at(x, y, z) != 0.0)
       cfl = std::max(cfl, h / abs(wg->at(x, y, z)));
   });

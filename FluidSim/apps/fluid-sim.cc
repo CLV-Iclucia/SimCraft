@@ -7,12 +7,11 @@
 #include <FluidSim/cpu/rebuild-surface.h>
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
-#include <imgui/backends/imgui_impl_glfw.h>
-#include <imgui/backends/imgui_impl_opengl3.h>
 #include <iostream>
 #include <memory>
 using namespace opengl;
-ImVec4 kClearColor = ImVec4(1.0f, 1.0f, 1.0f, 1.00f);
+using namespace core;
+Vec4d kClearColor = Vec4d(1.0f, 1.0f, 1.0f, 1.00f);
 
 bool initGLFW(GLFWwindow*& window) {
   if (!glfwInit()) {
@@ -31,19 +30,6 @@ bool initGLFW(GLFWwindow*& window) {
   glfwMakeContextCurrent(window);
   glfwSwapInterval(1);
   return true;
-}
-
-ImGuiIO& initImGui(GLFWwindow* window) {
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImGuiIO& io = ImGui::GetIO();
-  (void)io;
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-  ImGui::StyleColorsDark();
-  ImGui_ImplGlfw_InitForOpenGL(window, true);
-  ImGui_ImplOpenGL3_Init("#version 330");
-  return io;
 }
 
 struct Options {
@@ -197,7 +183,6 @@ int main(int argc, char** argv) {
   auto [nParticles, size, resolution, colliderPath] = parseOptions(argc, argv);
   GLFWwindow* window;
   if (!initGLFW(window)) return -1;
-  ImGuiIO& io = initImGui(window);
   auto simulator = std::make_unique<fluid::cpu::FluidSimulator>(
       nParticles, size, resolution);
   core::Mesh colliderMesh;
@@ -233,17 +218,7 @@ int main(int argc, char** argv) {
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
     processWindowInput(window, camera);
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-    {
-      ImGui::Begin("Hello, fluid simulation!");
-      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-                  1000.0f / io.Framerate, io.Framerate);
-      ImGui::End();
-    }
     // Rendering
-    ImGui::Render();
     int display_w, display_h;
     glfwGetFramebufferSize(window, &display_w, &display_h);
     glViewport(0, 0, display_w, display_h);
@@ -269,12 +244,8 @@ int main(int argc, char** argv) {
     }
     drawCollider(colliderCtx.get(), meshShader.get(), camera, colliderMesh,
                  display_w, display_h);
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     glfwSwapBuffers(window);
   }
-  ImGui_ImplOpenGL3_Shutdown();
-  ImGui_ImplGlfw_Shutdown();
-  ImGui::DestroyContext();
   glfwDestroyWindow(window);
   glfwTerminate();
 }

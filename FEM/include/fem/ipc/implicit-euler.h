@@ -12,7 +12,6 @@ namespace fem {
 
 struct IpcImplicitEuler final : public IpcIntegrator {
   explicit IpcImplicitEuler(System &system, const Config &config = {});
-  void step(Real dt) override;
  private:
 
   Real incrementalPotentialKinematicEnergy(const VecXd &x_t, Real h) const override;
@@ -22,9 +21,6 @@ struct IpcImplicitEuler final : public IpcIntegrator {
   }
 
   VecXd incrementalPotentialKinematicEnergyGradient(const VecXd &x_t, Real h) const override;
-
-  Eigen::SimplicialLDLT<SparseMatrix<Real>> ldlt{};
-  VecXd x_prev;
 
   friend VecXd symbolicIncrementalPotentialEnergyGradient(IpcImplicitEuler &euler, const VecXd &x_t, Real h);
   friend VecXd numericalIncrementalPotentialEnergyGradient(IpcImplicitEuler &euler, const VecXd &x_t, Real h);

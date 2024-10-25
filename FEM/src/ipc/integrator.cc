@@ -9,6 +9,45 @@
 
 namespace fem {
 
+void IpcIntegrator::step(Real dt) {
+  x_prev = system().currentConfig();
+  VecXd x_t = system().currentConfig();
+  Real h = dt;
+  Real E_prev = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
+  VecXd p(system().dof());
+  VecXd g(system().dof());
+  int iter = 0;
+  while (true) {
+    g = barrierAugmentedIncrementalPotentialEnergyGradient(x_t, h);
+    auto H = spdProjectHessian(h);
+//    if (ldlt.compute(H).info() != Eigen::Success)
+//      core::ERROR("Failed to perform LDLT decomposition");
+//    p = ldlt.solve(-g);
+    p = Eigen::ConjugateGradient<SparseMatrix<Real>>(H).solve(-g);
+    if (ldlt.info() != Eigen::Success)
+      throw std::runtime_error("Failed to solve triangular systems");
+    if (p.lpNorm<Eigen::Infinity>() < config.eps * system().meshLengthScale() * h)
+      break;
+    Real alpha = config.stepSizeScale * std::min(1.0, computeStepSizeUpperBound(p));
+    if (alpha == 0.0)
+      throw std::runtime_error("Invalid state: collision happened within an integration step");
+    precomputeConstraintSet(
+        {.descentDir = p,
+            .toi = alpha,
+            .dHat = config.dHat});
+    Real E;
+    do {
+      updateCandidateSolution(x_prev + alpha * p);
+      alpha = alpha * 0.5;
+      E = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
+    } while (E > E_prev);
+    iter++;
+    x_prev = system().currentConfig();
+    E_prev = E;
+  }
+  velocityUpdate(x_t, h);
+}
+
 SparseMatrix<fem::Real> IpcIntegrator::spdProjectHessian(Real h) {
   sparseBuilder.clear().setRows(system().dof()).setColumns(system().dof());
   system().spdProjectHessian(sparseBuilder);
