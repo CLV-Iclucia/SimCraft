@@ -1,6 +1,6 @@
 #include <Core/rand-gen.h>
 
-namespace core {
+namespace sim::core {
 float randomFloat() {
     static std::random_device rd;
     static std::mt19937 gen(rd());

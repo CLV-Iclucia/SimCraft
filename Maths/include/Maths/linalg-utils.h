@@ -2,11 +2,9 @@
 // Created by creeper on 5/28/24.
 //
 
-#ifndef SIMCRAFT_MATHS_INCLUDE_MATHS_LINALG_UTILS_H_
-#define SIMCRAFT_MATHS_INCLUDE_MATHS_LINALG_UTILS_H_
+#pragma once
 #include <Maths/types.h>
-#include <cmath>
-namespace maths {
+namespace sim::maths {
 template<typename T>
 Matrix<T, 3, 3> skewt(const Vector<T, 3> &v) {
   Matrix<T, 3, 3> A;
@@ -41,4 +39,3 @@ Matrix<T, 3, 3> constructFrame(const Vector<T, 3> &n) {
   return R;
 }
 }
-#endif //SIMCRAFT_MATHS_INCLUDE_MATHS_LINALG_UTILS_H_

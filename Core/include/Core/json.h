@@ -4,12 +4,14 @@
 
 #ifndef SIMCRAFT_CORE_INCLUDE_CORE_JSON_H_
 #define SIMCRAFT_CORE_INCLUDE_CORE_JSON_H_
-#include <string>
-#include <vector>
-#include <variant>
-#include <memory>
 #include <Core/core.h>
-namespace core {
+#include <filesystem>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <variant>
+#include <vector>
+namespace sim::core {
 struct JsonNode;
 using JsonDict = std::unordered_map<std::string, JsonNode>;
 using JsonList = std::vector<JsonNode>;
@@ -23,35 +25,45 @@ struct JsonNode {
   explicit JsonNode(const JsonDict &value) : m_value(value) {}
   explicit JsonNode(const JsonList &value) : m_value(value) {}
   JsonNode(const JsonNode &other) = default;
-  JsonNode(JsonNode &&other) noexcept: m_value(std::move(other.m_value)) { other.m_value = nullptr; }
+  JsonNode(JsonNode &&other) noexcept : m_value(std::move(other.m_value)) {
+    other.m_value = nullptr;
+  }
+  JsonNode &operator=(const JsonNode &other) = default;
+  JsonNode &operator=(JsonNode &&other) noexcept {
+    m_value = std::move(other.m_value);
+    other.m_value = nullptr;
+    return *this;
+  }
 
-  [[nodiscard]] bool isNull() const { return std::holds_alternative<std::nullptr_t>(m_value); }
-  [[nodiscard]] bool isInt() const { return std::holds_alternative<int>(m_value); }
-  [[nodiscard]] bool isReal() const { return std::holds_alternative<Real>(m_value); }
-  [[nodiscard]] bool isBool() const { return std::holds_alternative<bool>(m_value); }
-  [[nodiscard]] bool isString() const { return std::holds_alternative<std::string>(m_value); }
-  [[nodiscard]] bool isDict() const { return std::holds_alternative<JsonDict>(m_value); }
-  [[nodiscard]] bool isList() const { return std::holds_alternative<JsonList>(m_value); }
-
+  template <typename T> [[nodiscard]] bool is() const {
+    return std::holds_alternative<T>(m_value);
+  }
+  template <typename T> T &as() { return std::get<T>(m_value); }
+  template <typename T> const T &as() const { return std::get<T>(m_value); }
   JsonNode &value(const std::string &key) {
-    if (!isDict())
+    if (!is<JsonDict>())
       throw std::runtime_error("JsonNode is not a dictionary");
     auto &dict = std::get<JsonDict>(m_value);
     if (auto it = dict.find(key); it != dict.end())
       return it->second;
     throw std::runtime_error("Key not found");
   }
-  const JsonNode &value(const std::string &key) const {
-    if (!isDict())
+  [[nodiscard]] const JsonNode &value(const std::string &key) const {
+    if (!is<JsonDict>())
       throw std::runtime_error("JsonNode is not a dictionary");
     auto &dict = std::get<JsonDict>(m_value);
-    if (auto it = dict.find(key); it != dict.end())
+    if (const auto it = dict.find(key); it != dict.end())
       return it->second;
     throw std::runtime_error("Key not found");
   }
 
- private:
-  std::variant<std::nullptr_t, int, Real, bool, std::string, JsonDict, JsonList> m_value{};
+private:
+  std::variant<std::nullptr_t, int, Real, bool, std::string, JsonDict, JsonList>
+      m_value{};
 };
-}
-#endif //SIMCRAFT_CORE_INCLUDE_CORE_JSON_H_
+
+std::optional<JsonNode> parseJson(std::string_view json) noexcept;
+std::optional<JsonNode>
+loadJsonFile(const std::filesystem::path &path) noexcept;
+} // namespace core
+#endif // SIMCRAFT_CORE_INCLUDE_CORE_JSON_H_

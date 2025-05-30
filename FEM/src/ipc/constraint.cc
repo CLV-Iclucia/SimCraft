@@ -7,21 +7,22 @@
 #include <Maths/sparse-matrix-builder.h>
 #include <fem/types.h>
 #include <fem/system.h>
-namespace fem::ipc {
+
+namespace sim::fem::ipc {
 
 void VertexTriangleConstraint::updateDistanceType() {
-  auto p = system.currentPos(iv);
-  auto a = system.currentPos(system.triangleVertexIndex(it, 0));
-  auto b = system.currentPos(system.triangleVertexIndex(it, 1));
-  auto c = system.currentPos(system.triangleVertexIndex(it, 2));
+  auto p = xv.segment<3>(iv * 3);
+  auto a = xt.segment<3>(triangle.x * 3);
+  auto b = xt.segment<3>(triangle.y * 3);
+  auto c = xt.segment<3>(triangle.z * 3);
   type = decidePointTriangleDistanceType(p, a, b, c);
 }
 
 Real VertexTriangleConstraint::distanceSqr() const {
-  auto p = system.currentPos(iv);
-  auto a = system.currentPos(system.triangleVertexIndex(it, 0));
-  auto b = system.currentPos(system.triangleVertexIndex(it, 1));
-  auto c = system.currentPos(system.triangleVertexIndex(it, 2));
+  auto p = xv.segment<3>(iv * 3);
+  auto a = xt.segment<3>(triangle.x * 3);
+  auto b = xt.segment<3>(triangle.y * 3);
+  auto c = xt.segment<3>(triangle.z * 3);
   switch (type) {
     case PointTriangleDistanceType::P_A:return distanceSqrPointPoint(p, a);
     case PointTriangleDistanceType::P_B:return distanceSqrPointPoint(p, b);
@@ -37,13 +38,13 @@ Real VertexTriangleConstraint::distanceSqr() const {
 void VertexTriangleConstraint::assembleBarrierGradient(const LogBarrier &barrier,
                                                        VecXd &globalGradient,
                                                        Real kappa) const {
-  auto p = system.currentPos(iv);
-  int ia = system.triangleVertexIndex(it, 0);
-  auto a = system.currentPos(ia);
-  int ib = system.triangleVertexIndex(it, 1);
-  auto b = system.currentPos(ib);
-  int ic = system.triangleVertexIndex(it, 2);
-  auto c = system.currentPos(ic);
+  auto p = xv.segment<3>(iv * 3);
+  int ia = triangle.x;
+  auto a = xt.segment<3>(ia * 3);
+  int ib = triangle.y;
+  auto b = xt.segment<3>(ib * 3);
+  int ic = triangle.z;
+  auto c = xt.segment<3>(ic * 3);
   Real dist = distanceSqr();
   if (dist >= barrier.dHatSqr()) return;
   Real barrier_derivative = barrier.distanceSqrGradient(dist);
@@ -100,15 +101,15 @@ void VertexTriangleConstraint::assembleBarrierGradient(const LogBarrier &barrier
 }
 
 void VertexTriangleConstraint::assembleBarrierHessian(const LogBarrier &barrier,
-                                                      maths::SparseMatrixBuilder<Real> &globalHessian,
-                                                      Real kappa) const {
-  auto p = system.currentPos(iv);
-  int ia = system.triangleVertexIndex(it, 0);
-  auto a = system.currentPos(ia);
-  int ib = system.triangleVertexIndex(it, 1);
-  auto b = system.currentPos(ib);
-  int ic = system.triangleVertexIndex(it, 2);
-  auto c = system.currentPos(ic);
+                                                     maths::SparseMatrixBuilder<Real> &globalHessian,
+                                                     Real kappa) const {
+  auto p = xv.segment<3>(iv * 3);
+  int ia = triangle.x;
+  auto a = xt.segment<3>(ia * 3);
+  int ib = triangle.y;
+  auto b = xt.segment<3>(ib * 3);
+  int ic = triangle.z;
+  auto c = xt.segment<3>(ic * 3);
   Real dist = distanceSqr();
   if (dist >= barrier.dHatSqr()) return;
   Real barrier_derivative = barrier.distanceSqrGradient(dist);
@@ -177,13 +178,13 @@ void VertexTriangleConstraint::assembleBarrierHessian(const LogBarrier &barrier,
 
 Vector<Real, 12> VertexTriangleConstraint::localBarrierGradient(const LogBarrier& barrier, Real kappa) const {
   Vector<Real, 12> grad = Vector<Real, 12>::Zero();
-  auto p = system.currentPos(iv);
-  int ia = system.triangleVertexIndex(it, 0);
-  auto a = system.currentPos(ia);
-  int ib = system.triangleVertexIndex(it, 1);
-  auto b = system.currentPos(ib);
-  int ic = system.triangleVertexIndex(it, 2);
-  auto c = system.currentPos(ic);
+  auto p = xv.segment<3>(iv * 3);
+  int ia = triangle.x;
+  auto a = xt.segment<3>(ia * 3);
+  int ib = triangle.y;
+  auto b = xt.segment<3>(ib * 3);
+  int ic = triangle.z;
+  auto c = xt.segment<3>(ic * 3);
   switch (type) {
     case PointTriangleDistanceType::P_A: {
       grad.segment<3>(0) = localDistanceSqrPointPointGradient(p, a).segment<3>(0);
@@ -235,10 +236,10 @@ Vector<Real, 12> VertexTriangleConstraint::localBarrierGradient(const LogBarrier
 
 void EdgeEdgeConstraint::updateDistanceType() {
   constexpr double PARALLEL_THRESHOLD = 1.0e-20;
-  auto ea0 = system.currentPos(system.edgeVertexIndex(ia, 0));
-  auto ea1 = system.currentPos(system.edgeVertexIndex(ia, 1));
-  auto eb0 = system.currentPos(system.edgeVertexIndex(ib, 0));
-  auto eb1 = system.currentPos(system.edgeVertexIndex(ib, 1));
+  auto ea0 = xa.segment<3>(ea.x * 3);
+  auto ea1 = xa.segment<3>(ea.y * 3);
+  auto eb0 = xb.segment<3>(eb.x * 3);
+  auto eb1 = xb.segment<3>(eb.y * 3);
   const Eigen::Vector3d u = ea1 - ea0;
   const Eigen::Vector3d v = eb1 - eb0;
   const Eigen::Vector3d w = ea0 - eb0;
@@ -324,10 +325,10 @@ void EdgeEdgeConstraint::updateDistanceType() {
 }
 
 Real EdgeEdgeConstraint::distanceSqr() const {
-  auto A = system.currentPos(system.edgeVertexIndex(ia, 0));
-  auto B = system.currentPos(system.edgeVertexIndex(ia, 1));
-  auto C = system.currentPos(system.edgeVertexIndex(ib, 0));
-  auto D = system.currentPos(system.edgeVertexIndex(ib, 1));
+  auto A = xa.segment<3>(ea.x * 3);
+  auto B = xa.segment<3>(ea.y * 3);
+  auto C = xb.segment<3>(eb.x * 3);
+  auto D = xb.segment<3>(eb.y * 3);
   switch (type) {
     case EdgeEdgeDistanceType::A_C:return distanceSqrPointPoint(A, C);
     case EdgeEdgeDistanceType::A_D:return distanceSqrPointPoint(A, D);
@@ -345,10 +346,10 @@ Real EdgeEdgeConstraint::distanceSqr() const {
 void EdgeEdgeConstraint::assembleMollifiedBarrierGradient(const LogBarrier &barrier,
                                                           VecXd &globalGradient,
                                                           Real kappa) const {
-  int iA = system.edgeVertexIndex(ia, 0);
-  int iB = system.edgeVertexIndex(ia, 1);
-  int iC = system.edgeVertexIndex(ib, 0);
-  int iD = system.edgeVertexIndex(ib, 1);
+  int iA = ea.x;
+  int iB = ea.y;
+  int iC = eb.x;
+  int iD = eb.y;
   Real dist = distanceSqr();
   if (dist >= barrier.dHatSqr()) return;
   auto localGradient = mollifiedBarrierGradient(barrier);
@@ -361,10 +362,10 @@ void EdgeEdgeConstraint::assembleMollifiedBarrierGradient(const LogBarrier &barr
 void EdgeEdgeConstraint::assembleMollifiedBarrierHessian(const LogBarrier &barrier,
                                                          maths::SparseMatrixBuilder<Real> &globalHessian,
                                                          Real kappa) const {
-  int iA = system.edgeVertexIndex(ia, 0);
-  int iB = system.edgeVertexIndex(ia, 1);
-  int iC = system.edgeVertexIndex(ib, 0);
-  int iD = system.edgeVertexIndex(ib, 1);
+  int iA = ea.x;
+  int iB = ea.y;
+  int iC = eb.x;
+  int iD = eb.y;
   Real dist = distanceSqr();
   if (dist >= barrier.dHatSqr()) return;
   auto localHessian = mollifiedBarrierHessian(barrier);
@@ -372,15 +373,13 @@ void EdgeEdgeConstraint::assembleMollifiedBarrierHessian(const LogBarrier &barri
 }
 
 Real EdgeEdgeConstraint::epsCross() const {
-  return 1e-3 * (system.referencePos(system.edgeVertexIndex(ia, 1))
-      - system.referencePos(system.edgeVertexIndex(ia, 0))).squaredNorm()
-      * (system.referencePos(system.edgeVertexIndex(ib, 1))
-          - system.referencePos(system.edgeVertexIndex(ib, 0))).squaredNorm();
+  return 1e-3 * (Xa.segment<3>(ea.y * 3) - Xa.segment<3>(ea.x * 3)).squaredNorm()
+      * (Xb.segment<3>(eb.y * 3) - Xb.segment<3>(eb.x * 3)).squaredNorm();
 }
 
 Real EdgeEdgeConstraint::crossSquaredNorm() const {
-  return (system.currentPos(system.edgeVertexIndex(ia, 1)) - system.currentPos(system.edgeVertexIndex(ia, 0)))
-      .cross(system.currentPos(system.edgeVertexIndex(ib, 1)) - system.currentPos(system.edgeVertexIndex(ib, 0)))
+  return (xa.segment<3>(ea.y * 3) - xa.segment<3>(ea.x * 3))
+      .cross(xb.segment<3>(eb.y * 3) - xb.segment<3>(eb.x * 3))
       .squaredNorm();
 }
 
@@ -411,18 +410,18 @@ Matrix<Real, 12, 12> EdgeEdgeConstraint::mollifierHessian() const {
 }
 
 Vector<Real, 12> EdgeEdgeConstraint::crossedNormGradient() const {
-  const auto &ea0 = system.currentPos(system.edgeVertexIndex(ia, 0));
-  const auto &ea1 = system.currentPos(system.edgeVertexIndex(ia, 1));
-  const auto &eb0 = system.currentPos(system.edgeVertexIndex(ib, 0));
-  const auto &eb1 = system.currentPos(system.edgeVertexIndex(ib, 1));
+  const auto &ea0 = xa.segment<3>(ea.x * 3);
+  const auto &ea1 = xa.segment<3>(ea.y * 3);
+  const auto &eb0 = xb.segment<3>(eb.x * 3);
+  const auto &eb1 = xb.segment<3>(eb.y * 3);
   return edgeEdgeCrossSquareNormGradient(ea0, ea1, eb0, eb1);
 }
 
 Matrix<Real, 12, 12> EdgeEdgeConstraint::crossedNormHessian() const {
-  const auto &ea0 = system.currentPos(system.edgeVertexIndex(ia, 0));
-  const auto &ea1 = system.currentPos(system.edgeVertexIndex(ia, 1));
-  const auto &eb0 = system.currentPos(system.edgeVertexIndex(ib, 0));
-  const auto &eb1 = system.currentPos(system.edgeVertexIndex(ib, 1));
+  const auto &ea0 = xa.segment<3>(ea.x * 3);
+  const auto &ea1 = xa.segment<3>(ea.y * 3);
+  const auto &eb0 = xb.segment<3>(eb.x * 3);
+  const auto &eb1 = xb.segment<3>(eb.y * 3);
   return edgeEdgeCrossSquaredNormHessian(ea0, ea1, eb0, eb1);
 }
 
@@ -433,10 +432,10 @@ Vector<Real, 12> EdgeEdgeConstraint::mollifiedBarrierGradient(const LogBarrier &
   Real b = barrier(dist);
   Real p_b_p_d = barrier.distanceSqrGradient(dist);
   Vector<Real, 12> p_b_p_x = p_b_p_d * localDistanceSqrEdgeEdgeGradient(
-      system.currentPos(system.edgeVertexIndex(ia, 0)),
-      system.currentPos(system.edgeVertexIndex(ia, 1)),
-      system.currentPos(system.edgeVertexIndex(ib, 0)),
-      system.currentPos(system.edgeVertexIndex(ib, 1)));
+      xa.segment<3>(ea.x * 3),
+      xa.segment<3>(ea.y * 3),
+      xb.segment<3>(eb.x * 3),
+      xb.segment<3>(eb.y * 3));
   if (c > e_x) return p_b_p_x;
   Real m = mollifier();
   Vector<Real, 12> p_m_p_x = mollifierGradient();
@@ -451,16 +450,16 @@ Matrix<Real, 12, 12> EdgeEdgeConstraint::mollifiedBarrierHessian(const LogBarrie
   Real p_b_p_d = barrier.distanceSqrGradient(dist);
   Real p2_b_p_d2 = barrier.distanceSqrHessian(dist);
   Vector<Real, 12> p_d_p_x = localDistanceSqrEdgeEdgeGradient(
-      system.currentPos(system.edgeVertexIndex(ia, 0)),
-      system.currentPos(system.edgeVertexIndex(ia, 1)),
-      system.currentPos(system.edgeVertexIndex(ib, 0)),
-      system.currentPos(system.edgeVertexIndex(ib, 1)));
+      xa.segment<3>(ea.x * 3),
+      xa.segment<3>(ea.y * 3),
+      xb.segment<3>(eb.x * 3),
+      xb.segment<3>(eb.y * 3));
   Vector<Real, 12> p_b_p_x = p_b_p_d * p_d_p_x;
   Matrix<Real, 12, 12> p2_b_p_x2 = p_b_p_d * localDistanceSqrEdgeEdgeHessian(
-      system.currentPos(system.edgeVertexIndex(ia, 0)),
-      system.currentPos(system.edgeVertexIndex(ia, 1)),
-      system.currentPos(system.edgeVertexIndex(ib, 0)),
-      system.currentPos(system.edgeVertexIndex(ib, 1))) + p2_b_p_d2 * p_d_p_x * p_d_p_x.transpose();
+      xa.segment<3>(ea.x * 3),
+      xa.segment<3>(ea.y * 3),
+      xb.segment<3>(eb.x * 3),
+      xb.segment<3>(eb.y * 3)) + p2_b_p_d2 * p_d_p_x * p_d_p_x.transpose();
   if (c > e_x) return p2_b_p_x2;
   Real m = mollifier();
   Vector<Real, 12> p_m_p_x = mollifierGradient();

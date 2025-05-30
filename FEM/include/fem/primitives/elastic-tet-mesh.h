@@ -2,29 +2,74 @@
 // Created by creeper on 10/22/24.
 //
 
-#ifndef SIMCRAFT_FEM_INCLUDE_FEM_PRIMITIVES_TET_MESH_H_
-#define SIMCRAFT_FEM_INCLUDE_FEM_PRIMITIVES_TET_MESH_H_
-#include <memory>
-#include <fem/types.h>
-#include <fem/primitives/primitive-base.h>
+#pragma once
+
+#include <Core/deserializer.h>
+#include <Core/reflection.h>
 #include <Deform/strain-energy-density.h>
 #include <Maths/sparse-matrix-builder.h>
-namespace fem {
-struct ElasticTetMesh : PrimitiveBase {
-  std::vector<std::array<Index, 4>> tets{};
+#include <fem/types.h>
+#include <memory>
+#include "tet-mesh.h"
+
+namespace sim::fem {
+struct ElasticTetMeshConfig {
+  TetMesh mesh{};
+  Real density{};
+  REFLECT(mesh, density)
+};
+
+struct ElasticTetMesh {
+  TetMesh mesh{};
+  std::vector<Real> tetRefVolumes{};
+  std::vector<deform::DeformationGradient<Real, 3>> tetDeformationGradients{};
   std::unique_ptr<deform::StrainEnergyDensity<Real>> energy{};
-  void assembleEnergyGradient(VecXd &globalGrad) const {
+  Real density{};
+
+  ElasticTetMesh() = default;
+  
+  ElasticTetMesh(TetMesh mesh,
+                 std::unique_ptr<deform::StrainEnergyDensity<Real>> energy, 
+                 Real density)
+    : energy(std::move(energy)), density(density) {
+    setMesh(std::move(mesh));
   }
+
+  void init(const SubVector<Real>& x, const SubVector<Real>& xdot, const SubVector<Real>& X);
   [[nodiscard]] size_t dofDim() const {
-    return dofView.size();
+    return m_numVertices * 3;
   }
-  [[nodiscard]] Real potentialEnergy() const {
-    return 0.0;
+  void updateDeformationEnergyGradient(SubVector<Real> x);
+  void assembleEnergyGradient(const SubVector<Real>& primitiveGradSubView) const;
+  [[nodiscard]] Real deformationEnergy() const;
+  void assembleEnergyHessian(maths::SubMatrixBuilder<Real> &globalHessianSubView) const;
+  void assembleMassMatrix(maths::SubMatrixBuilder<Real> &globalMassSubView) const;
+  [[nodiscard]] std::span<const Triangle> getSurfaceView() const {
+    return mesh.surfaceView();
   }
-  void assembleEnergyHessian(maths::SparseMatrixBuilder<Real> &globalHessian) const {
+  [[nodiscard]] std::span<const Edge> getEdgesView() const {
+    return mesh.surfaceEdgeView();
   }
-  void assembleMassMatrix(maths::SparseMatrixBuilder<Real> &globalMass) const {
+  [[nodiscard]] size_t getVertexCount() const {
+    return m_numVertices;
+  }
+  static ElasticTetMesh static_deserialize(const core::JsonNode& json);
+  
+ private:
+  int m_numVertices{};
+
+  void setMesh(TetMesh&& mesh) {
+    this->mesh = std::move(mesh);
+    m_numVertices = static_cast<int>(this->mesh.getVertices().size());
+  }
+  static void tetAssembleGlobal(SubVector<Real> grad, const Vector<Real, 12> &local, Tetrahedron tet) {
+    for (int i = 0; i < 4; i++)
+      grad.segment<3>(tet[i] * 3) += local.segment<3>(3 * i);
+  }
+  [[nodiscard]] size_t numTets() const {
+    return mesh.tets.size();
   }
 };
+using SoftBody = ElasticTetMesh;
 }
-#endif //SIMCRAFT_FEM_INCLUDE_FEM_PRIMITIVES_TET_MESH_H_
+

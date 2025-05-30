@@ -2,90 +2,34 @@
 // Created by creeper on 5/25/24.
 //
 
-#ifndef SIMCRAFT_FEM_INCLUDE_FEM_SYSTEM_H_
-#define SIMCRAFT_FEM_INCLUDE_FEM_SYSTEM_H_
-#include <fem/types.h>
-#include <fem/tet-mesh.h>
-#include <Core/debug.h>
+#pragma once
+#include "external-force.h"
+#include "geometry-manager.h"
 #include <Core/zip.h>
 #include <Deform/strain-energy-density.h>
 #include <Maths/sparse-matrix-builder.h>
-namespace fem {
-using maths::vectorize;
-using deform::DeformationGradient;
-using deform::StrainEnergyDensity;
+#include <Spatify/lbvh.h>
+#include <fem/colliders.h>
+#include <fem/primitive.h>
+#include <fem/types.h>
 
-namespace core {
-struct JsonNode;
+namespace sim {
+namespace fem::ipc {
+struct CollisionDetector;
 }
 
-struct TetPrimitiveConfig {
-  std::unique_ptr<TetMesh> mesh{};
-  Matrix<Real, 3, Dynamic> velocities{};
-  std::unique_ptr<StrainEnergyDensity<Real>> energy{};
-  Real density{};
-};
+namespace fem {
+using deform::DeformationGradient;
+using deform::StrainEnergyDensity;
+using maths::vectorize;
 
+// the only thing System do is dispatching tasks to primitives
+// and gather the dof to solve the system globally
 struct System {
-  auto currentPos(int i) const {
-    return x.segment<3>(i * 3);
-  }
+  VecXd xdot{};
+  [[nodiscard]] Real meshLengthScale() const { return m_meshLengthScale; }
 
-  auto referencePos(int i) const {
-    return X.segment<3>(i * 3);
-  }
-
- private:
-  VecXd x;
-  VecXd energyGradient;
-  Real cachedEnergy{};
-
-  struct Primitives {
-    Matrix<int, 3, Dynamic> surfaces;
-    Matrix<int, 4, Dynamic> tets;
-    Matrix<int, 2, Dynamic> edges;
-    std::vector<Real> tetRefVolumes;
-    mutable std::vector<DeformationGradient<Real, 3>> tetDeformationGradients;
-    std::vector<int> tetMeshIDs;
-    std::vector<std::unique_ptr<StrainEnergyDensity<Real>>> meshEnergies;
-    std::vector<Real> meshDensities;
-  } primitives;
-
-  enum class State : uint8_t {
-    Initialization,
-    Simulation,
-  };
-
-  State state{State::Initialization};
-  Eigen::SparseMatrix<Real> m_mass;
-  Eigen::SimplicialLDLT<SparseMatrix<Real>> m_massLDLT;
-  Real m_meshLengthScale{std::numeric_limits<Real>::infinity()};
-
-  void updateDeformationGradient();
-
-  void buildMassMatrix(maths::SparseMatrixBuilder<Real> &builder) const;
- public:
-  VecXd xdot{}, X{}, f_ext{};
-
-  Real meshLengthScale() const {
-    return m_meshLengthScale;
-  }
-
-  const Matrix<int, 3, Dynamic> &surfaces() const {
-    return primitives.surfaces;
-  }
-
-  const Matrix<int, 2, Dynamic> &edges() const {
-    return primitives.edges;
-  }
-
-  const SparseMatrix<Real> &mass() const {
-    return m_mass;
-  }
-
-  const Eigen::SimplicialLDLT<SparseMatrix<Real>> &massLDLT() const {
-    return m_massLDLT;
-  }
+  [[nodiscard]] const SparseMatrix<Real> &mass() const { return m_mass; }
 
   void spdProjectHessian(maths::SparseMatrixBuilder<Real> &builder) const;
 
@@ -99,76 +43,130 @@ struct System {
 
   [[nodiscard]] const VecXd &deformationEnergyGradient() const;
 
-  [[nodiscard]] int numTets() const {
-    return static_cast<int>(primitives.tets.cols());
-  }
-
-  [[nodiscard]] int numTriangles() const {
-    return static_cast<int>(primitives.surfaces.cols());
-  }
-
-  int triangleVertexIndex(int triangle_index, int vertex_id) const {
-    assert(vertex_id >= 0 && vertex_id < 3);
-    return surfaces()(vertex_id, triangle_index);
-  }
-
-  int edgeVertexIndex(int edge_index, int vertex_id) const {
-    assert(vertex_id >= 0 && vertex_id < 2);
-    return edges()(vertex_id, edge_index);
-  }
-
-  size_t dof() const {
-    return x.size();
-  }
-
-  [[nodiscard]] int numVertices() const {
-    assert(x.size() % 3 == 0);
-    return static_cast<int>(x.size() / 3);
-  }
-
-  bool checkEdgeAdjacent(int ia, int ib) const {
-    if (edgeVertexIndex(ia, 0) == edgeVertexIndex(ib, 0) || edgeVertexIndex(ia, 0) == edgeVertexIndex(ib, 1))
-      return true;
-    if (edgeVertexIndex(ia, 1) == edgeVertexIndex(ib, 0) || edgeVertexIndex(ia, 1) == edgeVertexIndex(ib, 1))
-      return true;
-    return false;
-  }
-
-  bool checkTriangleAdjacent(int ia, int ib) const {
-    for (int i = 0; i < 3; i++)
-      for (int j = 0; j < 3; j++)
-        if (triangleVertexIndex(ia, i) == triangleVertexIndex(ib, j))
-          return true;
-    return false;
-  }
-
-  System &startSimulationPhase();
-
-  Real kineticEnergy() const {
+  [[nodiscard]] size_t dof() const { return x.size(); }
+  System &init();
+  [[nodiscard]] Real kineticEnergy() const {
     return 0.5 * xdot.dot(m_mass * xdot);
   }
 
-  Real potentialEnergy() const {
-    return deformationEnergy();
-  }
+  [[nodiscard]] Real potentialEnergy() const { return deformationEnergy(); }
 
-  Real totalEnergy() const {
+  [[nodiscard]] Real totalEnergy() const {
     return kineticEnergy() + potentialEnergy();
   }
 
-  const VecXd &currentConfig() const {
-    return x;
+  [[nodiscard]] const VecXd &currentConfig() const { return x; }
+  [[nodiscard]] const VecXd &referenceConfig() const { return X; }
+  [[nodiscard]] const Primitive &primitive(int id) const { return prs[id]; }
+  Primitive &primitive(int id) { return prs[id]; }
+
+  [[nodiscard]] const std::vector<Primitive> &primitives() const { return prs; }
+
+  [[nodiscard]] int numTriangles() const { return nTriangles; }
+  [[nodiscard]] int numEdges() const { return nEdges; }
+  [[nodiscard]] int numVertices() const { return nVertices; }
+
+  [[nodiscard]] int globalTriangleToPrimitive(int globalIdx) const {
+    return m_geometryManager.getTriangleRef(globalIdx).primitiveId;
   }
 
-  System &addPrimitive(TetPrimitiveConfig &&config);
+  [[nodiscard]] int globalEdgeToPrimitive(int globalIdx) const {
+    return m_geometryManager.getEdgeRef(globalIdx).primitiveId;
+  }
 
-  void saveSurfaceObjFile(const std::filesystem::path &path) const;
+  [[nodiscard]] int globalVertexToPrimitive(int globalIdx) const;
+
+  [[nodiscard]] Triangle getTriangleVertices(int globalIdx) const {
+    return m_geometryManager.getGlobalTriangle(globalIdx);
+  }
+
+  [[nodiscard]] Edge getGlobalEdge(int globalIdx) const {
+    return m_geometryManager.getGlobalEdge(globalIdx);
+  }
+
+  [[nodiscard]] bool triangleContainsVertex(int triangleIdx,
+                                            int vertexIdx) const {
+    return m_geometryManager.triangleContainsVertex(triangleIdx, vertexIdx);
+  }
+
+  [[nodiscard]] bool checkEdgeAdjacent(int edgeA, int edgeB) const {
+    return m_geometryManager.checkEdgeAdjacent(edgeA, edgeB);
+  }
+
+  [[nodiscard]] VecXd computeAcceleration() const;
+
+  template <typename Func> void sequentialDispatch(Func &&func) const {
+    for (auto i = 0; i < prs.size(); i++)
+      func(prs[i], i);
+  }
+
+  template <typename Func> void sequentialDispatch(Func &&func) {
+    for (auto i = 0; i < prs.size(); i++)
+      func(prs[i], i);
+  }
+
+  template <typename Func> void autoDispatch(Func &&func) {
+      sequentialDispatch(func);
+  }
+
+  template <typename Func> void autoDispatch(Func &&func) const {
+      sequentialDispatch(func);
+  }
+
+  void initGeometryManager();
+
+  [[nodiscard]] const GeometryManager &geometryManager() const {
+    return m_geometryManager;
+  }
 
   friend VecXd symbolicDeformationEnergyGradient(System &system);
   friend VecXd numericalDeformationEnergyGradient(System &system);
+  friend struct SystemBuilder;
+
+private:
+  void logSystemInfo() const;
+  VecXd x;
+  VecXd X;
+  VecXd energyGradient;
+  Real cachedEnergy{};
+  bool use_parallel_dispatch{false};
+
+  std::vector<Primitive> prs;
+  std::vector<Collider> colliders;
+  std::vector<ExternalForce> externalForces;
+  std::vector<int> dofStarts;
+  GeometryManager m_geometryManager;
+
+  int nTriangles{0};
+  int nEdges{0};
+  int nVertices{0};
+
+  Eigen::SparseMatrix<Real> m_mass;
+  Real m_meshLengthScale{std::numeric_limits<Real>::infinity()};
+
+  void updateDeformationGradient();
+  void buildMassMatrix(maths::SparseMatrixBuilder<Real> &builder) const;
 };
 
 VecXd symbolicDeformationEnergyGradient(System &system);
 VecXd numericalDeformationEnergyGradient(System &system);
+
+struct SystemConfig {
+  std::vector<Primitive> primitives{};
+  std::vector<Collider> colliders{};
+  std::vector<ExternalForce> externalForces{};
+  REFLECT(primitives, colliders)
+};
+
+struct SystemBuilder {
+  System build(const core::JsonNode &json) {
+    auto cfg = core::deserialize<SystemConfig>(json);
+    System system;
+    system.prs = std::move(cfg.primitives);
+    system.colliders = std::move(cfg.colliders);
+    system.init();
+    return system;
+  }
+};
 }
-#endif //SIMCRAFT_FEM_INCLUDE_FEM_SYSTEM_H_
+}

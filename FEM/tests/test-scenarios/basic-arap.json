@@ -1,0 +1,34 @@
+{
+    "system": {
+        "primitives": [{
+            "type": "ElasticTetMesh",
+            "mesh": {
+                "vertices": [
+                    [0.0, 0.0, 0.0],
+                    [1.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0],
+                    [0.0, 0.0, 1.0]
+                ],
+                "tets": [[0, 1, 2, 3]]
+            },
+            "energy": {
+                "type": "ARAP"
+            },
+            "density": 1000.0
+        }],
+        "colliders": []
+    },
+    "integrator": {
+        "type": "ipc",
+        "config": {
+            "type": "implicit-euler",
+            "dHat": 1e-3,
+            "eps": 1e-2,
+            "contactStiffness": 1e8,
+            "stepSizeScale": 0.8,
+            "linearSolver": {
+                "type": "cholesky-solver"
+            }
+        }
+    }
+} 

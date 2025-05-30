@@ -4,6 +4,8 @@
 #include <Core/animation.h>
 #include <Core/rand-gen.h>
 #include <FluidSim/cpu/fluid-simulator.h>
+#include <FluidSim/cpu/advect-solver.h>
+#include <FluidSim/cpu/project-solver.h>
 #include <FluidSim/cpu/util.h>
 #include <cassert>
 
@@ -138,11 +140,11 @@ void FluidSimulator::applyDirichletBoundary() const {
 void FluidSimulator::substep(Real dt) {
   clear();
   std::cout << "Solving advection... ";
-  advector->advect({m_particles.positions, *ug, *vg, *wg, *colliderSdf, dt});
+  advector->advect(std::span(positions()), *ug, *vg, *wg, *colliderSdf, dt);
   std::cout << "Done." << std::endl;
   std::cout << "Reconstructing surface... ";
   fluidSurfaceReconstructor->reconstruct(
-      m_particles.positions, 1.2 * ug->gridSpacing().x / std::sqrt(2.0),
+      m_particles.positions, 0.8 * ug->gridSpacing().x,
       *fluidSurface, *sdfValid);
   std::cout << "Done." << std::endl;
   std::cout << "Smoothing surface... ";
@@ -150,8 +152,8 @@ void FluidSimulator::substep(Real dt) {
   smoothFluidSurface(5);
   std::cout << "Done." << std::endl;
   std::cout << "Solving P2G... ";
-  advector->solvePtoG({m_particles.positions, *ug, *vg, *wg, *colliderSdf,
-                       uw, vw, ww, *uValid, *vValid, *wValid, dt});
+  advector->solveP2G(std::span(positions()), *ug, *vg, *wg,
+                     *colliderSdf, uw, vw, ww, *uValid, *vValid, *wValid, dt);
   applyDirichletBoundary();
   std::cout << "Done." << std::endl;
   std::cout << "Extrapolating velocities... ";
@@ -169,12 +171,13 @@ void FluidSimulator::substep(Real dt) {
     std::cerr << "Warning: projection residual is " << residual << std::endl;
   else std::cout << "Projection residual is " << residual << std::endl;
   std::cout << "Done." << std::endl;
-  std::cout << "Doing projection and applying fluidRegion... ";
+  std::cout << "Doing projection and applying collider... ";
   projector->project(*ug, *vg, *wg, pg, *fluidSurface, *colliderSdf, dt);
   applyCollider();
   std::cout << "Done." << std::endl;
   std::cout << "Solving G2P... ";
-  advector->solveGtoP({m_particles.positions, *ug, *vg, *wg, *colliderSdf, dt});
+  advector->solveG2P(std::span(positions()), *ug, *vg, *wg,
+                     *colliderSdf, dt);
   std::cout << "Done" << std::endl;
 }
 
@@ -182,18 +185,21 @@ Real FluidSimulator::CFL() const {
   Real h{ug->gridSpacing().x};
   Real cfl{h / 1e-6};
   ug->forEach([&cfl, h, this](int x, int y, int z) {
+    assert(notNan(ug->at(x, y ,z)));
     if (ug->at(x, y, z) != 0.0)
-      cfl = std::max(cfl, h / abs(ug->at(x, y, z)));
+      cfl = std::min(cfl, h / abs(ug->at(x, y, z)));
   });
   vg->forEach([&cfl, h, this](int x, int y, int z) {
+    assert(notNan(vg->at(x, y, z)));
     if (vg->at(x, y, z) != 0.0)
-      cfl = std::max(cfl, h / abs(vg->at(x, y, z)));
+      cfl = std::min(cfl, h / abs(vg->at(x, y, z)));
   });
   wg->forEach([&cfl, h, this](int x, int y, int z) {
+    assert(notNan(wg->at(x, y, z)));
     if (wg->at(x, y, z) != 0.0)
-      cfl = std::max(cfl, h / abs(wg->at(x, y, z)));
+      cfl = std::min(cfl, h / abs(wg->at(x, y, z)));
   });
-  return cfl;
+  return 5.0 * std::max(1e-3, cfl);
 }
 
 void FluidSimulator::step(core::Frame& frame) {

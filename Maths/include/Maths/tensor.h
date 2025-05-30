@@ -5,7 +5,7 @@
 #ifndef SIMCRAFT_MATHS_INCLUDE_MATHS_TENSOR_H_
 #define SIMCRAFT_MATHS_INCLUDE_MATHS_TENSOR_H_
 #include <Maths/types.h>
-namespace maths {
+namespace sim::maths {
 template<typename T, int N, int M>
 auto vectorize(const Matrix<T, N, M> &A) {
   return A.reshaped(N * M, 1).eval();

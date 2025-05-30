@@ -4,11 +4,12 @@
 
 #ifndef SIMCRAFT_CORE_INCLUDE_CORE_PROPERTIES_H_
 #define SIMCRAFT_CORE_INCLUDE_CORE_PROPERTIES_H_
-namespace core {
+namespace sim::core {
 struct NonCopyable {
   NonCopyable() = default;
   NonCopyable(const NonCopyable &) = delete;
   NonCopyable &operator=(const NonCopyable &) = delete;
+  NonCopyable(NonCopyable &&) = default;
 };
 struct Resource {
   Resource(Resource &&) = delete;

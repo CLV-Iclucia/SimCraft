@@ -6,7 +6,7 @@
 #define SIMCRAFT_FEM_INCLUDE_FEM_IPC_MOLLIFIER_H_
 #include <fem/types.h>
 #include <fem/ipc/external/mollifier.h>
-namespace fem::ipc {
+namespace sim::fem::ipc {
 inline Vector<Real, 12> edgeEdgeCrossSquareNormGradient(
     const Vector<Real, 3> &ea0,
     const Vector<Real, 3> &ea1,

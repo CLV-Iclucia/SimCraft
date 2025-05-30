@@ -1,10 +1,41 @@
+#include <Core/transfer-stencil.h>
 #include <Core/mesh.h>
 #include <FluidSim/cpu/util.h>
 #include <FluidSim/cpu/sdf.h>
-#include <FluidSim/cpu/stencil.h>
 #include <iostream>
 
 namespace fluid {
+using core::CubicKernel;
+Vec2d sampleVelocity(const Vec2d& p,
+                     const FaceCentredGrid<Real, Real, 2, 0>* u_grid,
+                     const FaceCentredGrid<Real, Real, 2, 1>* v_grid) {
+  Vec2i u_idx = u_grid->nearest(p);
+  Vec2i v_idx = v_grid->nearest(p);
+  Real h = u_grid->gridSpacing().x;
+  Real u = 0.0, v = 0.0;
+  Real w_u = 0.0, w_v = 0.0;
+  for (int j = -1; j <= 1; j++) {
+    for (int k = -1; k <= 1; k++) {
+      if (u_idx.x + j >= 0 && u_idx.x + j < u_grid->width() &&
+          u_idx.y + k >= 0 && u_idx.y + k < u_grid->height()) {
+        Real un = u_grid->at(u_idx + Vec2i(j, k));
+        Vec2d pn = u_grid->indexToCoord(u_idx + Vec2i(j, k));
+        Real w = CubicKernel::weight<Real, 2>(h, p - pn);
+        u += un * w;
+        w_u += w;
+      }
+      if (v_idx.x + j >= 0 && v_idx.x + j < v_grid->width() &&
+          v_idx.y + k >= 0 && v_idx.y + k < v_grid->height()) {
+        Real vn = v_grid->at(v_idx + Vec2i(j, k));
+        Vec2d pn = v_grid->indexToCoord(v_idx + Vec2i(j, k));
+        Real w = CubicKernel::weight<Real, 2>(h, p - pn);
+        v += vn * w;
+        w_v += w;
+      }
+    }
+  }
+  return Vec2d(w_u > 0.0 ? u / w_u : 0.0, w_v > 0.0 ? v / w_v : 0.0);
+}
 
 Vec3d sampleVelocity(const Vec3d& p,
                      const FaceCentredGrid<Real, Real, 3, 0>& ug,
@@ -16,9 +47,9 @@ Vec3d sampleVelocity(const Vec3d& p,
   Real h = ug.gridSpacing().x;
   Real u = 0.0, v = 0.0, w = 0.0;
   Real w_u = 0.0, w_v = 0.0, w_w = 0.0;
-  for (int i = -1; i <= 1; i++) {
-    for (int j = -1; j <= 1; j++) {
-      for (int k = -1; k <= 1; k++) {
+  for (int i = -1; i <= 2; i++) {
+    for (int j = -1; j <= 2; j++) {
+      for (int k = -1; k <= 2; k++) {
         if (u_idx.x + i >= 0 && u_idx.x + i < ug.width() &&
             u_idx.y + j >= 0 && u_idx.y + j < ug.height() &&
             u_idx.z + k >= 0 && u_idx.z + k < ug.depth()) {
@@ -98,7 +129,7 @@ static Real cross(const Vec2d& a, const Vec2d& b) {
   return a.x * b.y - b.x * a.y;
 }
 
-static bool insideTriangle2D(const Vec2d& p, const Vec2d& a, const Vec2d& b,
+static bool insideTraingle2D(const Vec2d& p, const Vec2d& a, const Vec2d& b,
                              const Vec2d& c) {
   Vec2d ap = p - a;
   Vec2d ab = b - a;
@@ -247,7 +278,7 @@ void manifold2SDF(int exact_band, spatify::Array3D<int>& closest,
       for (int k = lo_y; k <= hi_y; k++) {
         Vec3d orig = sdf->grid.indexToCoord(j, k, -1);
         Vec2d proj_p(orig.x, orig.y);
-        if (!insideTriangle2D(proj_p, proj_a, proj_b, proj_c)) continue;
+        if (!insideTraingle2D(proj_p, proj_a, proj_b, proj_c)) continue;
         Real u = -1.0, v = -1.0, w = -1.0;
         calcBiocentricCoord(proj_p, a, b, c, &u, &v, &w);
         assert(
@@ -377,5 +408,23 @@ void scaleAndAdd(spatify::Array3D<Real>& c, const spatify::Array3D<Real>& a,
     c(i, j, k) = a(i, j, k) + x * c(i, j, k);
     assert(!std::isnan(c(i, j, k)));
   });
+}
+std::optional<SDF<3>> loadSDF(const std::string& filename) {
+  std::fstream file(filename);
+  if (!file.is_open()) {
+    std::cerr << "Failed to open file " << filename << std::endl;
+    return std::nullopt;
+  }
+  Vector<int, 3> size;
+  Vector<Real, 3> origin, spacing;
+  file >> origin.x >> origin.y >> origin.z;
+  file >> size.x >> size.y >> size.z;
+  file >> spacing.x >> spacing.y >> spacing.z;
+  auto sdf = std::make_optional<SDF<3>>(size, Vec3d(spacing.x * size.x, spacing.y * size.y, spacing.z * size.z), origin);
+  for (int i = 0; i < size.x; i++)
+    for (int j = 0; j < size.y; j++)
+      for (int k = 0; k < size.z; k++)
+        file >> (*sdf)(i, j, k);
+  return std::move(sdf);
 }
 } // namespace fluid

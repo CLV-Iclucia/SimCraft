@@ -5,11 +5,8 @@
 #ifndef SIMCRAFT_DEFORM_INCLUDE_DEFORM_DEFORMATION_GRADIENT_H_
 #define SIMCRAFT_DEFORM_INCLUDE_DEFORM_DEFORMATION_GRADIENT_H_
 #include <Deform/types.h>
-#include <Core/debug.h>
-#include <Eigen/Core>
-#include <Maths/tensor.h>
 #include <Maths/svd.h>
-namespace deform {
+namespace sim::deform {
 template<typename T, int Dim>
 struct DeformationGradient {
   DeformationGradient() : m_Dm_inverse(Matrix<T, Dim, Dim>::Identity()) {}
@@ -86,6 +83,7 @@ struct DeformationGradient {
   Matrix<Real, Dim, Dim> m_F, m_U, m_V, m_Dm_inverse;
   Vector<Real, Dim> m_Sigma;
 };
+
 
 }
 #endif //SIMCRAFT_DEFORM_INCLUDE_DEFORM_DEFORMATION_GRADIENT_H_

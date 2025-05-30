@@ -1,37 +1,28 @@
 //
 // Created by creeper on 6/12/24.
 //
-#include <fstream>
-#include <fem/system.h>
-#include <Deform/invariants.h>
 #include <Core/json.h>
-namespace fem {
+#include <Deform/invariants.h>
+#include <fem/system.h>
+#include <spdlog/spdlog.h>
 
-static void tetAssembleGlobal(VecXd &global, const Vector<Real, 12> &local, const TetrahedronTopology &tet) {
+namespace sim::fem {
+void tetAssembleGlobal(VecXd &global, const Vector<Real, 12> &local,
+                       const Vector<int, 4> &tet) {
   for (int i = 0; i < 4; i++)
-    global.segment<3>(tet(i) * 3) += local.segment<3>(3 * i);
+    global.segment<3>(tet[i] * 3) += local.segment<3>(3 * i);
 }
 
-void System::spdProjectHessian(maths::SparseMatrixBuilder<Real> &builder) const {
-  for (int i = 0; i < numTets(); i++) {
-    auto &dg = primitives.tetDeformationGradients[i];
-    auto &energy = primitives.meshEnergies[primitives.tetMeshIDs[i]];
-    auto hessian_F = energy->filteredEnergyHessian(dg);
-    auto p_F_p_x = dg.gradient();
-    auto hessian_x = p_F_p_x.transpose() * hessian_F * p_F_p_x * primitives.tetRefVolumes[i];
-    builder.assembleBlock<12, 3>(hessian_x,
-                                 primitives.tets(0, i),
-                                 primitives.tets(1, i),
-                                 primitives.tets(2, i),
-                                 primitives.tets(3, i));
-  }
+void System::spdProjectHessian(
+    maths::SparseMatrixBuilder<Real> &builder) const {
+  autoDispatch([this, &builder](const Primitive &pr, int id) {
+    auto subMatBuilder = builder.subMatrixBuilder(dofStarts[id], dofStarts[id],
+                                                  pr.dofDim(), pr.dofDim());
+    pr.assembleEnergyHessian(subMatBuilder);
+  });
 }
 
-Real System::deformationEnergy() const {
-  if (state != State::Simulation)
-    throw std::runtime_error("Cannot compute deformation energy in states other than simulation");
-  return cachedEnergy;
-}
+Real System::deformationEnergy() const { return cachedEnergy; }
 
 System &System::updateCurrentConfig(const VecXd &x_nxt) {
   x = x_nxt;
@@ -40,116 +31,23 @@ System &System::updateCurrentConfig(const VecXd &x_nxt) {
 }
 
 const VecXd &System::deformationEnergyGradient() const {
-  if (state != State::Simulation)
-    throw std::runtime_error("Cannot compute deformation energy gradient in states other than simulation");
   return energyGradient;
 }
 
 void System::updateDeformationGradient() {
-  for (int i = 0; i < numTets(); i++) {
-    auto &dg = primitives.tetDeformationGradients[i];
-    Matrix<Real, 3, 3> local_x;
-    for (int j = 0; j < 3; j++)
-      local_x.col(j) = currentPos(primitives.tets(j + 1, i)) - currentPos(primitives.tets(0, i));
-    dg.updateCurrentConfig(local_x);
-  }
+  autoDispatch([this](Primitive &pr, int id) {
+    pr.updateDeformationEnergyGradient(pr.view(x));
+  });
   updateDeformationEnergy();
   updateDeformationEnergyGradient();
 }
 
-void System::saveSurfaceObjFile(const std::filesystem::path &path) const {
-  std::ofstream out(path);
-  for (int i = 0; i < numVertices(); i++)
-    out << "v " << currentPos(i).transpose() << std::endl;
-  for (int i = 0; i < primitives.surfaces.cols(); i++)
-    out << "f " << primitives.surfaces(0, i) + 1 << " " << primitives.surfaces(1, i) + 1 << " "
-        << primitives.surfaces(2, i) + 1 << std::endl;
-  out.close();
-}
-
-System &System::addPrimitive(TetPrimitiveConfig &&config) {
-  auto &&mesh = std::move(config.mesh);
-  auto &&energy = std::move(config.energy);
-  Real density = config.density;
-  if (state != State::Initialization)
-    throw std::runtime_error("Cannot add tet mesh after initialization");
-
-  int current_num_vertices = static_cast<int>(X.rows() / 3);
-  int current_num_tets = static_cast<int>(primitives.tets.cols());
-  int current_num_triangles = static_cast<int>(primitives.surfaces.cols());
-  int current_num_edges = static_cast<int>(primitives.edges.cols());
-  int added_num_vertices = static_cast<int>(mesh->vertices.cols());
-  int added_num_tets = static_cast<int>(mesh->tets.cols());
-  int added_num_triangles = static_cast<int>(mesh->surfaces.cols());
-  int added_num_edges = static_cast<int>(mesh->surfaceEdges.cols());
-  if (X.size() == 0) {
-    X = std::move(mesh->vertices).reshaped();
-    xdot = std::move(config.velocities).reshaped();
-    x = X;
-  } else {
-    assert(X.rows() % 3 == 0);
-    X.conservativeResize(X.rows() + added_num_vertices * 3, Eigen::NoChange);
-    X.block(current_num_vertices * 3, 0, added_num_vertices * 3, 1) = std::move(mesh->vertices).reshaped();
-
-    xdot.conservativeResize(xdot.rows() + added_num_vertices * 3, Eigen::NoChange);
-    xdot.block(current_num_vertices * 3, 0, added_num_vertices * 3, 1) = std::move(config.velocities).reshaped();
-
-    x.conservativeResize(x.rows() + added_num_vertices * 3, Eigen::NoChange);
-    x.block(current_num_vertices * 3, 0, added_num_vertices * 3, 1) =
-        X.block(current_num_vertices * 3, 0, added_num_vertices * 3, 1);
-  }
-
-  primitives.edges.conservativeResize(Eigen::NoChange, primitives.edges.cols() + added_num_edges);
-  for (int i = 0; i < added_num_edges; i++) {
-    Real length = (currentPos(mesh->surfaceEdges(0, i)) - currentPos(mesh->surfaceEdges(1, i))).norm();
-    m_meshLengthScale = std::min(m_meshLengthScale, length);
-    primitives.edges.col(current_num_edges + i) =
-        mesh->surfaceEdges.col(i) + Vector<int, 2>::Constant(current_num_vertices);
-  }
-
-  primitives.tets.conservativeResize(Eigen::NoChange, current_num_tets + mesh->tets.cols());
-  for (int i = 0; i < added_num_tets; i++)
-    primitives.tets.col(current_num_tets + i) = mesh->tets.col(i) + Vector<int, 4>::Constant(current_num_vertices);
-
-  primitives.surfaces.conservativeResize(Eigen::NoChange, current_num_triangles + mesh->surfaces.cols());
-  for (int i = 0; i < added_num_triangles; i++)
-    primitives.surfaces.col(current_num_triangles + i) =
-        mesh->surfaces.col(i) + Vector<int, 3>::Constant(current_num_vertices);
-
-  primitives.tetDeformationGradients.reserve(primitives.tets.cols());
-  primitives.tetRefVolumes.reserve(primitives.tets.cols());
-
-  for (int i = current_num_tets; i < primitives.tets.cols(); i++) {
-    Matrix<Real, 3, 3> local_X;
-    for (int j = 0; j < 3; j++)
-      local_X.col(j) = referencePos(primitives.tets(j + 1, i)) - referencePos(primitives.tets(0, i));
-    primitives.tetDeformationGradients.emplace_back(local_X);
-    primitives.tetRefVolumes.emplace_back(std::abs(local_X.determinant()) / 6.0);
-  }
-
-  primitives.meshEnergies.emplace_back(std::move(energy));
-  primitives.meshDensities.push_back(density);
-  for (int i = 0; i < mesh->tets.cols(); i++)
-    primitives.tetMeshIDs.push_back(static_cast<int>(primitives.meshEnergies.size()) - 1);
-  return *this;
-}
-
 void System::buildMassMatrix(maths::SparseMatrixBuilder<Real> &builder) const {
-  for (auto i = 0; i < numTets(); i++) {
-    Real density = primitives.meshDensities[primitives.tetMeshIDs[i]];
-    Real volume = primitives.tetRefVolumes[i];
-    Matrix<Real, 12, 12> localMass;
-    localMass.setZero();
-    for (int j = 0; j < 4; j++)
-      for (int k = 0; k < 4; k++)
-        localMass.block<3, 3>(j * 3, k * 3) +=
-            density * volume * (j == k ? 0.1 : 0.05) * Matrix<Real, 3, 3>::Identity();
-    builder.assembleBlock<12, 3>(localMass,
-                                 primitives.tets(0, i),
-                                 primitives.tets(1, i),
-                                 primitives.tets(2, i),
-                                 primitives.tets(3, i));
-  }
+  autoDispatch([this, &builder](const Primitive &pr, int id) {
+    auto subMatBuilder = builder.subMatrixBuilder(dofStarts[id], dofStarts[id],
+                                                  pr.dofDim(), pr.dofDim());
+    pr.assembleMassMatrix(subMatBuilder);
+  });
 }
 
 VecXd symbolicDeformationEnergyGradient(System &system) {
@@ -165,8 +63,10 @@ VecXd numericalDeformationEnergyGradient(System &system) {
     x_plus(i) += dx;
     VecXd x_minus = current;
     x_minus(i) -= dx;
-    Real E_plus = system.updateCurrentConfig(x_plus).deformationEnergy() / (2 * dx);
-    Real E_minus = system.updateCurrentConfig(x_minus).deformationEnergy() / (2 * dx);
+    Real E_plus =
+        system.updateCurrentConfig(x_plus).deformationEnergy() / (2 * dx);
+    Real E_minus =
+        system.updateCurrentConfig(x_minus).deformationEnergy() / (2 * dx);
     grad(i) = (E_plus - E_minus);
   }
   system.updateCurrentConfig(current);
@@ -175,38 +75,83 @@ VecXd numericalDeformationEnergyGradient(System &system) {
 
 void System::updateDeformationEnergy() {
   cachedEnergy = 0.0;
-  for (int i = 0; i < numTets(); i++) {
-    auto &dg = primitives.tetDeformationGradients[i];
-    auto &energy = primitives.meshEnergies[primitives.tetMeshIDs[i]];
-    cachedEnergy += energy->computeEnergyDensity(dg) * primitives.tetRefVolumes[i];
-  }
+  autoDispatch([this](Primitive &pr, int id) {
+    cachedEnergy += pr.deformationEnergy();
+  });
 }
 void System::updateDeformationEnergyGradient() {
   energyGradient.setZero();
-  for (int i = 0; i < numTets(); i++) {
-    auto &dg = primitives.tetDeformationGradients[i];
-    auto &energy = primitives.meshEnergies[primitives.tetMeshIDs[i]];
-    auto grad = energy->computeEnergyGradient(dg);
-    auto p_F_p_x = dg.gradient();
-    Vector<Real, 12> grad_x = p_F_p_x.transpose() * vectorize(grad) * primitives.tetRefVolumes[i];
-    tetAssembleGlobal(energyGradient, grad_x, primitives.tets.col(i));
-  }
+  autoDispatch([this](Primitive &pr, int dofStart) {
+    pr.assembleEnergyGradient(pr.view(energyGradient));
+  });
 }
 
-System &System::startSimulationPhase() {
-  state = State::Simulation;
+System &System::init() {
+  size_t dofDim{};
+  autoDispatch(
+      [this, &dofDim](const Primitive &pr, int id) { dofDim += pr.dofDim(); });
+  x.resize(static_cast<Eigen::Index>(dofDim));
+  xdot.resize(static_cast<Eigen::Index>(dofDim));
+  X.resize(static_cast<Eigen::Index>(dofDim));
+  energyGradient.resize(static_cast<Eigen::Index>(dofDim));
+  dofStarts.resize(prs.size());
+  int dofStart = 0;
+  for (int i = 0; i < prs.size(); ++i) {
+    dofStarts[i] = dofStart;
+    prs[i].setDofStart(dofStart);
+    dofStart += static_cast<int>(prs[i].dofDim());
+  }
+  autoDispatch([this](Primitive &pr, int id) {
+    auto x = pr.view(this->x);
+    auto X = pr.view(this->X);
+    auto xdot = pr.view(this->xdot);
+    pr.init(x, xdot, X);
+  });
   auto massBuilder = maths::SparseMatrixBuilder<Real>(dof(), dof());
   buildMassMatrix(massBuilder);
   m_mass = massBuilder.build();
-  m_massLDLT.compute(m_mass);
-  if (m_massLDLT.info() != Eigen::Success)
-    throw std::runtime_error("Failed to compute mass matrix LDLT decomposition");
-  f_ext.resize(static_cast<Eigen::Index>(dof()));
-  f_ext.setZero();
-  energyGradient.resize(static_cast<Eigen::Index>(dof()));
-  updateDeformationGradient();
+  initGeometryManager();
+
+  if (nEdges > 0) {
+    Real totalLength = 0.0;
+    for (int i = 0; i < nEdges; ++i) {
+      auto vertices = getGlobalEdge(i);
+      Vector<Real, 3> v0 = x.segment<3>(vertices.x * 3);
+      Vector<Real, 3> v1 = x.segment<3>(vertices.y * 3);
+      totalLength += (v1 - v0).norm();
+    }
+    m_meshLengthScale = totalLength / nEdges;
+  }
+  logSystemInfo();
   return *this;
 }
 
-using core::JsonNode;
+void System::initGeometryManager() {
+  m_geometryManager.collectGeometryReferences(prs, colliders);
+  nTriangles = m_geometryManager.triangleCount();
+  nEdges = m_geometryManager.edgeCount();
+  nVertices = m_geometryManager.vertexCount();
 }
+
+void System::logSystemInfo() const {
+  // log all the system info so that we can know all the information about the
+  // system
+  spdlog::info("System Info:");
+  spdlog::info("Number of primitives: {}", prs.size());
+  spdlog::info("Number of colliders: {}", colliders.size());
+  spdlog::info("Number of triangles: {}", nTriangles);
+  spdlog::info("Number of edges: {}", nEdges);
+  spdlog::info("Number of vertices: {}", nVertices);
+  spdlog::info("Mesh length scale: {}", m_meshLengthScale);
+  for (int i = 0; i < prs.size(); ++i) {
+    spdlog::info("Primitive {}: dofDim = {}, dofStart = {}", i, prs[i].dofDim(),
+                 dofStarts[i]);
+  }
+}
+
+int System::globalVertexToPrimitive(int globalIdx) const {
+  return m_geometryManager.getVertexRef(globalIdx).primitiveId;
+}
+
+VecXd System::computeAcceleration() const { return {}; }
+} // namespace sim::fem

@@ -10,7 +10,7 @@
 #ifdef _WIN32
 #define NOMINMAX
 #endif
-namespace core {
+namespace sim::core {
 using Real = double;
 using Index = int;
 using Vec2i = glm::ivec2;

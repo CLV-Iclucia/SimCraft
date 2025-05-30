@@ -2,11 +2,11 @@
 // Created by creeper on 9/10/24.
 //
 
-#ifndef SIMCRAFT_MATHS_INCLUDE_MATHS_INCLUSION_ROOT_FINDER_H_
-#define SIMCRAFT_MATHS_INCLUDE_MATHS_INCLUSION_ROOT_FINDER_H_
+#pragma once
 #include <optional>
 #include <Maths/types.h>
-namespace maths {
+#include <queue>
+namespace sim::maths {
 
 struct Interval {
   std::array<Real, 2> bounds{};
@@ -142,4 +142,3 @@ std::optional<Real> tightInclusionSolve(Func &&F, const TightInclusionSolverConf
   return std::nullopt;
 }
 }
-#endif //SIMCRAFT_MATHS_INCLUDE_MATHS_INCLUSION_ROOT_FINDER_H_

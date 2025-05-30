@@ -2,7 +2,7 @@
 #include <gtest/gtest.h>
 #include <Maths/equations.h>
 
-using namespace maths;
+using namespace sim::maths;
 
 TEST(QuadraticSolveTest, RealRoots) {
   QuadraticPolynomial poly{1, -3, 2}; // x^2 - 3x + 2 = 0

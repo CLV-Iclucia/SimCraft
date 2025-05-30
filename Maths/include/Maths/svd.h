@@ -5,7 +5,7 @@
 #ifndef SIMCRAFT_MATHS_INCLUDE_MATHS_SVD_H_
 #define SIMCRAFT_MATHS_INCLUDE_MATHS_SVD_H_
 #include <Maths/types.h>
-namespace maths {
+namespace sim::maths {
 // modified from HOBAKv1
 template <typename T, int Dim>
 struct SVDResult {

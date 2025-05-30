@@ -4,17 +4,16 @@
 
 #ifndef SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_FLUID_SIMULATOR_H_
 #define SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_FLUID_SIMULATOR_H_
-
-#include <memory>
 #include <Core/animation.h>
+#include <Core/timer.h>
 #include <Core/rand-gen.h>
-#include <Core/debug.h>
 #include <Spatify/grids.h>
 #include <Spatify/arrays.h>
 #include <FluidSim/fluid-sim.h>
 #include <FluidSim/cpu/sdf.h>
 #include <FluidSim/cpu/advect-solver.h>
 #include <FluidSim/cpu/project-solver.h>
+#include <memory>
 #include <FluidSim/fluid-simulator.h>
 
 namespace fluid::cpu {
@@ -25,18 +24,25 @@ using spatify::PaddedCellCentredGrid;
 
 class FluidSimulator final : public FluidComputeBackend {
  public:
+  core::Timer timer;
   FluidSimulator(int n, const Vec3d &size, const Vec3i &resolution)
       : nParticles(n), uw(resolution + Vec3i(1, 0, 0)),
         vw(resolution + Vec3i(0, 1, 0)), ww(resolution + Vec3i(0, 0, 1)),
-        pg(resolution), debugger("Fluid Simulation") {
+        pg(resolution) {
     m_particles.positions.resize(n);
     // initialize grids
-    ug = std::make_unique<FaceCentredGrid<Real, Real, 3, 0>>(resolution, size);
-    vg = std::make_unique<FaceCentredGrid<Real, Real, 3, 1>>(resolution, size);
-    wg = std::make_unique<FaceCentredGrid<Real, Real, 3, 2>>(resolution, size);
-    ubuf = std::make_unique<FaceCentredGrid<Real, Real, 3, 0>>(resolution, size);
-    vbuf = std::make_unique<FaceCentredGrid<Real, Real, 3, 1>>(resolution, size);
-    wbuf = std::make_unique<FaceCentredGrid<Real, Real, 3, 2>>(resolution, size);
+    ug = std::make_unique<FaceCentredGrid<
+        Real, Real, 3, 0>>(resolution, size);
+    vg = std::make_unique<FaceCentredGrid<
+        Real, Real, 3, 1>>(resolution, size);
+    wg = std::make_unique<FaceCentredGrid<
+        Real, Real, 3, 2>>(resolution, size);
+    ubuf = std::make_unique<FaceCentredGrid<Real, Real, 3, 0>>(
+        resolution, size);
+    vbuf = std::make_unique<FaceCentredGrid<Real, Real, 3, 1>>(
+        resolution, size);
+    wbuf = std::make_unique<FaceCentredGrid<Real, Real, 3, 2>>(
+        resolution, size);
     uValid = std::make_unique<Array3D<char>>(resolution + Vec3i(1, 0, 0));
     vValid = std::make_unique<Array3D<char>>(resolution + Vec3i(0, 1, 0));
     wValid = std::make_unique<Array3D<char>>(resolution + Vec3i(0, 0, 1));
@@ -48,14 +54,13 @@ class FluidSimulator final : public FluidComputeBackend {
     fluidSurface = std::make_unique<SDF<3>>(resolution, size);
     fluidSurfaceBuf = std::make_unique<SDF<3>>(resolution, size);
     colliderSdf = std::make_unique<SDF<3>>(resolution, size);
-    debugger.activate();
     assert(
         ug->gridSpacing() == vg->gridSpacing() && vg->gridSpacing() == wg->
             gridSpacing());
   }
 
   void setCollider(const Mesh &colliderMesh) const override {
-    std::cout << "Building fluidRegion SDF..." << std::endl;
+    std::cout << "Building collider SDF..." << std::endl;
     Array3D<int> closest(colliderSdf->width(), colliderSdf->height(),
                          colliderSdf->depth());
     Array3D<int> intersection_cnt(colliderSdf->width(), colliderSdf->height(),
@@ -67,18 +72,29 @@ class FluidSimulator final : public FluidComputeBackend {
 
   void setInitialFluid(const Mesh &fluid_mesh) override {
     for (auto &p : m_particles.positions) {
-      p = core::randomVec<Real, 3>() * Vec3d(1.0, 0.45, 1.0) + Vec3d(
-          0.0, 0.5, 0.0);
+      p = core::randomVec<Real, 3>() * Vec3d(0.5, 0.5, 0.5) + Vec3d(
+          0.5, 0.0, 0.5);
     }
   }
 
   void setAdvector(AdvectionMethod advection_method) override {
     if (advection_method == AdvectionMethod::PIC) {
-      advector = std::make_unique<PicAdvector3D>(nParticles, pg.width(),
-                                                 pg.height(), pg.depth());
-      return;
-    }
-    throw std::runtime_error("Unknown advection solver");
+      advector = std::make_unique<PicAdvector3D>(nParticles, Vec3i(pg.width(),
+                                                                   pg.height(),
+                                                                   pg.depth()),
+                                                 pg.width() * ug->gridSpacing().x,
+                                                 pg.height() * ug->gridSpacing().y,
+                                                 pg.depth() * ug->gridSpacing().z);
+    } else if (advection_method == AdvectionMethod::FLIP) {
+      advector = std::make_unique<FlipAdvectionSolver3D>(nParticles,
+                                                         Vec3i(pg.width(),
+                                                               pg.height(),
+                                                               pg.depth()),
+                                                         pg.width() * ug->gridSpacing().x,
+                                                         pg.height() * ug->gridSpacing().y,
+                                                         pg.depth() * ug->gridSpacing().z);
+    } else
+      ERROR("Unknown advection solver");
   }
 
   void setProjector(ProjectSolver project_solver) override {
@@ -87,17 +103,9 @@ class FluidSimulator final : public FluidComputeBackend {
                                                 pg.depth());
       return;
     }
-    throw std::runtime_error("Unknown projection solver");
+    ERROR("Unknown projection solver");
   }
-  void setParticleReconstructor(ReconstructionMethod reconstruction_method) override {
-    if (reconstruction_method == ReconstructionMethod::Naive) {
-      Vec3d size(pg.width() * ug->gridSpacing().x, pg.height() * ug->gridSpacing().y,
-                 pg.depth() * ug->gridSpacing().z);
-      fluidSurfaceReconstructor =
-          std::make_unique<NaiveReconstructor<Real, 3>>(nParticles, pg.width(), pg.height(), pg.depth(), size);
-    } else
-      throw std::runtime_error("Unknown reconstruction method");
-  }
+
   void setCompressedSolver(CompressedSolverMethod solver_method,
                            PreconditionerMethod
                            preconditioner_method) override {
@@ -157,6 +165,19 @@ class FluidSimulator final : public FluidComputeBackend {
     }
   }
 
+  void setReconstructor(ReconstructorMethod reconstructor_method) override {
+    Vector<Real, 3>
+        size(pg.width() * ug->gridSpacing().x, pg.height() * ug->gridSpacing().y, pg.depth() * ug->gridSpacing().z);
+    if (reconstructor_method == ReconstructorMethod::Naive) {
+      fluidSurfaceReconstructor =
+          std::make_unique<NaiveReconstructor<Real, 3>>(nParticles,
+                                                        pg.width(),
+                                                        pg.height(),
+                                                        pg.depth(),
+                                                        size);
+    }
+  }
+
   void step(core::Frame &frame);
 
   [[nodiscard]] const std::vector<Vec3d> &positions() const {
@@ -172,40 +193,6 @@ class FluidSimulator final : public FluidComputeBackend {
   }
 
   std::vector<Vec3d> &positions() { return m_particles.positions; }
-
-  void erodeFluidSurface(int iters) {
-    Real h = fluidSurface->grid.gridSpacing().x;
-    for (int iter = 0; iter < iters; iter++) {
-      fluidSurfaceBuf->grid.forEach([&](int i, int j, int k) {
-        // if any of my neighbors are outside of the fluid, then I am outside
-        if (i > 0 && fluidSurface->grid(i - 1, j, k) > 0.0) {
-          fluidSurfaceBuf->grid(i, j, k) = 0.5 * h;
-          return;
-        }
-        if (i < fluidSurface->width() - 1 && fluidSurface->grid(i + 1, j, k) > 0.0) {
-          fluidSurfaceBuf->grid(i, j, k) = 0.5 * h;
-          return;
-        }
-        if (j > 0 && fluidSurface->grid(i, j - 1, k) > 0.0) {
-          fluidSurfaceBuf->grid(i, j, k) = 0.5 * h;
-          return;
-        }
-        if (j < fluidSurface->height() - 1 && fluidSurface->grid(i, j + 1, k) > 0.0) {
-          fluidSurfaceBuf->grid(i, j, k) = 0.5 * h;
-          return;
-        }
-        if (k > 0 && fluidSurface->grid(i, j, k - 1) > 0.0) {
-          fluidSurfaceBuf->grid(i, j, k) = 0.5 * h;
-          return;
-        }
-        if (k < fluidSurface->depth() - 1 && fluidSurface->grid(i, j, k + 1) > 0.0) {
-          fluidSurfaceBuf->grid(i, j, k) = 0.5 * h;
-          return;
-        }
-      });
-      std::swap(fluidSurface, fluidSurfaceBuf);
-    }
-  }
 
  private:
   int nParticles{};
@@ -264,6 +251,7 @@ class FluidSimulator final : public FluidComputeBackend {
       std::swap(valid, validBuf);
     }
   }
+
   void clear();
   void applyForce(Real dt) const;
   void applyCollider() const;
@@ -281,7 +269,6 @@ class FluidSimulator final : public FluidComputeBackend {
   std::unique_ptr<SDF<3>> fluidSurface{}, fluidSurfaceBuf{}, colliderSdf{};
   std::unique_ptr<ProjectionSolver3D> projector{};
   std::unique_ptr<HybridAdvectionSolver3D> advector{};
-  core::Debugger debugger;
 };
 } // namespace fluid::cpu
 #endif  // SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_FLUID_SIMULATOR_H_

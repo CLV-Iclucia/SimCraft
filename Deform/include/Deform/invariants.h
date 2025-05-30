@@ -2,14 +2,13 @@
 // Created by creeper on 5/23/24.
 //
 
-#ifndef SIMCRAFT_DEFORM_INCLUDE_DEFORM_INVARIANTS_H_
-#define SIMCRAFT_DEFORM_INCLUDE_DEFORM_INVARIANTS_H_
+#pragma once
 #include <Deform/types.h>
 #include <Deform/deformation-gradient.h>
 #include <Core/properties.h>
 #include <Maths/tensor.h>
 #include <Maths/linalg-utils.h>
-namespace deform {
+namespace sim::deform {
 template<typename T>
 struct EigenMatrixSigmas : core::NonCopyable {
   std::array<Matrix<T, 3, 3>, 3> eigenMatrixSigmas;
@@ -84,4 +83,3 @@ Matrix<T, 9, 9> hessianIiii(const DeformationGradient<T, 3> &dg) {
 }
 
 }
-#endif //SIMCRAFT_DEFORM_INCLUDE_DEFORM_INVARIANTS_H_

@@ -36,7 +36,7 @@ enum class CompressedSolverMethod {
   CG
 };
 
-enum class ReconstructionMethod {
+enum class ReconstructorMethod {
   Naive
 };
 
@@ -48,7 +48,7 @@ struct FluidComputeBackend : NonCopyable {
   virtual void setCompressedSolver(CompressedSolverMethod solver_method,
                                    PreconditionerMethod preconditioner_method) =
   0;
-  virtual void setParticleReconstructor(ReconstructionMethod reconstruction_method) = 0;
+  virtual void setReconstructor(ReconstructorMethod reconstructor_method) = 0;
   virtual ~FluidComputeBackend() = default;
 };
 
@@ -78,10 +78,10 @@ struct FluidSimulator final : core::Animation {
     if (!scene)
       scene = std::make_unique<Scene>();
     if (!myLoadObj(collider_path, &scene->collider_mesh)) {
-      throw std::runtime_error("Failed to load fluidRegion mesh");
+      ERROR("Failed to load collider mesh");
     }
     if (!myLoadObj(fluid_path, &scene->fluid_init_mesh)) {
-      throw std::runtime_error("Failed to load fluid mesh");
+      ERROR("Failed to load fluid mesh");
     }
   }
 

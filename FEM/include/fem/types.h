@@ -8,14 +8,15 @@
 #include <Maths/tensor.h>
 #include <Spatify/bbox.h>
 #include <Core/zip.h>
-namespace fem {
+#include <Core/reflection.h>
+namespace sim::fem {
 using maths::Dynamic;
-template <typename T, int Rows, int Cols>
-using Matrix = maths::Matrix<T, Rows, Cols>;
-template <typename T, int Dim>
-using Vector = maths::Vector<T, Dim>;
-template <typename T, int Dim>
-using VecView = maths::VecView<T, Dim>;
+using maths::Matrix;
+using maths::Vector;
+template <typename T>
+using SubVector = maths::VecView<T, Eigen::Dynamic>;
+template <typename T>
+using CSubVector = maths::CVecView<T, Eigen::Dynamic>;
 template <typename T>
 using SparseMatrix = Eigen::SparseMatrix<T>;
 using Real = double;

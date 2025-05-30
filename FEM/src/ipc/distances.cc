@@ -2,7 +2,7 @@
 // Created by creeper on 7/14/24.
 //
 #include <fem/ipc/distances.h>
-namespace fem::ipc {
+namespace sim::fem::ipc {
 
 Real distanceSqrPointTriangle(const Vector<Real, 3> &p,
                               const Vector<Real, 3> &a,

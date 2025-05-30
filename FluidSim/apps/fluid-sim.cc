@@ -3,8 +3,8 @@
 #include <Core/mesh.h>
 #include <ogl-render/resource-handles.h>
 #include <ogl-render/camera.h>
-#include <FluidSim/cpu/fluid-simulator.h>
-#include <FluidSim/cpu/rebuild-surface.h>
+#include <FluidSim/fluid-simulator.h>
+#include <FluidSim/rebuild-surface.h>
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
 #include <iostream>

@@ -6,7 +6,7 @@
 #define SIMCRAFT_FEM_INCLUDE_FEM_IPC_EXTERNAL_DISTANCES_H_
 
 // These codes are taken from ipc-toolkit symbolically generated derivatives
-namespace fem::ipc::autogen {
+namespace sim::fem::ipc::autogen {
 inline void point_line_distance_gradient_3D(
     double v01,
     double v02,

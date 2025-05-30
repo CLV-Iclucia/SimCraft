@@ -6,7 +6,7 @@
 #define SIMCRAFT_CORE_INCLUDE_CORE_SURFACE_H_
 #include <Core/core.h>
 #include <string>
-namespace core {
+namespace sim::core {
 struct Mesh {
   int triangleCount;
   std::vector<Vec3d> vertices;

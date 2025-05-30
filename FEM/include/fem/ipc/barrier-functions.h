@@ -6,7 +6,7 @@
 #define SIMCRAFT_FEM_INCLUDE_FEM_IPC_BARRIER_FUNCTIONS_H_
 #include <fem/types.h>
 #include <cmath>
-namespace fem::ipc {
+namespace sim::fem::ipc {
 
 struct LogBarrier {
   explicit LogBarrier(Real dHat) : m_dHat(dHat) {}

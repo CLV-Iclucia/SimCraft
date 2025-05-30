@@ -3,27 +3,19 @@
 //
 #include <fem/ipc/collision-detector.h>
 #include <fem/ipc/implicit-euler.h>
-#include <fem/ipc/distances.h>
 #include <fem/system.h>
-namespace fem {
 
-IpcImplicitEuler::IpcImplicitEuler(System &system, const Config &config) : IpcIntegrator(system, config) {
-  collisionDetector = std::make_unique<ipc::CollisionDetector>();
-  edgesBVH = std::make_unique<spatify::LBVH<Real>>();
-  trianglesBVH = std::make_unique<spatify::LBVH<Real>>();
-}
+namespace sim::fem {
 
 Real IpcImplicitEuler::incrementalPotentialKinematicEnergy(const VecXd &x_t, Real h) const {
   const auto &v_t = system().xdot;
-  const auto &f_e = system().f_ext;
-  auto x_hat = x_t + h * v_t + h * h * system().massLDLT().solve(f_e);
+  auto x_hat = x_t + h * v_t + h * h * system().computeAcceleration();
   return 0.5 * (system().currentConfig() - x_hat).transpose() * system().mass() * (system().currentConfig() - x_hat);
 }
 
 VecXd IpcImplicitEuler::incrementalPotentialKinematicEnergyGradient(const VecXd &x_t, Real h) const {
   const auto &v_t = system().xdot;
-  const auto &f_e = system().f_ext;
-  auto x_hat = x_t + h * v_t + h * h * system().massLDLT().solve(f_e);
+  auto x_hat = x_t + h * v_t + h * h * system().computeAcceleration();
   return system().mass() * (system().currentConfig() - x_hat);
 }
 

@@ -1,11 +1,13 @@
 cmake_minimum_required(VERSION 3.10)
-
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CUDA_ARCHITECTURES 52;70;75;86)
 project(SimCraft)
 
+if (MSVC)
+    add_compile_options(/Zc:preprocessor)
+endif()
 find_package(TBB REQUIRED)
-find_package(glfw3 REQUIRED)
+find_package(GTest REQUIRED)
 
 set(GLAD_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/glad/include)
 set(EXTERNAL_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external)
@@ -23,7 +25,6 @@ endforeach()
 
 add_subdirectory(Core)
 add_subdirectory(Maths)
-add_subdirectory(OglRender)
 add_subdirectory(Spatify)
 add_subdirectory(FluidSim)
 add_subdirectory(Deform)

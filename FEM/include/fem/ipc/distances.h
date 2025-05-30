@@ -4,20 +4,25 @@
 
 #ifndef SIMCRAFT_FEM_INCLUDE_FEM_IPC_DISTANCES_H_
 #define SIMCRAFT_FEM_INCLUDE_FEM_IPC_DISTANCES_H_
-#include <fem/types.h>
-#include <fem/ipc/external/distances.h>
 #include <cstdint>
-namespace fem::ipc {
-inline Real distanceSqrPointPoint(const Vector<Real, 3> &p1, const Vector<Real, 3> &p2) {
+#include <fem/ipc/external/distances.h>
+#include <fem/types.h>
+namespace sim::fem::ipc {
+inline Real distanceSqrPointPoint(const Vector<Real, 3> &p1,
+                                  const Vector<Real, 3> &p2) {
   return (p1 - p2).squaredNorm();
 }
-inline Vector<Real, 6> localDistanceSqrPointPointGradient(const Vector<Real, 3> &p1, const Vector<Real, 3> &p2) {
+inline Vector<Real, 6>
+localDistanceSqrPointPointGradient(const Vector<Real, 3> &p1,
+                                   const Vector<Real, 3> &p2) {
   Vector<Real, 6> localGrad;
   localGrad.segment<3>(0) = 2 * (p1 - p2);
   localGrad.segment<3>(3) = -localGrad.segment<3>(0);
   return localGrad;
 }
-inline Matrix<Real, 6, 6> localDistanceSqrPointPointHessian(const Vector<Real, 3> &p1, const Vector<Real, 3> &p2) {
+inline Matrix<Real, 6, 6>
+localDistanceSqrPointPointHessian(const Vector<Real, 3> &p1,
+                                  const Vector<Real, 3> &p2) {
   Matrix<Real, 6, 6> localHessian;
   localHessian.block<3, 3>(0, 0) = 2 * Matrix<Real, 3, 3>::Identity();
   localHessian.block<3, 3>(3, 3) = 2 * Matrix<Real, 3, 3>::Identity();
@@ -25,39 +30,29 @@ inline Matrix<Real, 6, 6> localDistanceSqrPointPointHessian(const Vector<Real, 3
   localHessian.block<3, 3>(3, 0) = -localHessian.block<3, 3>(3, 3);
   return localHessian;
 }
-inline Real distanceSqrPointLine(const Vector<Real, 3> &p, const Vector<Real, 3> &l1, const Vector<Real, 3> &l2) {
+inline Real distanceSqrPointLine(const Vector<Real, 3> &p,
+                                 const Vector<Real, 3> &l1,
+                                 const Vector<Real, 3> &l2) {
   assert((l2 - l1).norm() != 0.0);
   return ((l2 - l1).cross(p - l1)).squaredNorm() / (l2 - l1).squaredNorm();
 }
-inline Vector<Real, 9> localDistanceSqrPointLineGradient(const Vector<Real, 3> &p,
-                                                         const Vector<Real, 3> &l1,
-                                                         const Vector<Real, 3> &l2) {
+inline Vector<Real, 9>
+localDistanceSqrPointLineGradient(const Vector<Real, 3> &p,
+                                  const Vector<Real, 3> &l1,
+                                  const Vector<Real, 3> &l2) {
   Vector<Real, 9> localGrad;
-  autogen::point_line_distance_gradient_3D(p(0),
-                                           p(1),
-                                           p(2),
-                                           l1(0),
-                                           l1(1),
-                                           l1(2),
-                                           l2(0),
-                                           l2(1),
-                                           l2(2),
+  autogen::point_line_distance_gradient_3D(p(0), p(1), p(2), l1(0), l1(1),
+                                           l1(2), l2(0), l2(1), l2(2),
                                            localGrad.data());
   return localGrad;
 }
-inline Matrix<Real, 9, 9> localDistanceSqrPointLineHessian(const Vector<Real, 3> &p,
-                                                           const Vector<Real, 3> &l1,
-                                                           const Vector<Real, 3> &l2) {
+inline Matrix<Real, 9, 9>
+localDistanceSqrPointLineHessian(const Vector<Real, 3> &p,
+                                 const Vector<Real, 3> &l1,
+                                 const Vector<Real, 3> &l2) {
   Matrix<Real, 9, 9> localHessian;
-  autogen::point_line_distance_hessian_3D(p(0),
-                                          p(1),
-                                          p(2),
-                                          l1(0),
-                                          l1(1),
-                                          l1(2),
-                                          l2(0),
-                                          l2(1),
-                                          l2(2),
+  autogen::point_line_distance_hessian_3D(p(0), p(1), p(2), l1(0), l1(1), l1(2),
+                                          l2(0), l2(1), l2(2),
                                           localHessian.data());
   return localHessian;
 }
@@ -70,44 +65,22 @@ inline Real distanceSqrPointPlane(const Vector<Real, 3> &p,
   auto normal = (p2 - p1).cross(p3 - p1);
   return (p - p1).dot(normal) * (p - p1).dot(normal) / normal.squaredNorm();
 }
-inline Vector<Real, 12> localDistanceSqrPointPlaneGradient(const Vector<Real, 3> &p,
-                                                           const Vector<Real, 3> &p1,
-                                                           const Vector<Real, 3> &p2,
-                                                           const Vector<Real, 3> &p3) {
+inline Vector<Real, 12> localDistanceSqrPointPlaneGradient(
+    const Vector<Real, 3> &p, const Vector<Real, 3> &p1,
+    const Vector<Real, 3> &p2, const Vector<Real, 3> &p3) {
   Vector<Real, 12> local_grad;
-  autogen::point_plane_distance_gradient(p(0),
-                                         p(1),
-                                         p(2),
-                                         p1(0),
-                                         p1(1),
-                                         p1(2),
-                                         p2(0),
-                                         p2(1),
-                                         p2(2),
-                                         p3(0),
-                                         p3(1),
-                                         p3(2),
-                                         local_grad.data());
+  autogen::point_plane_distance_gradient(p(0), p(1), p(2), p1(0), p1(1), p1(2),
+                                         p2(0), p2(1), p2(2), p3(0), p3(1),
+                                         p3(2), local_grad.data());
   return local_grad;
 }
-inline Matrix<Real, 12, 12> localDistanceSqrPointPlaneHessian(const Vector<Real, 3> &p,
-                                                              const Vector<Real, 3> &p1,
-                                                              const Vector<Real, 3> &p2,
-                                                              const Vector<Real, 3> &p3) {
+inline Matrix<Real, 12, 12> localDistanceSqrPointPlaneHessian(
+    const Vector<Real, 3> &p, const Vector<Real, 3> &p1,
+    const Vector<Real, 3> &p2, const Vector<Real, 3> &p3) {
   Matrix<Real, 12, 12> local_hessian;
-  autogen::point_plane_distance_hessian(p(0),
-                                        p(1),
-                                        p(2),
-                                        p1(0),
-                                        p1(1),
-                                        p1(2),
-                                        p2(0),
-                                        p2(1),
-                                        p2(2),
-                                        p3(0),
-                                        p3(1),
-                                        p3(2),
-                                        local_hessian.data());
+  autogen::point_plane_distance_hessian(p(0), p(1), p(2), p1(0), p1(1), p1(2),
+                                        p2(0), p2(1), p2(2), p3(0), p3(1),
+                                        p3(2), local_hessian.data());
   return local_hessian;
 }
 inline Real distanceSqrLineLine(const Vector<Real, 3> &l1,
@@ -120,43 +93,21 @@ inline Real distanceSqrLineLine(const Vector<Real, 3> &l1,
   Real line_to_line = (l1 - m1).dot(normal) * (l1 - m1).dot(normal);
   return line_to_line / normal.squaredNorm();
 }
-inline Vector<Real, 12> localDistanceSqrLineLineGradient(const Vector<Real, 3> &l1,
-                                                         const Vector<Real, 3> &l2,
-                                                         const Vector<Real, 3> &m1,
-                                                         const Vector<Real, 3> &m2) {
+inline Vector<Real, 12> localDistanceSqrLineLineGradient(
+    const Vector<Real, 3> &l1, const Vector<Real, 3> &l2,
+    const Vector<Real, 3> &m1, const Vector<Real, 3> &m2) {
   Vector<Real, 12> local_grad;
-  autogen::line_line_distance_gradient(l1(0),
-                                       l1(1),
-                                       l1(2),
-                                       l2(0),
-                                       l2(1),
-                                       l2(2),
-                                       m1(0),
-                                       m1(1),
-                                       m1(2),
-                                       m2(0),
-                                       m2(1),
-                                       m2(2),
+  autogen::line_line_distance_gradient(l1(0), l1(1), l1(2), l2(0), l2(1), l2(2),
+                                       m1(0), m1(1), m1(2), m2(0), m2(1), m2(2),
                                        local_grad.data());
   return local_grad;
 }
-inline Matrix<Real, 12, 12> localDistanceSqrLineLineHessian(const Vector<Real, 3> &l1,
-                                                            const Vector<Real, 3> &l2,
-                                                            const Vector<Real, 3> &m1,
-                                                            const Vector<Real, 3> &m2) {
+inline Matrix<Real, 12, 12> localDistanceSqrLineLineHessian(
+    const Vector<Real, 3> &l1, const Vector<Real, 3> &l2,
+    const Vector<Real, 3> &m1, const Vector<Real, 3> &m2) {
   Matrix<Real, 12, 12> local_hessian;
-  autogen::line_line_distance_hessian(l1(0),
-                                      l1(1),
-                                      l1(2),
-                                      l2(0),
-                                      l2(1),
-                                      l2(2),
-                                      m1(0),
-                                      m1(1),
-                                      m1(2),
-                                      m2(0),
-                                      m2(1),
-                                      m2(2),
+  autogen::line_line_distance_hessian(l1(0), l1(1), l1(2), l2(0), l2(1), l2(2),
+                                      m1(0), m1(1), m1(2), m2(0), m2(1), m2(2),
                                       local_hessian.data());
   return local_hessian;
 }
@@ -170,7 +121,8 @@ enum class EdgeEdgeDistanceType : uint8_t {
   AB_D,
   A_CD,
   B_CD,
-  AB_CD
+  AB_CD,
+  Unknown
 };
 
 enum class PointTriangleDistanceType : uint8_t {
@@ -180,15 +132,14 @@ enum class PointTriangleDistanceType : uint8_t {
   P_AB,
   P_BC,
   P_CA,
-  P_ABC
+  P_ABC,
+  Unknown
 };
 
 // modified from ipc-toolkit
 inline EdgeEdgeDistanceType decideEdgeEdgeParallelDistanceType(
-    const Eigen::Vector3d &ea0,
-    const Eigen::Vector3d &ea1,
-    const Eigen::Vector3d &eb0,
-    const Eigen::Vector3d &eb1) {
+    const Eigen::Vector3d &ea0, const Eigen::Vector3d &ea1,
+    const Eigen::Vector3d &eb0, const Eigen::Vector3d &eb1) {
   const Eigen::Vector3d ea = ea1 - ea0;
   const double alpha = (eb0 - ea0).dot(ea) / ea.squaredNorm();
   const double beta = (eb1 - ea0).dot(ea) / ea.squaredNorm();
@@ -220,10 +171,9 @@ inline EdgeEdgeDistanceType decideEdgeEdgeParallelDistanceType(
   return EdgeEdgeDistanceType(ebc < 2 ? (eac << 1 | ebc) : (6 + eac));
 }
 // modified from ipc-toolkit
-inline EdgeEdgeDistanceType decideEdgeEdgeDistanceType(const Vector<Real, 3> &ea0,
-                                                       const Vector<Real, 3> &ea1,
-                                                       const Vector<Real, 3> &eb0,
-                                                       const Vector<Real, 3> &eb1) {
+inline EdgeEdgeDistanceType decideEdgeEdgeDistanceType(
+    const Vector<Real, 3> &ea0, const Vector<Real, 3> &ea1,
+    const Vector<Real, 3> &eb0, const Vector<Real, 3> &eb1) {
   constexpr double PARALLEL_THRESHOLD = 1.0e-20;
 
   const Eigen::Vector3d u = ea1 - ea0;
@@ -268,8 +218,7 @@ inline EdgeEdgeDistanceType decideEdgeEdgeDistanceType(const Vector<Real, 3> &ea
   } else {
     tN = (a * e - b * d);
     tD = D; // default tD = D ≥ 0
-    if (tN > 0.0 && tN < tD
-        && u.cross(v).squaredNorm() < parallel_tolerance) {
+    if (tN > 0.0 && tN < tD && u.cross(v).squaredNorm() < parallel_tolerance) {
       // avoid coplanar or nearly parallel EE
       if (sN < D / 2) {
         tN = e;
@@ -305,14 +254,13 @@ inline EdgeEdgeDistanceType decideEdgeEdgeDistanceType(const Vector<Real, 3> &ea
   }
 
   return default_case;
-
 }
 
-inline PointTriangleDistanceType decidePointTriangleDistanceType(
-    const Eigen::Ref<const Eigen::Vector3d> &p,
-    const Eigen::Ref<const Eigen::Vector3d> &t0,
-    const Eigen::Ref<const Eigen::Vector3d> &t1,
-    const Eigen::Ref<const Eigen::Vector3d> &t2) {
+inline PointTriangleDistanceType
+decidePointTriangleDistanceType(const Eigen::Ref<const Eigen::Vector3d> &p,
+                                const Eigen::Ref<const Eigen::Vector3d> &t0,
+                                const Eigen::Ref<const Eigen::Vector3d> &t1,
+                                const Eigen::Ref<const Eigen::Vector3d> &t2) {
   const Eigen::Vector3d normal = (t1 - t0).cross(t2 - t0);
 
   Eigen::Matrix<Real, 2, 3> basis, param;
@@ -362,13 +310,11 @@ Vector<Real, 12> localDistancePointTriangleGradient(const Vector<Real, 3> &p,
                                                     const Vector<Real, 3> &b,
                                                     const Vector<Real, 3> &c);
 
-Matrix<Real, 12, 12> localDistancePointTriangleHessian(const Vector<Real, 3> &p,
-                                                       const Vector<Real, 3> &a,
-                                                       const Vector<Real, 3> &b,
-                                                       const Vector<Real, 3> &c);
+Matrix<Real, 12, 12> localDistancePointTriangleHessian(
+    const Vector<Real, 3> &p, const Vector<Real, 3> &a,
+    const Vector<Real, 3> &b, const Vector<Real, 3> &c);
 
-Real distanceSqrEdgeEdge(const Vector<Real, 3> &ea0,
-                         const Vector<Real, 3> &ea1,
+Real distanceSqrEdgeEdge(const Vector<Real, 3> &ea0, const Vector<Real, 3> &ea1,
                          const Vector<Real, 3> &eb0,
                          const Vector<Real, 3> &eb1);
 
@@ -381,5 +327,5 @@ Matrix<Real, 12, 12> localDistanceSqrEdgeEdgeHessian(const Vector<Real, 3> &a,
                                                      const Vector<Real, 3> &b,
                                                      const Vector<Real, 3> &c,
                                                      const Vector<Real, 3> &d);
-}
-#endif //SIMCRAFT_FEM_INCLUDE_FEM_IPC_DISTANCES_H_
+} // namespace fem::ipc
+#endif // SIMCRAFT_FEM_INCLUDE_FEM_IPC_DISTANCES_H_

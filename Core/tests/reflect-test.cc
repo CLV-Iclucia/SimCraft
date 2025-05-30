@@ -3,8 +3,8 @@
 //
 #include <string>
 #include <iostream>
-#include <Core/static-reflection.h>
-using namespace core;
+#include <Core/reflection.h>
+using namespace sim::core;
 
 struct Student {
   std::string name;

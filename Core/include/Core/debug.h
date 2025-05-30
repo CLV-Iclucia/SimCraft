@@ -10,7 +10,7 @@
 #include <format>
 #include <source_location>
 #include <Core/properties.h>
-namespace core {
+namespace sim::core {
 inline void do_nothing() {};
 // only support single thread for now
 class Debugger {

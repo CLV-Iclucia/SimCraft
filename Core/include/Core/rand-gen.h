@@ -4,7 +4,7 @@
 #include <Core/core.h>
 #include <random>
 #include <type_traits>
-namespace core {
+namespace sim::core {
 float randomFloat();
 Real randomReal();
 template <typename T>

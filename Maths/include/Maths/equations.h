@@ -8,7 +8,7 @@
 #include <optional>
 #include <iostream>
 #include <Maths/types.h>
-namespace maths {
+namespace sim::maths {
 struct QuadraticPolynomial {
   Real a, b, c;
 };

@@ -1,9 +1,9 @@
+#include <../include/fem/primitives/tet-mesh.h>
 #include <Deform/strain-energy-density.h>
-#include <fem/tet-mesh.h>
-#include <fem/system.h>
-#include <fem/ipc/implicit-euler.h>
-#include <ogl-render/window.h>
 #include <Maths/svd.h>
+#include <fem/ipc/implicit-euler.h>
+#include <fem/system.h>
+#include <ogl-render/window.h>
 using namespace fem;
 using namespace deform;
 
@@ -46,7 +46,7 @@ int main() {
   auto system = std::make_unique<System>();
   system->addPrimitive(alicePrimitive());
   system->addPrimitive(bobPrimitive());
-  system->startSimulationPhase();
+  system->init();
   auto integrator = std::make_unique<IpcImplicitEuler>(*system);
   Real t = 0.0, dt = 0.001;
   std::cout << std::format("total energy: {:f} = {:f} (T) + {:f} (V)\n", system->totalEnergy(), system->kineticEnergy(), system->potentialEnergy());
