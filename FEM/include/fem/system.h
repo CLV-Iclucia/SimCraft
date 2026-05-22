@@ -8,6 +8,8 @@
 #include <Core/zip.h>
 #include <Deform/strain-energy-density.h>
 #include <Maths/sparse-matrix-builder.h>
+#include <Maths/block-vector.h>
+#include <Maths/block-sparse-matrix.h>
 #include <Spatify/lbvh.h>
 #include <fem/colliders.h>
 #include <fem/primitive.h>
@@ -26,9 +28,13 @@ using maths::vectorize;
 // the only thing System do is dispatching tasks to primitives
 // and gather the dof to solve the system globally
 struct System {
-  VecXd xdot{};
+  maths::BlockVector<3> x{}, X{}, xdot{}, energyGradient{};
+
   [[nodiscard]] Real meshLengthScale() const { return m_meshLengthScale; }
 
+  [[nodiscard]] const maths::BlockSparseMatrix<3> &blockMass() const { return m_blockMass; }
+
+  /// Legacy Eigen mass accessor (temporary bridge for Phase 2A)
   [[nodiscard]] const SparseMatrix<Real> &mass() const { return m_mass; }
 
   void spdProjectHessian(maths::SparseMatrixBuilder<Real> &builder) const;
@@ -39,14 +45,15 @@ struct System {
 
   [[nodiscard]] Real deformationEnergy() const;
 
-  System &updateCurrentConfig(const VecXd &x_nxt);
+  void updateCurrentConfig(const maths::BlockVector<3> &x_nxt);
 
-  [[nodiscard]] const VecXd &deformationEnergyGradient() const;
+  [[nodiscard]] const maths::BlockVector<3> &deformationEnergyGradient() const { return energyGradient; }
 
-  [[nodiscard]] size_t dof() const { return x.size(); }
+  [[nodiscard]] size_t dof() const { return x.scalarSize(); }
   System &init();
   [[nodiscard]] Real kineticEnergy() const {
-    return 0.5 * xdot.dot(m_mass * xdot);
+    auto v = xdot.asEigen();
+    return 0.5 * v.dot(m_mass * v);
   }
 
   [[nodiscard]] Real potentialEnergy() const { return deformationEnergy(); }
@@ -55,8 +62,6 @@ struct System {
     return kineticEnergy() + potentialEnergy();
   }
 
-  [[nodiscard]] const VecXd &currentConfig() const { return x; }
-  [[nodiscard]] const VecXd &referenceConfig() const { return X; }
   [[nodiscard]] const Primitive &primitive(int id) const { return prs[id]; }
   Primitive &primitive(int id) { return prs[id]; }
 
@@ -125,9 +130,6 @@ struct System {
 
 private:
   void logSystemInfo() const;
-  VecXd x;
-  VecXd X;
-  VecXd energyGradient;
   Real cachedEnergy{};
   bool use_parallel_dispatch{false};
 
@@ -142,6 +144,7 @@ private:
   int nVertices{0};
 
   Eigen::SparseMatrix<Real> m_mass;
+  maths::BlockSparseMatrix<3> m_blockMass;
   Real m_meshLengthScale{std::numeric_limits<Real>::infinity()};
 
   void updateDeformationGradient();

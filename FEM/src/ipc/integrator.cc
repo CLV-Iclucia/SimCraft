@@ -2,6 +2,7 @@
 // Created by creeper on 10/25/24.
 //
 #include <Maths/linear-solver.h>
+#include <Maths/block-solvers/block-pcg.h>
 #include <fem/integrator-factory.h>
 #include <fem/ipc/collision-detector.h>
 #include <fem/ipc/distances.h>
@@ -21,20 +22,28 @@ static int ipc_auto_reg = ([]() {
   }(), 0);
 
 void IpcIntegrator::step(Real dt) {
-  x_prev = system().currentConfig();
-  VecXd x_t = system().currentConfig();
+  x_prev = system().x;
+  maths::BlockVector<3> x_t = system().x;
   Real h = dt;
   Real E_prev = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
-  VecXd p(system().dof());
-  VecXd g(system().dof());
+  maths::BlockVector<3> p(x_t.numBlocks());
   int iter = 0;
   while (true) {
-    g = barrierAugmentedIncrementalPotentialEnergyGradient(x_t, h);
-    auto H = spdProjectHessian(h);
-    p = linearSolver->solve(H, -g);
-    if (!linearSolver->success())
-      throw std::runtime_error("Failed to solve triangular systems");
-    if (p.lpNorm<Eigen::Infinity>() <
+    VecXd g = barrierAugmentedIncrementalPotentialEnergyGradient(x_t, h);
+    auto H_eigen = spdProjectHessian(h);
+
+    // --- Block solver boundary ---
+    auto H_block = maths::BlockSparseMatrix<3>::fromEigen(H_eigen);
+    maths::BlockVector<3> negG(x_t.numBlocks());
+    negG.asEigen() = -g;
+
+    p.setZero();
+    auto result = solver->solve(H_block, negG, p);
+    if (!result.converged)
+      spdlog::warn("BlockPCG: {} iters, residual={}", result.iterations, result.residualNorm);
+    // --- end Block solver boundary ---
+
+    if (p.asEigen().template lpNorm<Eigen::Infinity>() <
         config.eps * system().meshLengthScale() * h)
       break;
     Real alpha =
@@ -46,12 +55,14 @@ void IpcIntegrator::step(Real dt) {
         {.descentDir = p, .toi = alpha, .dHat = config.dHat});
     Real E;
     do {
-      updateCandidateSolution(x_prev + alpha * p);
+      maths::BlockVector<3> x_candidate = x_prev;
+      x_candidate.axpy(alpha, p);
+      updateCandidateSolution(x_candidate);
       alpha = alpha * 0.5;
       E = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
     } while (E > E_prev);
     iter++;
-    x_prev = system().currentConfig();
+    x_prev = system().x;
     E_prev = E;
   }
   velocityUpdate(x_t, h);
@@ -79,7 +90,7 @@ void IpcIntegrator::precomputeConstraintSet(
     const ConstraintSetPrecomputeRequest &config) {
   constraintSet.vtConstraints.clear();
   constraintSet.eeConstraints.clear();
-  collisionDetector->updateBVHs(config.descentDir, config.toi);
+  collisionDetector->updateBVHs(config.descentDir.asEigen(), config.toi);
   computeVertexTriangleConstraints(config);
   computeEdgeEdgeConstraints(config);
 }
@@ -92,7 +103,7 @@ void IpcIntegrator::computeVertexTriangleConstraints(
     auto vertexTrajectoryBBox =
         system()
             .geometryManager()
-            .getTrajectoryAccessor(system().currentConfig(), p, toi)
+            .getTrajectoryAccessor(system().x, p, toi)
             .vertexBBox(vertexIdx);
     vertexTrajectoryBBox = vertexTrajectoryBBox.dilate(dHat);
     const auto &primitive = system().primitive(
@@ -102,12 +113,11 @@ void IpcIntegrator::computeVertexTriangleConstraints(
           if (system().triangleContainsVertex(triangleIdx, vertexIdx))
             return false;
           auto triangle = system().geometryManager().getTriangle(triangleIdx);
-          const auto &x = system().currentConfig();
 
           constraintSet.vtConstraints.push_back({
               .triangle = triangle,
-              .xv = primitive.cview(x),
-              .xt = primitive.cview(x),
+              .xv = primitive.cview(system().x),
+              .xt = primitive.cview(system().x),
               .iv = vertexIdx,
               .type = ipc::PointTriangleDistanceType::Unknown,
           });
@@ -130,7 +140,7 @@ void IpcIntegrator::computeEdgeEdgeConstraints(
     auto edgeTrajectoryBBox =
         system()
             .geometryManager()
-            .getTrajectoryAccessor(system().currentConfig(), p, toi)
+            .getTrajectoryAccessor(system().x, p, toi)
             .edgeBBox(edgeIdx);
     edgeTrajectoryBBox = edgeTrajectoryBBox.dilate(dHat);
 
@@ -145,16 +155,14 @@ void IpcIntegrator::computeEdgeEdgeConstraints(
           auto pr_b_id = system().globalEdgeToPrimitive(otherEdgeIdx);
           const auto &pr_a = system().primitive(pr_a_id);
           const auto &pr_b = system().primitive(pr_b_id);
-          const auto &x = system().currentConfig();
-          const auto &X = system().referenceConfig();
 
           constraintSet.eeConstraints.push_back({
               .ea = ea,
               .eb = eb,
-              .xa = pr_a.cview(x),
-              .Xa = pr_a.cview(X),
-              .xb = pr_b.cview(x),
-              .Xb = pr_b.cview(X),
+              .xa = pr_a.cview(system().x),
+              .Xa = pr_a.cview(system().X),
+              .xb = pr_b.cview(system().x),
+              .Xb = pr_b.cview(system().X),
               .type = ipc::EdgeEdgeDistanceType::Unknown,
           });
 
@@ -201,9 +209,15 @@ std::unique_ptr<Integrator> IpcIntegrator::create(System &system,
   auto config = core::deserialize<Config>(dict.at("config"));
   auto integrator = integratorCreators.at(subtype)(system, config);
 
-  if (dict.contains("linearSolver"))
-    integrator->linearSolver =
-        maths::createLinearSolver(dict.at("linearSolver"));
+  // Create block solver (replaces legacy linearSolver creation)
+  int maxIter = 1000;
+  Real tol = 1e-6;
+  if (dict.contains("solver")) {
+    const auto &sDict = dict.at("solver").as<core::JsonDict>();
+    if (sDict.contains("maxIterations")) maxIter = sDict.at("maxIterations").as<int>();
+    if (sDict.contains("tolerance")) tol = sDict.at("tolerance").as<Real>();
+  }
+  integrator->solver = std::make_unique<maths::BlockPCGSolver>(maxIter, tol);
   return integrator;
 }
 

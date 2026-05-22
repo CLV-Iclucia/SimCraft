@@ -24,15 +24,12 @@ void System::spdProjectHessian(
 
 Real System::deformationEnergy() const { return cachedEnergy; }
 
-System &System::updateCurrentConfig(const VecXd &x_nxt) {
+void System::updateCurrentConfig(const maths::BlockVector<3> &x_nxt) {
   x = x_nxt;
   updateDeformationGradient();
-  return *this;
 }
 
-const VecXd &System::deformationEnergyGradient() const {
-  return energyGradient;
-}
+
 
 void System::updateDeformationGradient() {
   autoDispatch([this](Primitive &pr, int id) {
@@ -51,25 +48,24 @@ void System::buildMassMatrix(maths::SparseMatrixBuilder<Real> &builder) const {
 }
 
 VecXd symbolicDeformationEnergyGradient(System &system) {
-  return system.deformationEnergyGradient();
+  return VecXd(system.deformationEnergyGradient().asEigen());
 }
 
 VecXd numericalDeformationEnergyGradient(System &system) {
   VecXd grad(system.dof());
   Real dx = 1e-7;
-  VecXd current = system.currentConfig();
+  maths::BlockVector<3> saved = system.x;
   for (int i = 0; i < system.dof(); i++) {
-    VecXd x_plus = current;
-    x_plus(i) += dx;
-    VecXd x_minus = current;
-    x_minus(i) -= dx;
-    Real E_plus =
-        system.updateCurrentConfig(x_plus).deformationEnergy() / (2 * dx);
-    Real E_minus =
-        system.updateCurrentConfig(x_minus).deformationEnergy() / (2 * dx);
-    grad(i) = (E_plus - E_minus);
+    system.x.data()[i] += dx;
+    system.updateCurrentConfig(system.x);
+    Real E_plus = system.deformationEnergy();
+    system.x.data()[i] -= 2.0 * dx;
+    system.updateCurrentConfig(system.x);
+    Real E_minus = system.deformationEnergy();
+    system.x.data()[i] += dx; // restore
+    grad(i) = (E_plus - E_minus) / (2 * dx);
   }
-  system.updateCurrentConfig(current);
+  system.updateCurrentConfig(saved);
   return grad;
 }
 
@@ -90,10 +86,12 @@ System &System::init() {
   size_t dofDim{};
   autoDispatch(
       [this, &dofDim](const Primitive &pr, int id) { dofDim += pr.dofDim(); });
-  x.resize(static_cast<Eigen::Index>(dofDim));
-  xdot.resize(static_cast<Eigen::Index>(dofDim));
-  X.resize(static_cast<Eigen::Index>(dofDim));
-  energyGradient.resize(static_cast<Eigen::Index>(dofDim));
+  assert(dofDim % 3 == 0 && "DOF dimension must be a multiple of 3 for BlockVector<3>");
+  int numBlocks = static_cast<int>(dofDim / 3);
+  x.resize(numBlocks);
+  xdot.resize(numBlocks);
+  X.resize(numBlocks);
+  energyGradient.resize(numBlocks);
   dofStarts.resize(prs.size());
   int dofStart = 0;
   for (int i = 0; i < prs.size(); ++i) {
@@ -110,14 +108,16 @@ System &System::init() {
   auto massBuilder = maths::SparseMatrixBuilder<Real>(dof(), dof());
   buildMassMatrix(massBuilder);
   m_mass = massBuilder.build();
+  m_blockMass = maths::BlockSparseMatrix<3>::fromEigen(m_mass);
   initGeometryManager();
 
   if (nEdges > 0) {
     Real totalLength = 0.0;
+    auto xView = x.asEigen();
     for (int i = 0; i < nEdges; ++i) {
       auto vertices = getGlobalEdge(i);
-      Vector<Real, 3> v0 = x.segment<3>(vertices.x * 3);
-      Vector<Real, 3> v1 = x.segment<3>(vertices.y * 3);
+      Vector<Real, 3> v0 = xView.segment<3>(vertices.x * 3);
+      Vector<Real, 3> v1 = xView.segment<3>(vertices.y * 3);
       totalLength += (v1 - v0).norm();
     }
     m_meshLengthScale = totalLength / nEdges;

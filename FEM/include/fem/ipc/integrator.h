@@ -10,6 +10,7 @@
 #include <fem/ipc/collision-detector.h>
 #include <fem/ipc/barrier-functions.h>
 #include <Maths/linear-solver.h>
+#include <Maths/block-linear-solver.h>
 
 namespace sim::fem {
 struct ConstraintSet {
@@ -22,7 +23,7 @@ struct ConstraintSet {
 };
 
 struct ConstraintSetPrecomputeRequest {
-  const VecXd &descentDir;
+  const maths::BlockVector<3> &descentDir;
   Real toi;
   Real dHat;
 };
@@ -43,7 +44,7 @@ class IpcIntegrator : public Integrator {
     }
 
     void step(Real dt) override;
-    std::unique_ptr<maths::LinearSolver> linearSolver;
+    std::unique_ptr<maths::BlockLinearSolver> solver;
     static std::unique_ptr<Integrator> create(System &system, const core::JsonNode &json);
 
   protected:
@@ -52,35 +53,35 @@ class IpcIntegrator : public Integrator {
 
     [[nodiscard]] VecXd barrierEnergyGradient() const;
 
-    virtual void velocityUpdate(const VecXd &x_t, Real h) const = 0;
-    [[nodiscard]] virtual Real incrementalPotentialKinematicEnergy(const VecXd &x_t, Real h) const = 0;
-    [[nodiscard]] virtual VecXd incrementalPotentialKinematicEnergyGradient(const VecXd &x_t, Real h) const = 0;
+    virtual void velocityUpdate(const maths::BlockVector<3> &x_t, Real h) const = 0;
+    [[nodiscard]] virtual Real incrementalPotentialKinematicEnergy(const maths::BlockVector<3> &x_t, Real h) const = 0;
+    [[nodiscard]] virtual VecXd incrementalPotentialKinematicEnergyGradient(const maths::BlockVector<3> &x_t, Real h) const = 0;
 
     [[nodiscard]] Real barrierAugmentedPotentialEnergy() const {
       return system().potentialEnergy() + barrierEnergy();
     }
 
     [[nodiscard]] VecXd barrierAugmentedPotentialEnergyGradient() const {
-      return system().deformationEnergyGradient() + barrierEnergyGradient();
+      return system().deformationEnergyGradient().asEigen() + barrierEnergyGradient();
     }
 
-    [[nodiscard]] Real barrierAugmentedIncrementalPotentialEnergy(const VecXd &x_t, Real h) const {
+    [[nodiscard]] Real barrierAugmentedIncrementalPotentialEnergy(const maths::BlockVector<3> &x_t, Real h) const {
       return incrementalPotentialKinematicEnergy(x_t, h) + h * h * barrierAugmentedPotentialEnergy();
     }
 
-    [[nodiscard]] VecXd barrierAugmentedIncrementalPotentialEnergyGradient(const VecXd &x_t, Real h) const {
+    [[nodiscard]] VecXd barrierAugmentedIncrementalPotentialEnergyGradient(const maths::BlockVector<3> &x_t, Real h) const {
       return incrementalPotentialKinematicEnergyGradient(x_t, h)
           + h * h * barrierAugmentedPotentialEnergyGradient();
     }
 
-    void updateCandidateSolution(const VecXd &x) {
+    void updateCandidateSolution(const maths::BlockVector<3> &x) {
       system().updateCurrentConfig(x);
       updateConstraintStatus();
     }
 
-    [[nodiscard]] Real computeStepSizeUpperBound(const VecXd &p) const {
-      collisionDetector->updateBVHs(p, 1.0);
-      auto t = collisionDetector->detect(p);
+    [[nodiscard]] Real computeStepSizeUpperBound(const maths::BlockVector<3> &p) const {
+      collisionDetector->updateBVHs(p.asEigen(), 1.0);
+      auto t = collisionDetector->detect(p.asEigen());
       return t.value_or(1.0);
     }
 
@@ -94,6 +95,6 @@ class IpcIntegrator : public Integrator {
     std::unique_ptr<ipc::CollisionDetector> collisionDetector{};
     ipc::LogBarrier barrier;
     maths::SparseMatrixBuilder<Real> sparseBuilder{};
-    VecXd x_prev;
+    maths::BlockVector<3> x_prev;
 };
 }
