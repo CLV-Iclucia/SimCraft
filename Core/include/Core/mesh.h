@@ -2,8 +2,7 @@
 // Created by creeper on 23-9-1.
 //
 
-#ifndef SIMCRAFT_CORE_INCLUDE_CORE_SURFACE_H_
-#define SIMCRAFT_CORE_INCLUDE_CORE_SURFACE_H_
+#pragma once
 #include <Core/core.h>
 #include <string>
 namespace sim::core {
@@ -17,4 +16,3 @@ struct Mesh {
 bool myLoadObj(const std::string& path, Mesh* mesh);
 bool exportObj(const std::string& path, const Mesh& mesh);
 }// namespace core
-#endif // SIMCRAFT_CORE_INCLUDE_CORE_SURFACE_H_

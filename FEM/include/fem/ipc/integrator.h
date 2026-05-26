@@ -3,13 +3,11 @@
 //
 
 #pragma once
-#include <Maths/sparse-matrix-builder.h>
 #include <Core/debug.h>
 #include <fem/integrator.h>
 #include <fem/ipc/constraint.h>
 #include <fem/ipc/collision-detector.h>
 #include <fem/ipc/barrier-functions.h>
-#include <Maths/linear-solver.h>
 #include <Maths/block-linear-solver.h>
 
 namespace sim::fem {
@@ -17,9 +15,12 @@ struct ConstraintSet {
   void clear() {
     vtConstraints.clear();
     eeConstraints.clear();
+    kinematicVTConstraints.clear();
   }
   std::vector<ipc::VertexTriangleConstraint> vtConstraints{};
   std::vector<ipc::EdgeEdgeConstraint> eeConstraints{};
+  // 运动学体约束 (弹性体顶点 vs 运动学三角形)
+  std::vector<ipc::DeformableKinematicVTConstraint> kinematicVTConstraints{};
 };
 
 struct ConstraintSetPrecomputeRequest {
@@ -51,27 +52,33 @@ class IpcIntegrator : public Integrator {
 
     [[nodiscard]] Real barrierEnergy() const;
 
-    [[nodiscard]] VecXd barrierEnergyGradient() const;
+    [[nodiscard]] maths::BlockVector<3> barrierEnergyGradient() const;
 
     virtual void velocityUpdate(const maths::BlockVector<3> &x_t, Real h) const = 0;
     [[nodiscard]] virtual Real incrementalPotentialKinematicEnergy(const maths::BlockVector<3> &x_t, Real h) const = 0;
-    [[nodiscard]] virtual VecXd incrementalPotentialKinematicEnergyGradient(const maths::BlockVector<3> &x_t, Real h) const = 0;
+    [[nodiscard]] virtual maths::BlockVector<3> incrementalPotentialKinematicEnergyGradient(const maths::BlockVector<3> &x_t, Real h) const = 0;
 
     [[nodiscard]] Real barrierAugmentedPotentialEnergy() const {
       return system().potentialEnergy() + barrierEnergy();
     }
 
-    [[nodiscard]] VecXd barrierAugmentedPotentialEnergyGradient() const {
-      return system().deformationEnergyGradient().asEigen() + barrierEnergyGradient();
+    [[nodiscard]] maths::BlockVector<3> barrierAugmentedPotentialEnergyGradient() const {
+      auto grad = system().deformationEnergyGradient();
+      auto barrierGrad = barrierEnergyGradient();
+      grad += barrierGrad;
+      return grad;
     }
 
     [[nodiscard]] Real barrierAugmentedIncrementalPotentialEnergy(const maths::BlockVector<3> &x_t, Real h) const {
       return incrementalPotentialKinematicEnergy(x_t, h) + h * h * barrierAugmentedPotentialEnergy();
     }
 
-    [[nodiscard]] VecXd barrierAugmentedIncrementalPotentialEnergyGradient(const maths::BlockVector<3> &x_t, Real h) const {
-      return incrementalPotentialKinematicEnergyGradient(x_t, h)
-          + h * h * barrierAugmentedPotentialEnergyGradient();
+    [[nodiscard]] maths::BlockVector<3> barrierAugmentedIncrementalPotentialEnergyGradient(const maths::BlockVector<3> &x_t, Real h) const {
+      auto kinGrad = incrementalPotentialKinematicEnergyGradient(x_t, h);
+      auto potGrad = barrierAugmentedPotentialEnergyGradient();
+      potGrad *= (h * h);
+      kinGrad += potGrad;
+      return kinGrad;
     }
 
     void updateCandidateSolution(const maths::BlockVector<3> &x) {
@@ -80,21 +87,21 @@ class IpcIntegrator : public Integrator {
     }
 
     [[nodiscard]] Real computeStepSizeUpperBound(const maths::BlockVector<3> &p) const {
-      collisionDetector->updateBVHs(p.asEigen(), 1.0);
-      auto t = collisionDetector->detect(p.asEigen());
+      collisionDetector->updateBVHs(p, 1.0);
+      auto t = collisionDetector->detect(p);
       return t.value_or(1.0);
     }
 
-    SparseMatrix<Real> spdProjectHessian(Real h);
+    maths::BlockSparseMatrix<3> spdProjectHessian(Real h);
     void updateConstraintStatus();
     void precomputeConstraintSet(const ConstraintSetPrecomputeRequest &config);
     void computeVertexTriangleConstraints(const ConstraintSetPrecomputeRequest &config);
     void computeEdgeEdgeConstraints(const ConstraintSetPrecomputeRequest &config);
+    void computeKinematicVTConstraints(const ConstraintSetPrecomputeRequest &config);
 
     ConstraintSet constraintSet;
     std::unique_ptr<ipc::CollisionDetector> collisionDetector{};
     ipc::LogBarrier barrier;
-    maths::SparseMatrixBuilder<Real> sparseBuilder{};
     maths::BlockVector<3> x_prev;
 };
 }

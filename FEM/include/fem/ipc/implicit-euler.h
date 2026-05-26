@@ -14,16 +14,19 @@ struct IpcImplicitEuler final : public IpcIntegrator {
   }
 
 private:
-  [[nodiscard]] Real incrementalPotentialKinematicEnergy(const VecXd &x_t, Real h) const override;
+  [[nodiscard]] Real incrementalPotentialKinematicEnergy(const maths::BlockVector<3> &x_t, Real h) const override;
 
-  void velocityUpdate(const VecXd& x_t, Real h) const override {
-    system().xdot = (system().currentConfig() - x_t) / h;
+  void velocityUpdate(const maths::BlockVector<3> &x_t, Real h) const override {
+    maths::BlockVector<3> diff = system().x;
+    diff -= x_t;
+    diff *= (1.0 / h);
+    system().xdot = diff;
   }
 
-  [[nodiscard]] VecXd incrementalPotentialKinematicEnergyGradient(const VecXd &x_t, Real h) const override;
+  [[nodiscard]] maths::BlockVector<3> incrementalPotentialKinematicEnergyGradient(const maths::BlockVector<3> &x_t, Real h) const override;
 
-  friend VecXd symbolicIncrementalPotentialEnergyGradient(IpcImplicitEuler &euler, const VecXd &x_t, Real h);
-  friend VecXd numericalIncrementalPotentialEnergyGradient(IpcImplicitEuler &euler, const VecXd &x_t, Real h);
+  friend maths::BlockVector<3> symbolicIncrementalPotentialEnergyGradient(IpcImplicitEuler &euler, const maths::BlockVector<3> &x_t, Real h);
+  friend maths::BlockVector<3> numericalIncrementalPotentialEnergyGradient(IpcImplicitEuler &euler, const maths::BlockVector<3> &x_t, Real h);
 };
 
 }

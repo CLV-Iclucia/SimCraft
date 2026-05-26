@@ -2,8 +2,7 @@
 // Created by creeper on 24-3-20.
 //
 
-#ifndef DEBUG_H
-#define DEBUG_H
+#pragma once
 #include <iostream>
 #include <functional>
 #include <type_traits>
@@ -73,4 +72,3 @@ class Debugger {
   }
 };
 }
-#endif //DEBUG_H

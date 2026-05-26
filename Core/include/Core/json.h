@@ -2,8 +2,7 @@
 // Created by creeper on 10/24/24.
 //
 
-#ifndef SIMCRAFT_CORE_INCLUDE_CORE_JSON_H_
-#define SIMCRAFT_CORE_INCLUDE_CORE_JSON_H_
+#pragma once
 #include <Core/core.h>
 #include <filesystem>
 #include <optional>
@@ -66,4 +65,3 @@ std::optional<JsonNode> parseJson(std::string_view json) noexcept;
 std::optional<JsonNode>
 loadJsonFile(const std::filesystem::path &path) noexcept;
 } // namespace core
-#endif // SIMCRAFT_CORE_INCLUDE_CORE_JSON_H_

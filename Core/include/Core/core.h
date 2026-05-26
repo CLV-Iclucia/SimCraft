@@ -2,11 +2,9 @@
 // Created by creeper on 23-8-13.
 //
 
-#ifndef SIMCRAFT_CORE_INCLUDE_CORE_CORE_H_
-#define SIMCRAFT_CORE_INCLUDE_CORE_CORE_H_
+#pragma once
 #include <glm/glm.hpp>
 #include <vector>
-// if it is windows, define NOMINMAX to avoid conflict with std::min and std::max
 #ifdef _WIN32
 #define NOMINMAX
 #endif
@@ -32,7 +30,6 @@ using Mat2d = glm::dmat2;
 using Mat3d = glm::dmat3;
 using Mat4d = glm::dmat4;
 using uint = unsigned int;
-using std::vector;
 template <typename T, int Dim> struct TVector {
   static_assert(Dim == 2 || Dim == 3 || Dim == 4, "Dim must be 2, 3 or 4");
 };
@@ -63,5 +60,4 @@ enum Device {
   CPU = 0,
   GPU = 1,
 };
-} // namespace core
-#endif // SIMCRAFT_CORE_INCLUDE_CORE_CORE_H_
+} // namespace sim::core

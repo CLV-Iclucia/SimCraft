@@ -1,15 +1,26 @@
 //
 // Created by creeper on 5/25/24.
 //
+
+#include <glm/glm.hpp>
+#include <glm/geometric.hpp>
 #include <Maths/equations.h>
 #include <Maths/linalg-utils.h>
 #include <fem/ipc/collision-detector.h>
 #include <fem/ipc/distances.h>
 #include <fem/system.h>
 #include <tbb/tbb.h>
+
 namespace sim::fem::ipc {
-using maths::mixedProduct;
-using spatify::parallel_for;
+
+// GLM-based mixed product: a · (b × c)
+static inline Real mixedProduct(const glm::dvec3 &a,
+                             const glm::dvec3 &b,
+                             const glm::dvec3 &c) {
+  return glm::dot(a, glm::cross(b, c));
+}
+
+using sim::maths::CubicEquationRoots;
 
 maths::CubicEquationRoots solveCoplanarTime(const CCDQuery &query, Real toi) {
   const auto &[x1, x2_x1, x3_x1, x4_x1, u1, u2_u1, u3_u1, u4_u1] = query;
@@ -43,9 +54,9 @@ std::optional<Contact> eeCCD(const CCDQuery &query, Real toi) {
     bool hasSol = true;
     for (int j = 0; j < 3; j++) {
       int k = (j + 1) % 3;
-      Real a00 = updated_x2_x1(j), a01 = -updated_x4_x3(j),
-           a10 = updated_x2_x1(k), a11 = -updated_x4_x3(k);
-      Real b0 = updated_x3_x1(j), b1 = -updated_x3_x1(k);
+      Real a00 = updated_x2_x1[j], a01 = -updated_x4_x3[j],
+           a10 = updated_x2_x1[k], a11 = -updated_x4_x3[k];
+      Real b0 = updated_x3_x1[j], b1 = -updated_x3_x1[k];
       auto linearSystem = maths::BinaryLinearSystem{
           .a00 = a00, .a01 = a01, .a10 = a10, .a11 = a11, .b0 = b0, .b1 = b1};
       if (hasInfiniteSolutions(linearSystem))
@@ -59,13 +70,15 @@ std::optional<Contact> eeCCD(const CCDQuery &query, Real toi) {
       continue;
     [[unlikely]] if (!sol) {
       // the two edges are on the same line
-      Real la = updated_x2_x1.norm();
-      Real lb = updated_x4_x3.norm();
+      Real la = glm::length(updated_x2_x1);
+      Real lb = glm::length(updated_x4_x3);
       auto updated_x4_x2 = updated_x4_x1 - updated_x2_x1;
       auto updated_x3_x2 = updated_x3_x1 - updated_x2_x1;
       Real longest_distance =
-          std::max({la, lb, updated_x4_x1.norm(), updated_x4_x2.norm(),
-                    updated_x3_x1.norm(), updated_x3_x2.norm()});
+          std::max({la, lb, glm::length(updated_x4_x1),
+                    glm::length(updated_x4_x2),
+                    glm::length(updated_x3_x1),
+                    glm::length(updated_x3_x2)});
       if (longest_distance > la + lb)
         continue;
       auto updated_x1 = x1 + u1 * t;
@@ -75,11 +88,11 @@ std::optional<Contact> eeCCD(const CCDQuery &query, Real toi) {
         return std::make_optional<Contact>(0.5 * updated_x4_x3 + updated_x3, t);
       if (longest_distance == lb)
         return std::make_optional<Contact>(0.5 * updated_x2_x1 + updated_x1, t);
-      if (longest_distance == updated_x4_x1.norm())
+      if (longest_distance == glm::length(updated_x4_x1))
         return std::make_optional<Contact>(0.5 * updated_x3_x2 + updated_x2, t);
-      if (longest_distance == updated_x4_x2.norm())
+      if (longest_distance == glm::length(updated_x4_x2))
         return std::make_optional<Contact>(0.5 * updated_x3_x1 + updated_x1, t);
-      if (longest_distance == updated_x3_x1.norm())
+      if (longest_distance == glm::length(updated_x3_x1))
         return std::make_optional<Contact>(0.5 * updated_x4_x2 + updated_x2, t);
       else
         return std::make_optional<Contact>(0.5 * updated_x4_x1 + updated_x1, t);
@@ -114,9 +127,9 @@ std::optional<Contact> vtCCD(const CCDQuery &query, Real toi) {
     bool hasSol = true;
     for (int j = 0; j < 3; j++) {
       int k = (j + 1) % 3;
-      Real a00 = updated_x2_x4(j), a01 = updated_x3_x4(j),
-           a10 = updated_x2_x4(k), a11 = updated_x3_x4(k);
-      Real b0 = updated_x1_x4(j), b1 = updated_x1_x4(k);
+      Real a00 = updated_x2_x4[j], a01 = updated_x3_x4[j],
+           a10 = updated_x2_x4[k], a11 = updated_x3_x4[k];
+      Real b0 = updated_x1_x4[j], b1 = updated_x1_x4[k];
       auto linearSystem = maths::BinaryLinearSystem{
           .a00 = a00, .a01 = a01, .a10 = a10, .a11 = a11, .b0 = b0, .b1 = b1};
       if (hasInfiniteSolutions(linearSystem))
@@ -141,8 +154,8 @@ std::optional<Contact> vtCCD(const CCDQuery &query, Real toi) {
 }
 
 std::optional<Real> CollisionDetector::runACCDReserved(
-    CCDMode mode, std::array<Vector<Real, 3>, 4> &x,
-    std::array<Vector<Real, 3>, 4> &p, Real toi, Real reservedDistance) const {
+    CCDMode mode, std::array<glm::dvec3, 4> &x,
+    std::array<glm::dvec3, 4> &p, Real toi, Real reservedDistance) const {
   auto computeSquaredDistance = [&]() -> Real {
     if (mode == CCDMode::EE)
       return distanceSqrEdgeEdge(x[0], x[1], x[2], x[3]);
@@ -151,10 +164,10 @@ std::optional<Real> CollisionDetector::runACCDReserved(
   Real lp = 0.0;
   if (mode == CCDMode::EE)
     lp =
-        std::max(p[0].norm(), p[1].norm()) + std::max(p[2].norm(), p[3].norm());
+        std::max(glm::length(p[0]), glm::length(p[1])) + std::max(glm::length(p[2]), glm::length(p[3]));
   else
     lp =
-        p[0].norm() + std::max(p[1].norm(), std::max(p[2].norm(), p[3].norm()));
+        glm::length(p[0]) + std::max({glm::length(p[1]), glm::length(p[2]), glm::length(p[3])});
   if (lp == 0.0)
     return std::nullopt;
   Real dSqr = computeSquaredDistance();
@@ -181,8 +194,8 @@ std::optional<Real> CollisionDetector::runACCDReserved(
 }
 
 std::optional<Real>
-CollisionDetector::runACCD(CCDMode mode, std::array<Vector<Real, 3>, 4> &x,
-                           std::array<Vector<Real, 3>, 4> &p, Real toi) const {
+CollisionDetector::runACCD(CCDMode mode, std::array<glm::dvec3, 4> &x,
+                           std::array<glm::dvec3, 4> &p, Real toi) const {
   auto computeDistance = [&]() -> Real {
     if (mode == CCDMode::EE)
       return std::sqrt(distanceSqrEdgeEdge(x[0], x[1], x[2], x[3]));
@@ -192,10 +205,10 @@ CollisionDetector::runACCD(CCDMode mode, std::array<Vector<Real, 3>, 4> &x,
   Real lp = 0.0;
   if (mode == CCDMode::EE)
     lp =
-        std::max(p[0].norm(), p[1].norm()) + std::max(p[2].norm(), p[3].norm());
+        std::max(glm::length(p[0]), glm::length(p[1])) + std::max(glm::length(p[2]), glm::length(p[3]));
   else
     lp =
-        p[0].norm() + std::max(p[1].norm(), std::max(p[2].norm(), p[3].norm()));
+        glm::length(p[0]) + std::max({glm::length(p[1]), glm::length(p[2]), glm::length(p[3])});
   if (lp == 0.0)
     return std::nullopt;
   Real dis = computeDistance();
@@ -221,23 +234,23 @@ CollisionDetector::runACCD(CCDMode mode, std::array<Vector<Real, 3>, 4> &x,
 
 std::optional<Real> CollisionDetector::runACCD(const ACCDOptions &options) {
   const auto &[mode, query, toi, reservedDistance] = options;
-  const auto &[x1, x2, x3, x4, u1, u2, u3, u4] = query;
-  auto pBar = (u1 + u2 + u3 + u4) * 0.25;
-  std::array<Vector<Real, 3>, 4> x{x1, x2, x3, x4};
-  std::array<Vector<Real, 3>, 4> p{u1 - pBar, u2 - pBar, u3 - pBar, u4 - pBar};
+  auto pBar = (query.u1 + query.u2 + query.u3 + query.u4) * 0.25;
+  std::array<glm::dvec3, 4> x{query.x1, query.x2, query.x3, query.x4};
+  std::array<glm::dvec3, 4> p{query.u1 - pBar, query.u2 - pBar,
+                                     query.u3 - pBar, query.u4 - pBar};
   if (reservedDistance)
     return runACCDReserved(mode, x, p, toi, reservedDistance.value());
   return runACCD(mode, x, p, toi);
 }
 
 std::optional<Real>
-CollisionDetector::detectVertexTriangleCollision(const VecXd &p) {
+CollisionDetector::detectVertexTriangleCollision(const maths::BlockVector<3> &p) {
   std::atomic<Real> toi = 1.0;
   std::atomic<bool> hasContact{false};
   
   tbb::parallel_for(0, system.numVertices(), [&](int vertexIdx) {
     auto vertexTrajectoryBBox = system.geometryManager().getTrajectoryAccessor(
-        system.currentConfig(), p, toi).vertexBBox(vertexIdx);
+        system.x, p, toi).vertexBBox(vertexIdx);
     
     trianglesBVH().runSpatialQuery(
         [&](int triangleIdx) -> bool {
@@ -247,14 +260,14 @@ CollisionDetector::detectVertexTriangleCollision(const VecXd &p) {
           auto triangleVertices = system.getTriangleVertices(triangleIdx);
           
           CCDQuery query{
-              .x1 = system.currentConfig().segment<3>(3 * vertexIdx),
-              .x2 = system.currentConfig().segment<3>(3 * triangleVertices.x),
-              .x3 = system.currentConfig().segment<3>(3 * triangleVertices.y),
-              .x4 = system.currentConfig().segment<3>(3 * triangleVertices.z),
-              .u1 = p.segment<3>(3 * vertexIdx),
-              .u2 = p.segment<3>(3 * triangleVertices.x),
-              .u3 = p.segment<3>(3 * triangleVertices.y),
-              .u4 = p.segment<3>(3 * triangleVertices.z)
+              .x1 = system.x[vertexIdx],
+              .x2 = system.x[triangleVertices.x],
+              .x3 = system.x[triangleVertices.y],
+              .x4 = system.x[triangleVertices.z],
+              .u1 = p[vertexIdx],
+              .u2 = p[triangleVertices.x],
+              .u3 = p[triangleVertices.y],
+              .u4 = p[triangleVertices.z]
           };
           
           auto contact = runACCD(ACCDOptions{CCDMode::VT, query, toi});
@@ -278,13 +291,13 @@ CollisionDetector::detectVertexTriangleCollision(const VecXd &p) {
 }
 
 std::optional<Real>
-CollisionDetector::detectEdgeEdgeCollision(const VecXd &p) {
+CollisionDetector::detectEdgeEdgeCollision(const maths::BlockVector<3> &p) {
   std::atomic<Real> toi = 1.0;
   std::atomic<bool> hasContact{false};
   
   tbb::parallel_for(0, system.numEdges(), [&](int edgeIdx) {
     auto edgeTrajectoryBBox = system.geometryManager().getTrajectoryAccessor(
-        system.currentConfig(), p, toi).edgeBBox(edgeIdx);
+        system.x, p, toi).edgeBBox(edgeIdx);
     
     edgesBVH().runSpatialQuery(
         [&](int otherEdgeIdx) -> bool {
@@ -295,14 +308,14 @@ CollisionDetector::detectEdgeEdgeCollision(const VecXd &p) {
           auto otherEdgeVertices = system.getGlobalEdge(otherEdgeIdx);
           
           CCDQuery query{
-              .x1 = system.currentConfig().segment<3>(3 * edgeVertices[0]),
-              .x2 = system.currentConfig().segment<3>(3 * edgeVertices[1]),
-              .x3 = system.currentConfig().segment<3>(3 * otherEdgeVertices[0]),
-              .x4 = system.currentConfig().segment<3>(3 * otherEdgeVertices[1]),
-              .u1 = p.segment<3>(3 * edgeVertices[0]),
-              .u2 = p.segment<3>(3 * edgeVertices[1]),
-              .u3 = p.segment<3>(3 * otherEdgeVertices[0]),
-              .u4 = p.segment<3>(3 * otherEdgeVertices[1])
+              .x1 = system.x[edgeVertices[0]],
+              .x2 = system.x[edgeVertices[1]],
+              .x3 = system.x[otherEdgeVertices[0]],
+              .x4 = system.x[otherEdgeVertices[1]],
+              .u1 = p[edgeVertices[0]],
+              .u2 = p[edgeVertices[1]],
+              .u3 = p[otherEdgeVertices[0]],
+              .u4 = p[otherEdgeVertices[1]]
           };
           
           auto contact = runACCD(ACCDOptions{CCDMode::EE, query, toi});
@@ -325,7 +338,7 @@ CollisionDetector::detectEdgeEdgeCollision(const VecXd &p) {
   return std::nullopt;
 }
 
-std::optional<Real> CollisionDetector::detect(const VecXd &p) {
+std::optional<Real> CollisionDetector::detect(const maths::BlockVector<3> &p) {
   auto vtCollision = detectVertexTriangleCollision(p);
   auto eeCollision = detectEdgeEdgeCollision(p);
   
@@ -341,9 +354,9 @@ std::optional<Real> CollisionDetector::detect(const VecXd &p) {
   return std::min(*vtCollision, *eeCollision);
 }
 
-void CollisionDetector::updateBVHs(const VecXd &p, Real toi) {
+void CollisionDetector::updateBVHs(const maths::BlockVector<3> &p, Real toi) {
   auto trajectoryAccessor = system.geometryManager().getTrajectoryAccessor(
-      system.currentConfig(), p, toi);
+      system.x, p, toi);
   
   if (system.numTriangles() > 0) {
     struct BVHAdapter {
@@ -384,6 +397,108 @@ void CollisionDetector::updateBVHs(const VecXd &p, Real toi) {
     BVHAdapter adapter(trajectoryAccessor);
     edges_bvh.update(adapter);
   }
+}
+
+void CollisionDetector::updateKinematicBVHs() {
+  if (!m_kinBodies) return;
+  
+  m_kinTriBVHs.resize(m_kinBodies->size());
+  
+  for (size_t bodyIdx = 0; bodyIdx < m_kinBodies->size(); bodyIdx++) {
+    const auto& body = (*m_kinBodies)[bodyIdx];
+    auto* mg = std::get_if<KinematicBody::MeshGeometry>(&body.geometry);
+    if (!mg) continue;  // SDF 碰撞体不需要 BVH
+    
+    const auto& triangles = mg->mesh->triangles;
+    
+    // 构建 BVH adapter
+    struct KinematicBVHAdapter {
+      using CoordType = Real;
+      const std::vector<glm::dvec3>& vertices;
+      const std::vector<glm::ivec3>& triangles;
+      
+      [[nodiscard]] BBox<Real, 3> bbox(int idx) const {
+        const auto& tri = triangles[idx];
+        BBox<Real, 3> box;
+        box.expand({vertices[tri.x].x, vertices[tri.x].y, vertices[tri.x].z});
+        box.expand({vertices[tri.y].x, vertices[tri.y].y, vertices[tri.y].z});
+        box.expand({vertices[tri.z].x, vertices[tri.z].y, vertices[tri.z].z});
+        return box;
+      }
+      
+      [[nodiscard]] int size() const {
+        return static_cast<int>(triangles.size());
+      }
+    };
+    
+    KinematicBVHAdapter adapter{body.currentVertices, triangles};
+    m_kinTriBVHs[bodyIdx].bvh.update(adapter);
+  }
+}
+
+std::optional<Real> CollisionDetector::detectDeformableVsKinematic(
+    const maths::BlockVector<3>& p, Real dt) {
+  if (!m_kinBodies || m_kinBodies->empty()) return std::nullopt;
+  
+  // 更新运动学体的 BVH
+  updateKinematicBVHs();
+  
+  std::atomic<Real> toi = 1.0;
+  std::atomic<bool> hasContact{false};
+  
+  for (size_t bodyIdx = 0; bodyIdx < m_kinBodies->size(); bodyIdx++) {
+    const auto& body = (*m_kinBodies)[bodyIdx];
+    
+    // 仅处理 MeshGeometry (SDF 碰撞在 barrier 层单独处理)
+    auto* mg = std::get_if<KinematicBody::MeshGeometry>(&body.geometry);
+    if (!mg) continue;
+    
+    const auto& triangles = mg->mesh->triangles;
+    
+    // 如果没有 BVH，跳过
+    if (bodyIdx >= m_kinTriBVHs.size()) continue;
+    
+    tbb::parallel_for(0, system.numVertices(), [&](int vertexIdx) {
+      // 弹性体顶点轨迹 bbox
+      auto startPos = system.x[vertexIdx];
+      auto endPos = startPos + p[vertexIdx] * toi.load();
+      BBox<Real, 3> vertexBBox;
+      vertexBBox.expand({startPos.x, startPos.y, startPos.z});
+      vertexBBox.expand({endPos.x, endPos.y, endPos.z});
+      
+      m_kinTriBVHs[bodyIdx].bvh.runSpatialQuery(
+          [&](int triIdx) -> bool {
+            const auto& tri = triangles[triIdx];
+            
+            // 构造 CCDQuery:
+            // x1: 弹性体顶点位置
+            // x2, x3, x4: 运动学三角形顶点位置
+            // u1: 弹性体搜索方向
+            // u2, u3, u4: 运动学顶点速度 * dt
+            CCDQuery query{
+              .x1 = system.x[vertexIdx],
+              .x2 = body.currentVertices[tri.x],
+              .x3 = body.currentVertices[tri.y],
+              .x4 = body.currentVertices[tri.z],
+              .u1 = p[vertexIdx],
+              .u2 = body.vertexVelocity(tri.x, system.currentTime()) * dt,
+              .u3 = body.vertexVelocity(tri.y, system.currentTime()) * dt,
+              .u4 = body.vertexVelocity(tri.z, system.currentTime()) * dt,
+            };
+            
+            auto contact = runACCD(ACCDOptions{CCDMode::VT, query, toi.load()});
+            if (contact && *contact < toi.load()) {
+              hasContact.store(true);
+              toi.store(*contact);
+            }
+            return true;
+          },
+          [&](const BBox<Real, 3>& bbox) { return vertexBBox.overlap(bbox); }
+      );
+    });
+  }
+  
+  return hasContact ? std::optional<Real>(toi.load()) : std::nullopt;
 }
 
 } // namespace fem::ipc

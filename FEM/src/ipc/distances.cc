@@ -1,13 +1,26 @@
 //
 // Created by creeper on 7/14/24.
 //
+
 #include <fem/ipc/distances.h>
+#include <Maths/block-types.h>
+#include <glm/glm.hpp>
+#include <glm/geometric.hpp>
+#include <stdexcept>
+
 namespace sim::fem::ipc {
 
-Real distanceSqrPointTriangle(const Vector<Real, 3> &p,
-                              const Vector<Real, 3> &a,
-                              const Vector<Real, 3> &b,
-                              const Vector<Real, 3> &c) {
+using maths::LocalGrad;
+using maths::LocalHessian;
+
+// =========================================================================
+// distanceSqrPointTriangle — 标量返回值，glm 接口
+// =========================================================================
+
+Real distanceSqrPointTriangle(const glm::dvec3 &p,
+                              const glm::dvec3 &a,
+                              const glm::dvec3 &b,
+                              const glm::dvec3 &c) {
   auto type = decidePointTriangleDistanceType(p, a, b, c);
   switch (type) {
     case PointTriangleDistanceType::P_A:return distanceSqrPointPoint(p, a);
@@ -20,108 +33,156 @@ Real distanceSqrPointTriangle(const Vector<Real, 3> &p,
     default:throw std::runtime_error("Unknown distance type");
   }
 }
-Vector<Real, 12> localDistancePointTriangleGradient(const Vector<Real, 3> &p,
-                                                    const Vector<Real, 3> &a,
-                                                    const Vector<Real, 3> &b,
-                                                    const Vector<Real, 3> &c) {
+
+// =========================================================================
+// localDistancePointTriangleGradient — 返回 LocalGrad<4>
+// =========================================================================
+
+LocalGrad<4> localDistancePointTriangleGradient(const glm::dvec3 &p,
+                                                    const glm::dvec3 &a,
+                                                    const glm::dvec3 &b,
+                                                    const glm::dvec3 &c) {
   auto type = decidePointTriangleDistanceType(p, a, b, c);
-  Vector<Real, 12> local_grad = Vector<Real, 12>::Zero();
+  LocalGrad<4> grad{};  // zero-initialized
   switch (type) {
     case PointTriangleDistanceType::P_A: {
-      Vector<Real, 6> grad = localDistanceSqrPointPointGradient(p, a);
-      local_grad.segment<6>(0) = grad;
-      return local_grad;
+      auto g = localDistanceSqrPointPointGradient(p, a);
+      grad[0] = g[0];  // p
+      grad[1] = g[1];  // a
+      return grad;
     }
     case PointTriangleDistanceType::P_B: {
-      Vector<Real, 6> grad = localDistanceSqrPointPointGradient(p, b);
-      local_grad.segment<3>(0) = grad.segment<3>(0);
-      local_grad.segment<3>(6) = grad.segment<3>(3);
-      return local_grad;
+      auto g = localDistanceSqrPointPointGradient(p, b);
+      grad[0] = g[0];  // p
+      grad[2] = g[1];  // b
+      return grad;
     }
     case PointTriangleDistanceType::P_C: {
-      Vector<Real, 6> grad = localDistanceSqrPointPointGradient(p, c);
-      local_grad.segment<3>(0) = grad.segment<3>(0);
-      local_grad.segment<3>(9) = grad.segment<3>(3);
-      return local_grad;
+      auto g = localDistanceSqrPointPointGradient(p, c);
+      grad[0] = g[0];  // p
+      grad[3] = g[1];  // c
+      return grad;
     }
     case PointTriangleDistanceType::P_AB: {
-      Vector<Real, 9> grad = localDistanceSqrPointLineGradient(p, a, b);
-      local_grad.segment<3>(0) = grad.segment<3>(0);
-      local_grad.segment<6>(3) = grad.segment<6>(3);
-      return local_grad;
+      auto g = localDistanceSqrPointLineGradient(p, a, b);
+      // g: [p, a, b] → grad: [p@0, a@1, b@2, 0@3]
+      grad[0] = g[0];
+      grad[1] = g[1];
+      grad[2] = g[2];
+      return grad;
     }
     case PointTriangleDistanceType::P_BC: {
-      Vector<Real, 9> grad = localDistanceSqrPointLineGradient(p, b, c);
-      local_grad.segment<3>(0) = grad.segment<3>(0);
-      local_grad.segment<6>(6) = grad.segment<6>(3);
-      return local_grad;
+      auto g = localDistanceSqrPointLineGradient(p, b, c);
+      // g: [p, b, c] → grad: [p@0, 0@1, b@2, c@3]
+      grad[0] = g[0];
+      grad[2] = g[1];
+      grad[3] = g[2];
+      return grad;
     }
     case PointTriangleDistanceType::P_CA: {
-      Vector<Real, 9> grad = localDistanceSqrPointLineGradient(p, a, c);
-      local_grad.segment<6>(0) = grad.segment<6>(0);
-      local_grad.segment<3>(9) = grad.segment<3>(6);
-      return local_grad;
+      auto g = localDistanceSqrPointLineGradient(p, c, a);
+      // g: [p, c, a] → grad: [p@0, a@1, 0@2, c@3]
+      grad[0] = g[0];
+      grad[1] = g[2];
+      grad[3] = g[1];
+      return grad;
     }
-    case PointTriangleDistanceType::P_ABC:return localDistanceSqrPointPlaneGradient(p, a, b, c);
+    case PointTriangleDistanceType::P_ABC:
+      return localDistanceSqrPointPlaneGradient(p, a, b, c);
     default:throw std::runtime_error("Unknown distance type");
   }
 }
-Matrix<Real, 12, 12> localDistancePointTriangleHessian(const Vector<Real, 3> &p,
-                                                       const Vector<Real, 3> &a,
-                                                       const Vector<Real, 3> &b,
-                                                       const Vector<Real, 3> &c) {
+
+// =========================================================================
+// localDistancePointTriangleHessian — 返回 LocalHessian<4>
+// =========================================================================
+
+LocalHessian<4> localDistancePointTriangleHessian(const glm::dvec3 &p,
+                                                       const glm::dvec3 &a,
+                                                       const glm::dvec3 &b,
+                                                       const glm::dvec3 &c) {
   auto type = decidePointTriangleDistanceType(p, a, b, c);
-  Matrix<Real, 12, 12> local_hessian = Matrix<Real, 12, 12>::Zero();
+  LocalHessian<4> H{};  // zero-initialized
   switch (type) {
     case PointTriangleDistanceType::P_A: {
-      Matrix<Real, 6, 6> hessian = localDistanceSqrPointPointHessian(p, a);
-      local_hessian.block<6, 6>(0, 0) = hessian;
-      return local_hessian;
+      auto h = localDistanceSqrPointPointHessian(p, a);
+      // h: [p, a] × [p, a]
+      H[0][0] = h[0][0];
+      H[0][1] = h[0][1];
+      H[1][0] = h[1][0];
+      H[1][1] = h[1][1];
+      return H;
     }
     case PointTriangleDistanceType::P_B: {
-      Matrix<Real, 6, 6> hessian = localDistanceSqrPointPointHessian(p, b);
-      local_hessian.block<3, 3>(0, 0) = hessian.block<3, 3>(0, 0);
-      local_hessian.block<3, 3>(0, 6) = hessian.block<3, 3>(0, 3);
-      local_hessian.block<3, 3>(6, 0) = hessian.block<3, 3>(3, 0);
-      local_hessian.block<3, 3>(6, 6) = hessian.block<3, 3>(3, 3);
-      return local_hessian;
+      auto h = localDistanceSqrPointPointHessian(p, b);
+      H[0][0] = h[0][0];  // p-p
+      H[0][2] = h[0][1];  // p-b
+      H[2][0] = h[1][0];  // b-p
+      H[2][2] = h[1][1];  // b-b
+      return H;
     }
     case PointTriangleDistanceType::P_C: {
-      Matrix<Real, 6, 6> hessian = localDistanceSqrPointPointHessian(p, c);
-      local_hessian.block<3, 3>(0, 0) = hessian.block<3, 3>(0, 0);
-      local_hessian.block<3, 3>(0, 9) = hessian.block<3, 3>(0, 3);
-      local_hessian.block<3, 3>(9, 0) = hessian.block<3, 3>(3, 0);
-      local_hessian.block<3, 3>(9, 9) = hessian.block<3, 3>(3, 3);
-      return local_hessian;
+      auto h = localDistanceSqrPointPointHessian(p, c);
+      H[0][0] = h[0][0];  // p-p
+      H[0][3] = h[0][1];  // p-c
+      H[3][0] = h[1][0];  // c-p
+      H[3][3] = h[1][1];  // c-c
+      return H;
     }
     case PointTriangleDistanceType::P_AB: {
-      Matrix<Real, 9, 9> hessian = localDistanceSqrPointLineHessian(p, a, b);
-      local_hessian.block<9, 9>(0, 0) = hessian;
-      return local_hessian;
+      auto h = localDistanceSqrPointLineHessian(p, a, b);
+      // h: [p, a, b] × [p, a, b]
+      for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++)
+          H[i][j] = h[i][j];
+      return H;
     }
     case PointTriangleDistanceType::P_BC: {
-      Matrix<Real, 9, 9> hessian = localDistanceSqrPointLineHessian(p, b, c);
-      local_hessian.block<3, 3>(0, 0) = hessian.block<3, 3>(0, 0);
-      local_hessian.block<3, 6>(0, 6) = hessian.block<3, 6>(0, 3);
-      local_hessian.block<6, 3>(6, 0) = hessian.block<6, 3>(3, 0);
-      local_hessian.block<6, 6>(6, 6) = hessian.block<6, 6>(3, 3);
-      return local_hessian;
+      auto h = localDistanceSqrPointLineHessian(p, b, c);
+      // h: [p, b, c] → H: [p@0, 0@1, b@2, c@3]
+      for (int r = 0; r < 3; r++) {
+        H[0][0][r] = h[0][0][r];
+        H[0][2][r] = h[0][1][r];
+        H[0][3][r] = h[0][2][r];
+        H[2][0][r] = h[1][0][r];
+        H[2][2][r] = h[1][1][r];
+        H[2][3][r] = h[1][2][r];
+        H[3][0][r] = h[2][0][r];
+        H[3][2][r] = h[2][1][r];
+        H[3][3][r] = h[2][2][r];
+      }
+      return H;
     }
     case PointTriangleDistanceType::P_CA: {
-      Matrix<Real, 9, 9> hessian = localDistanceSqrPointLineHessian(p, a, c);
-      local_hessian.block<6, 6>(0, 0) = hessian.block<6, 6>(0, 0);
-      local_hessian.block<3, 6>(9, 0) = hessian.block<3, 6>(6, 0);
-      local_hessian.block<6, 3>(0, 9) = hessian.block<6, 3>(0, 6);
-      local_hessian.block<3, 3>(9, 9) = hessian.block<3, 3>(6, 6);
+      auto h = localDistanceSqrPointLineHessian(p, c, a);
+      // h: [p, c, a] → H: [p@0, a@1, 0@2, c@3]
+      for (int r = 0; r < 3; r++) {
+        H[0][0][r] = h[0][0][r];
+        H[0][1][r] = h[0][2][r];
+        H[0][3][r] = h[0][1][r];
+        H[1][0][r] = h[2][0][r];
+        H[1][1][r] = h[2][2][r];
+        H[1][3][r] = h[2][1][r];
+        H[3][0][r] = h[1][0][r];
+        H[3][1][r] = h[1][2][r];
+        H[3][3][r] = h[1][1][r];
+      }
+      return H;
     }
-    case PointTriangleDistanceType::P_ABC:return localDistanceSqrPointPlaneHessian(p, a, b, c);
+    case PointTriangleDistanceType::P_ABC:
+      return localDistanceSqrPointPlaneHessian(p, a, b, c);
     default:throw std::runtime_error("Unknown distance type");
   }
 }
-Real distanceSqrEdgeEdge(const Vector<Real, 3> &ea0,
-                         const Vector<Real, 3> &ea1,
-                         const Vector<Real, 3> &eb0,
-                         const Vector<Real, 3> &eb1) {
+
+// =========================================================================
+// distanceSqrEdgeEdge — 标量返回值，glm 接口
+// =========================================================================
+
+Real distanceSqrEdgeEdge(const glm::dvec3 &ea0,
+                         const glm::dvec3 &ea1,
+                         const glm::dvec3 &eb0,
+                         const glm::dvec3 &eb1) {
   auto type = decideEdgeEdgeDistanceType(ea0, ea1, eb0, eb1);
   switch (type) {
     case EdgeEdgeDistanceType::A_C:return distanceSqrPointPoint(ea0, eb0);
@@ -136,134 +197,194 @@ Real distanceSqrEdgeEdge(const Vector<Real, 3> &ea0,
     default:throw std::runtime_error("Unknown distance type");
   }
 }
-Vector<Real, 12> localDistanceSqrEdgeEdgeGradient(const Vector<Real, 3> &a,
-                                                  const Vector<Real, 3> &b,
-                                                  const Vector<Real, 3> &c,
-                                                  const Vector<Real, 3> &d) {
+
+// =========================================================================
+// localDistanceSqrEdgeEdgeGradient — 返回 LocalGrad<4>
+// =========================================================================
+
+LocalGrad<4> localDistanceSqrEdgeEdgeGradient(const glm::dvec3 &a,
+                                                  const glm::dvec3 &b,
+                                                  const glm::dvec3 &c,
+                                                  const glm::dvec3 &d) {
   auto type = decideEdgeEdgeDistanceType(a, b, c, d);
+  LocalGrad<4> grad{};
   switch (type) {
     case EdgeEdgeDistanceType::A_C: {
-      Vector<Real, 6> grad = localDistanceSqrPointPointGradient(a, c);
-      Vector<Real, 12> local_grad = Vector<Real, 12>::Zero();
-      local_grad.segment<3>(0) = grad.segment<3>(0);
-      local_grad.segment<3>(6) = grad.segment<3>(3);
-      return local_grad;
+      auto g = localDistanceSqrPointPointGradient(a, c);
+      grad[0] = g[0];  // a
+      grad[2] = g[1];  // c
+      return grad;
     }
     case EdgeEdgeDistanceType::A_D: {
-      Vector<Real, 6> grad = localDistanceSqrPointPointGradient(a, d);
-      Vector<Real, 12> local_grad = Vector<Real, 12>::Zero();
-      local_grad.segment<3>(0) = grad.segment<3>(0);
-      local_grad.segment<3>(9) = grad.segment<3>(3);
-      return local_grad;
+      auto g = localDistanceSqrPointPointGradient(a, d);
+      grad[0] = g[0];  // a
+      grad[3] = g[1];  // d
+      return grad;
     }
     case EdgeEdgeDistanceType::B_C: {
-      Vector<Real, 6> grad = localDistanceSqrPointPointGradient(b, c);
-      Vector<Real, 12> local_grad = Vector<Real, 12>::Zero();
-      local_grad.segment<6>(3) = grad.segment<6>(0);
-      return local_grad;
+      auto g = localDistanceSqrPointPointGradient(b, c);
+      grad[1] = g[0];  // b
+      grad[2] = g[1];  // c
+      return grad;
     }
     case EdgeEdgeDistanceType::B_D: {
-      Vector<Real, 6> grad = localDistanceSqrPointPointGradient(b, d);
-      Vector<Real, 12> local_grad = Vector<Real, 12>::Zero();
-      local_grad.segment<3>(3) = grad.segment<3>(0);
-      local_grad.segment<3>(9) = grad.segment<3>(3);
-      return local_grad;
+      auto g = localDistanceSqrPointPointGradient(b, d);
+      grad[1] = g[0];  // b
+      grad[3] = g[1];  // d
+      return grad;
     }
     case EdgeEdgeDistanceType::A_CD: {
-      Vector<Real, 9> grad = localDistanceSqrPointLineGradient(a, c, d);
-      Vector<Real, 12> local_grad = Vector<Real, 12>::Zero();
-      local_grad.segment<3>(0) = grad.segment<3>(0);
-      local_grad.segment<6>(6) = grad.segment<6>(3);
-      return local_grad;
+      auto g = localDistanceSqrPointLineGradient(a, c, d);
+      // g: [a, c, d]
+      grad[0] = g[0];
+      grad[2] = g[1];
+      grad[3] = g[2];
+      return grad;
     }
     case EdgeEdgeDistanceType::B_CD: {
-      Vector<Real, 9> grad = localDistanceSqrPointLineGradient(b, c, d);
-      Vector<Real, 12> local_grad = Vector<Real, 12>::Zero();
-      local_grad.segment<3>(3) = grad.segment<3>(0);
-      local_grad.segment<6>(6) = grad.segment<6>(3);
-      return local_grad;
+      auto g = localDistanceSqrPointLineGradient(b, c, d);
+      grad[1] = g[0];
+      grad[2] = g[1];
+      grad[3] = g[2];
+      return grad;
     }
     case EdgeEdgeDistanceType::AB_C: {
-      Vector<Real, 9> grad = localDistanceSqrPointLineGradient(c, a, b);
-      Vector<Real, 12> local_grad = Vector<Real, 12>::Zero();
-      local_grad.segment<6>(0) = grad.segment<6>(3);
-      local_grad.segment<3>(6) = grad.segment<3>(0);
+      auto g = localDistanceSqrPointLineGradient(c, a, b);
+      // g: [c, a, b]
+      grad[2] = g[0];
+      grad[0] = g[1];
+      grad[1] = g[2];
+      return grad;
     }
     case EdgeEdgeDistanceType::AB_D: {
-      Vector<Real, 9> grad = localDistanceSqrPointLineGradient(d, a, b);
-      Vector<Real, 12> local_grad = Vector<Real, 12>::Zero();
-      local_grad.segment<6>(0) = grad.segment<6>(3);
-      local_grad.segment<3>(9) = grad.segment<3>(0);
+      auto g = localDistanceSqrPointLineGradient(d, a, b);
+      // g: [d, a, b]
+      grad[3] = g[0];
+      grad[0] = g[1];
+      grad[1] = g[2];
+      return grad;
     }
-    case EdgeEdgeDistanceType::AB_CD:return localDistanceSqrLineLineGradient(a, b, c, d);
-    default:throw std::runtime_error("Unknown distance type");
-  }
-}
-Matrix<Real, 12, 12> localDistanceSqrEdgeEdgeHessian(const Vector<Real, 3> &a,
-                                                     const Vector<Real, 3> &b,
-                                                     const Vector<Real, 3> &c,
-                                                     const Vector<Real, 3> &d) {
-  auto type = decideEdgeEdgeDistanceType(a, b, c, d);
-  Matrix<Real, 12, 12> local_hessian = Matrix<Real, 12, 12>::Zero();
-  switch (type) {
-    case EdgeEdgeDistanceType::A_C: {
-      Matrix<Real, 6, 6> hessian = localDistanceSqrPointPointHessian(a, c);
-      local_hessian.block<3, 3>(0, 0) = hessian.block<3, 3>(0, 0);
-      local_hessian.block<3, 3>(6, 6) = hessian.block<3, 3>(3, 3);
-      local_hessian.block<3, 3>(0, 6) = hessian.block<3, 3>(0, 3);
-      local_hessian.block<3, 3>(6, 0) = hessian.block<3, 3>(3, 0);
-      return local_hessian;
-    }
-    case EdgeEdgeDistanceType::A_D: {
-      Matrix<Real, 6, 6> hessian = localDistanceSqrPointPointHessian(a, d);
-      local_hessian.block<3, 3>(0, 0) = hessian.block<3, 3>(0, 0);
-      local_hessian.block<3, 3>(9, 9) = hessian.block<3, 3>(3, 3);
-      local_hessian.block<3, 3>(0, 9) = hessian.block<3, 3>(0, 3);
-      local_hessian.block<3, 3>(9, 0) = hessian.block<3, 3>(3, 0);
-      return local_hessian;
-    }
-    case EdgeEdgeDistanceType::B_C: {
-      Matrix<Real, 6, 6> hessian = localDistanceSqrPointPointHessian(b, c);
-      local_hessian.block<6, 6>(3, 3) = hessian;
-      return local_hessian;
-    }
-    case EdgeEdgeDistanceType::B_D: {
-      Matrix<Real, 6, 6> hessian = localDistanceSqrPointPointHessian(b, d);
-      local_hessian.block<3, 3>(3, 3) = hessian.block<3, 3>(0, 0);
-      local_hessian.block<3, 3>(9, 9) = hessian.block<3, 3>(3, 3);
-      local_hessian.block<3, 3>(3, 9) = hessian.block<3, 3>(0, 3);
-      local_hessian.block<3, 3>(9, 3) = hessian.block<3, 3>(3, 0);
-      return local_hessian;
-    }
-    case EdgeEdgeDistanceType::A_CD: {
-      Matrix<Real, 9, 9> hessian = localDistanceSqrPointLineHessian(a, c, d);
-      local_hessian.block<3, 3>(0, 0) = hessian.block<3, 3>(0, 0);
-      local_hessian.block<3, 6>(0, 6) = hessian.block<3, 6>(0, 3);
-      local_hessian.block<6, 3>(6, 0) = hessian.block<6, 3>(3, 0);
-      local_hessian.block<6, 6>(6, 6) = hessian.block<6, 6>(3, 3);
-      return local_hessian;
-    }
-    case EdgeEdgeDistanceType::B_CD: {
-      Matrix<Real, 9, 9> hessian = localDistanceSqrPointLineHessian(b, c, d);
-      local_hessian.block<9, 9>(3, 3) = hessian;
-      return local_hessian;
-    }
-    case EdgeEdgeDistanceType::AB_C: {
-      Matrix<Real, 9, 9> hessian = localDistanceSqrPointLineHessian(c, a, b);
-      local_hessian.block<9, 9>(0, 0) = hessian;
-      return local_hessian;
-    }
-    case EdgeEdgeDistanceType::AB_D: {
-      Matrix<Real, 9, 9> hessian = localDistanceSqrPointLineHessian(d, a, b);
-      local_hessian.block<6, 6>(0, 0) = hessian.block<6, 6>(3, 3);
-      local_hessian.block<3, 6>(9, 0) = hessian.block<3, 6>(6, 3);
-      local_hessian.block<6, 3>(0, 9) = hessian.block<6, 3>(3, 6);
-      local_hessian.block<3, 3>(9, 9) = hessian.block<3, 3>(6, 6);
-      return local_hessian;
-    }
-    case EdgeEdgeDistanceType::AB_CD:return localDistanceSqrLineLineHessian(a, b, c, d);
+    case EdgeEdgeDistanceType::AB_CD:
+      return localDistanceSqrLineLineGradient(a, b, c, d);
     default:throw std::runtime_error("Unknown distance type");
   }
 }
 
+// =========================================================================
+// localDistanceSqrEdgeEdgeHessian — 返回 LocalHessian<4>
+// =========================================================================
+
+LocalHessian<4> localDistanceSqrEdgeEdgeHessian(const glm::dvec3 &a,
+                                                     const glm::dvec3 &b,
+                                                     const glm::dvec3 &c,
+                                                     const glm::dvec3 &d) {
+  auto type = decideEdgeEdgeDistanceType(a, b, c, d);
+  LocalHessian<4> H{};
+  switch (type) {
+    case EdgeEdgeDistanceType::A_C: {
+      auto h = localDistanceSqrPointPointHessian(a, c);
+      H[0][0] = h[0][0];  // a-a
+      H[0][2] = h[0][1];  // a-c
+      H[2][0] = h[1][0];  // c-a
+      H[2][2] = h[1][1];  // c-c
+      return H;
+    }
+    case EdgeEdgeDistanceType::A_D: {
+      auto h = localDistanceSqrPointPointHessian(a, d);
+      H[0][0] = h[0][0];  // a-a
+      H[0][3] = h[0][1];  // a-d
+      H[3][0] = h[1][0];  // d-a
+      H[3][3] = h[1][1];  // d-d
+      return H;
+    }
+    case EdgeEdgeDistanceType::B_C: {
+      auto h = localDistanceSqrPointPointHessian(b, c);
+      H[1][1] = h[0][0];  // b-b
+      H[1][2] = h[0][1];  // b-c
+      H[2][1] = h[1][0];  // c-b
+      H[2][2] = h[1][1];  // c-c
+      return H;
+    }
+    case EdgeEdgeDistanceType::B_D: {
+      auto h = localDistanceSqrPointPointHessian(b, d);
+      H[1][1] = h[0][0];  // b-b
+      H[1][3] = h[0][1];  // b-d
+      H[3][1] = h[1][0];  // d-b
+      H[3][3] = h[1][1];  // d-d
+      return H;
+    }
+    case EdgeEdgeDistanceType::A_CD: {
+      auto h = localDistanceSqrPointLineHessian(a, c, d);
+      // h: [a, c, d] × [a, c, d]
+      for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++)
+          H[i][j] = h[i][j];
+      // H[0][2], H[0][3], H[2][0], H[2][3], H[3][0], H[3][2] already set
+      // Need to map: h[0]=a, h[1]=c, h[2]=d → H[0]=a, H[2]=c, H[3]=d
+      for (int r = 0; r < 3; r++) {
+        H[0][0][r] = h[0][0][r];
+        H[0][2][r] = h[0][1][r];
+        H[0][3][r] = h[0][2][r];
+        H[2][0][r] = h[1][0][r];
+        H[2][2][r] = h[1][1][r];
+        H[2][3][r] = h[1][2][r];
+        H[3][0][r] = h[2][0][r];
+        H[3][2][r] = h[2][1][r];
+        H[3][3][r] = h[2][2][r];
+      }
+      return H;
+    }
+    case EdgeEdgeDistanceType::B_CD: {
+      auto h = localDistanceSqrPointLineHessian(b, c, d);
+      for (int r = 0; r < 3; r++) {
+        H[1][1][r] = h[0][0][r];
+        H[1][2][r] = h[0][1][r];
+        H[1][3][r] = h[0][2][r];
+        H[2][1][r] = h[1][0][r];
+        H[2][2][r] = h[1][1][r];
+        H[2][3][r] = h[1][2][r];
+        H[3][1][r] = h[2][0][r];
+        H[3][2][r] = h[2][1][r];
+        H[3][3][r] = h[2][2][r];
+      }
+      return H;
+    }
+    case EdgeEdgeDistanceType::AB_C: {
+      auto h = localDistanceSqrPointLineHessian(c, a, b);
+      // h: [c, a, b] → H: [a@0, b@1, c@2, 0@3]
+      for (int r = 0; r < 3; r++) {
+        H[2][2][r] = h[0][0][r];
+        H[2][0][r] = h[0][1][r];
+        H[2][1][r] = h[0][2][r];
+        H[0][2][r] = h[1][0][r];
+        H[0][0][r] = h[1][1][r];
+        H[0][1][r] = h[1][2][r];
+        H[1][2][r] = h[2][0][r];
+        H[1][0][r] = h[2][1][r];
+        H[1][1][r] = h[2][2][r];
+      }
+      return H;
+    }
+    case EdgeEdgeDistanceType::AB_D: {
+      auto h = localDistanceSqrPointLineHessian(d, a, b);
+      // h: [d, a, b] → H: [a@0, b@1, 0@2, d@3]
+      for (int r = 0; r < 3; r++) {
+        H[3][3][r] = h[0][0][r];
+        H[3][0][r] = h[0][1][r];
+        H[3][1][r] = h[0][2][r];
+        H[0][3][r] = h[1][0][r];
+        H[0][0][r] = h[1][1][r];
+        H[0][1][r] = h[1][2][r];
+        H[1][3][r] = h[2][0][r];
+        H[1][0][r] = h[2][1][r];
+        H[1][1][r] = h[2][2][r];
+      }
+      return H;
+    }
+    case EdgeEdgeDistanceType::AB_CD:
+      return localDistanceSqrLineLineHessian(a, b, c, d);
+    default:throw std::runtime_error("Unknown distance type");
+  }
 }
+
+} // namespace sim::fem::ipc

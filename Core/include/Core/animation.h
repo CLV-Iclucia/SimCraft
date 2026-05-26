@@ -2,8 +2,7 @@
 // Created by creeper on 23-8-13.
 //
 
-#ifndef SIMCRAFT_CORE_INCLUDE_CORE_ANIMATION_H_
-#define SIMCRAFT_CORE_INCLUDE_CORE_ANIMATION_H_
+#pragma once
 #include <Core/core.h>
 namespace sim {
 namespace core {
@@ -22,4 +21,3 @@ public:
 };
 }
 }
-#endif // SIMCRAFT_CORE_INCLUDE_CORE_ANIMATION_H_

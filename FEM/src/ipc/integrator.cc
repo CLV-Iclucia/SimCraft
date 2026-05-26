@@ -22,32 +22,55 @@ static int ipc_auto_reg = ([]() {
   }(), 0);
 
 void IpcIntegrator::step(Real dt) {
+  // ===== 运动学体: 推进到下一时刻 =====
+  Real t_next = system().currentTime() + dt;
+  system().advanceKinematicBodies(t_next);
+
+  // ===== 设置 collision detector 的运动学体 =====
+  collisionDetector->setKinematicBodies(&system().kinematicBodies());
+
   x_prev = system().x;
   maths::BlockVector<3> x_t = system().x;
+
+  // ===== enforce 约束到目标位置 =====
+  system().constraints().enforcePosition(system().x, t_next);
+
   Real h = dt;
   Real E_prev = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
   maths::BlockVector<3> p(x_t.numBlocks());
   int iter = 0;
   while (true) {
-    VecXd g = barrierAugmentedIncrementalPotentialEnergyGradient(x_t, h);
-    auto H_eigen = spdProjectHessian(h);
+    // Compute negative gradient directly as BlockVector<3>
+    auto negG = barrierAugmentedIncrementalPotentialEnergyGradient(x_t, h);
+    negG *= Real(-1);
 
-    // --- Block solver boundary ---
-    auto H_block = maths::BlockSparseMatrix<3>::fromEigen(H_eigen);
-    maths::BlockVector<3> negG(x_t.numBlocks());
-    negG.asEigen() = -g;
+    // ===== 投影梯度（清零被约束分量）=====
+    system().constraints().zeroConstrainedGradient(negG);
+
+    // Compute Hessian directly as BlockSparseMatrix<3>
+    auto H_block = spdProjectHessian(h);
 
     p.setZero();
     auto result = solver->solve(H_block, negG, p);
     if (!result.converged)
       spdlog::warn("BlockPCG: {} iters, residual={}", result.iterations, result.residualNorm);
-    // --- end Block solver boundary ---
 
-    if (p.asEigen().template lpNorm<Eigen::Infinity>() <
+    // ===== 投影搜索方向 =====
+    system().constraints().projectToFreeSpace(p);
+
+    if (p.infNorm() <
         config.eps * system().meshLengthScale() * h)
       break;
-    Real alpha =
-        config.stepSizeScale * std::min(1.0, computeStepSizeUpperBound(p));
+
+    // ===== 计算步长上限 (弹性体 + 运动学体) =====
+    Real alphaElastic = computeStepSizeUpperBound(p);
+    Real alphaKinematic = 1.0;
+    if (!system().kinematicBodies().empty()) {
+      auto toiKin = collisionDetector->detectDeformableVsKinematic(p, dt);
+      if (toiKin) alphaKinematic = *toiKin;
+    }
+    Real alpha = config.stepSizeScale * std::min({1.0, alphaElastic, alphaKinematic});
+
     if (alpha == 0.0)
       throw std::runtime_error(
           "Invalid state: collision happened within an integration step");
@@ -58,6 +81,8 @@ void IpcIntegrator::step(Real dt) {
       maths::BlockVector<3> x_candidate = x_prev;
       x_candidate.axpy(alpha, p);
       updateCandidateSolution(x_candidate);
+      // ===== line search 后再次 enforce =====
+      system().constraints().enforcePosition(system().x, t_next);
       alpha = alpha * 0.5;
       E = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
     } while (E > E_prev);
@@ -66,17 +91,37 @@ void IpcIntegrator::step(Real dt) {
     E_prev = E;
   }
   velocityUpdate(x_t, h);
+
+  // ===== enforce 速度约束 =====
+  system().constraints().enforceVelocity(system().xdot, t_next);
+
+  // ===== 推进时间 =====
+  system().advanceTime(dt);
 }
 
-SparseMatrix<Real> IpcIntegrator::spdProjectHessian(Real h) {
-  sparseBuilder.clear().setRows(system().dof()).setColumns(system().dof());
-  system().spdProjectHessian(sparseBuilder);
+maths::BlockSparseMatrix<3> IpcIntegrator::spdProjectHessian(Real h) {
+  int nBlocks = system().x.numBlocks();
+  maths::BlockSparseMatrix<3> H(nBlocks, nBlocks);
+
+  // Elastic Hessian
+  system().spdProjectHessian(H);
+
+  // Barrier Hessian (elastic-elastic)
   Real kappa = config.contactStiffness;
   for (const auto &c : constraintSet.vtConstraints)
-    c.assembleBarrierHessian(barrier, sparseBuilder, kappa);
+    c.assembleBarrierHessian(barrier, H, kappa);
   for (const auto &c : constraintSet.eeConstraints)
-    c.assembleMollifiedBarrierHessian(barrier, sparseBuilder, kappa);
-  return sparseBuilder.build() * h * h + system().mass();
+    c.assembleMollifiedBarrierHessian(barrier, H, kappa);
+
+  // Barrier Hessian (elastic-kinematic)
+  for (const auto &c : constraintSet.kinematicVTConstraints)
+    c.assembleBarrierHessian(barrier, H, kappa);
+
+  // H_total = h² * H_elastic_barrier + M
+  H.scale(h * h);
+  H.addFrom(system().blockMass());
+
+  return H;
 }
 
 void IpcIntegrator::updateConstraintStatus() {
@@ -90,9 +135,66 @@ void IpcIntegrator::precomputeConstraintSet(
     const ConstraintSetPrecomputeRequest &config) {
   constraintSet.vtConstraints.clear();
   constraintSet.eeConstraints.clear();
-  collisionDetector->updateBVHs(config.descentDir.asEigen(), config.toi);
+  constraintSet.kinematicVTConstraints.clear();
+  
+  collisionDetector->updateBVHs(config.descentDir, config.toi);
   computeVertexTriangleConstraints(config);
   computeEdgeEdgeConstraints(config);
+  
+  // 检测运动学体约束
+  if (!system().kinematicBodies().empty()) {
+    computeKinematicVTConstraints(config);
+  }
+}
+
+void IpcIntegrator::computeKinematicVTConstraints(
+    const ConstraintSetPrecomputeRequest &config) {
+  const auto &[p, toi, dHat] = config;
+  
+  // 遍历所有运动学体
+  for (size_t bodyIdx = 0; bodyIdx < system().kinematicBodies().size(); bodyIdx++) {
+    const auto& body = system().kinematicBodies()[bodyIdx];
+    auto* mg = std::get_if<KinematicBody::MeshGeometry>(&body.geometry);
+    if (!mg) continue;  // SDF 碰撞在 barrier 层单独处理
+    
+    const auto& triangles = mg->mesh->triangles;
+    
+    // 使用运动学体的 BVH 进行空间查询
+    // 为简化，先遍历所有顶点
+    for (int vertexIdx = 0; vertexIdx < system().numVertices(); vertexIdx++) {
+      // 弹性体顶点轨迹 bbox
+      auto startPos = system().x[vertexIdx];
+      auto endPos = startPos + p[vertexIdx] * toi;
+      BBox<Real, 3> vertexBBox;
+      vertexBBox.expand({startPos.x, startPos.y, startPos.z});
+      vertexBBox.expand({endPos.x, endPos.y, endPos.z});
+      
+      // 遍历运动学体的三角形
+      for (size_t triIdx = 0; triIdx < triangles.size(); triIdx++) {
+        const auto& tri = triangles[triIdx];
+        
+        // 计算运动学三角形在当前时刻的位置
+        glm::dvec3 ka = body.currentVertices[tri.x];
+        glm::dvec3 kb = body.currentVertices[tri.y];
+        glm::dvec3 kc = body.currentVertices[tri.z];
+        
+        // 简单距离检测：如果弹性体顶点接近运动学三角形，添加约束
+        Real distSqr = ipc::distanceSqrPointTriangle(startPos, ka, kb, kc);
+        
+        if (distSqr < dHat * dHat) {
+          constraintSet.kinematicVTConstraints.push_back({
+              .x = system().x,
+              .deformableVertex = vertexIdx,
+              .ka = ka,
+              .kb = kb,
+              .kc = kc,
+              .type = ipc::PointTriangleDistanceType::Unknown,
+          });
+          constraintSet.kinematicVTConstraints.back().updateDistanceType();
+        }
+      }
+    }
+  }
 }
 
 void IpcIntegrator::computeVertexTriangleConstraints(
@@ -106,19 +208,17 @@ void IpcIntegrator::computeVertexTriangleConstraints(
             .getTrajectoryAccessor(system().x, p, toi)
             .vertexBBox(vertexIdx);
     vertexTrajectoryBBox = vertexTrajectoryBBox.dilate(dHat);
-    const auto &primitive = system().primitive(
-        system().geometryManager().getVertexPrimitiveId(vertexIdx));
     collisionDetector->trianglesBVH().runSpatialQuery(
         [&](int triangleIdx) -> bool {
           if (system().triangleContainsVertex(triangleIdx, vertexIdx))
             return false;
-          auto triangle = system().geometryManager().getTriangle(triangleIdx);
+
+          auto globalTri = system().geometryManager().getGlobalTriangle(triangleIdx);
 
           constraintSet.vtConstraints.push_back({
-              .triangle = triangle,
-              .xv = primitive.cview(system().x),
-              .xt = primitive.cview(system().x),
-              .iv = vertexIdx,
+              .x = system().x,
+              .globalVertex = vertexIdx,
+              .globalTriVerts = {globalTri.x, globalTri.y, globalTri.z},
               .type = ipc::PointTriangleDistanceType::Unknown,
           });
 
@@ -149,20 +249,14 @@ void IpcIntegrator::computeEdgeEdgeConstraints(
           if (system().checkEdgeAdjacent(edgeIdx, otherEdgeIdx))
             return false;
 
-          const auto &ea = system().geometryManager().getEdge(edgeIdx);
-          const auto &eb = system().geometryManager().getEdge(otherEdgeIdx);
-          auto pr_a_id = system().globalEdgeToPrimitive(edgeIdx);
-          auto pr_b_id = system().globalEdgeToPrimitive(otherEdgeIdx);
-          const auto &pr_a = system().primitive(pr_a_id);
-          const auto &pr_b = system().primitive(pr_b_id);
+          auto globalEa = system().geometryManager().getGlobalEdge(edgeIdx);
+          auto globalEb = system().geometryManager().getGlobalEdge(otherEdgeIdx);
 
           constraintSet.eeConstraints.push_back({
-              .ea = ea,
-              .eb = eb,
-              .xa = pr_a.cview(system().x),
-              .Xa = pr_a.cview(system().X),
-              .xb = pr_b.cview(system().x),
-              .Xb = pr_b.cview(system().X),
+              .x = system().x,
+              .X = system().X,
+              .globalEdgeA = {globalEa.x, globalEa.y},
+              .globalEdgeB = {globalEb.x, globalEb.y},
               .type = ipc::EdgeEdgeDistanceType::Unknown,
           });
 
@@ -176,14 +270,17 @@ void IpcIntegrator::computeEdgeEdgeConstraints(
   });
 }
 
-VecXd IpcIntegrator::barrierEnergyGradient() const {
-  VecXd gradient = VecXd::Zero(system().dof());
+maths::BlockVector<3> IpcIntegrator::barrierEnergyGradient() const {
+  maths::BlockVector<3> gradient(system().x.numBlocks());
   gradient.setZero();
   Real kappa = config.contactStiffness;
   for (const auto &c : constraintSet.vtConstraints)
     c.assembleBarrierGradient(barrier, gradient, kappa);
   for (const auto &c : constraintSet.eeConstraints)
     c.assembleMollifiedBarrierGradient(barrier, gradient, kappa);
+  // 运动学约束梯度
+  for (const auto &c : constraintSet.kinematicVTConstraints)
+    c.assembleBarrierGradient(barrier, gradient, kappa);
   return gradient;
 }
 
@@ -228,6 +325,9 @@ Real IpcIntegrator::barrierEnergy() const {
     barrierEnergy += barrier(c.distanceSqr());
   for (const auto &c : constraintSet.eeConstraints)
     barrierEnergy += c.mollifier() * barrier(c.distanceSqr());
+  // 运动学约束
+  for (const auto &c : constraintSet.kinematicVTConstraints)
+    barrierEnergy += barrier(c.distanceSqr());
   return kappa * barrierEnergy;
 }
 } // namespace sim::fem

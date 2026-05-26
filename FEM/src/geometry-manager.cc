@@ -98,8 +98,8 @@ BBox<Real, 3> GeometryManager::TriangleAccessor::bbox(int idx) const {
   BBox<Real, 3> box;
   std::array<int, 3> vertexIds = {vertices.x, vertices.y, vertices.z};
   for (int i = 0; i < 3; ++i) {
-    const Vector<Real, 3> pos = positions.segment<3>(vertexIds[i] * 3);
-    box.expand({pos(0), pos(1), pos(2)});
+    const auto& pos = positions[vertexIds[i]];
+    box.expand({pos.x, pos.y, pos.z});
   }
   return box;
 }
@@ -110,15 +110,15 @@ BBox<Real, 3> GeometryManager::EdgeAccessor::bbox(int idx) const {
   BBox<Real, 3> box;
   std::array<int, 2> vertexIds = {vertices.x, vertices.y};
   for (int i = 0; i < 2; ++i) {
-    auto pos = positions.segment<3>(vertexIds[i] * 3);
-    box.expand({pos(0), pos(1), pos(2)});
+    const auto& pos = positions[vertexIds[i]];
+    box.expand({pos.x, pos.y, pos.z});
   }
   return box;
 }
 
 BBox<Real, 3> GeometryManager::VertexAccessor::bbox(int idx) const {
-  auto pos = positions.segment<3>(idx * 3);
-  return BBox<Real, 3>({pos(0), pos(1), pos(2)});
+  const auto& pos = positions[idx];
+  return BBox<Real, 3>({pos.x, pos.y, pos.z});
 }
 
 BBox<Real, 3> GeometryManager::TrajectoryAccessor::triangleBBox(int idx) const {
@@ -128,12 +128,12 @@ BBox<Real, 3> GeometryManager::TrajectoryAccessor::triangleBBox(int idx) const {
   std::array<int, 3> vertexIds = {vertices.x, vertices.y, vertices.z};
   for (int i = 0; i < 3; ++i) {
     int vIdx = vertexIds[i];
-    auto startPos = positions.segment<3>(vIdx * 3);
-    auto dir = directions.segment<3>(vIdx * 3);
+    const auto& startPos = positions[vIdx];
+    const auto& dir = directions[vIdx];
     auto endPos = startPos + dir * toi;
 
-    box.expand({startPos(0), startPos(1), startPos(2)});
-    box.expand({endPos(0), endPos(1), endPos(2)});
+    box.expand({startPos.x, startPos.y, startPos.z});
+    box.expand({endPos.x, endPos.y, endPos.z});
   }
   return box;
 }
@@ -145,23 +145,22 @@ BBox<Real, 3> GeometryManager::TrajectoryAccessor::edgeBBox(int idx) const {
   std::array<int, 2> vertexIds = {vertices.x, vertices.y};
   for (int i = 0; i < 2; ++i) {
     int vIdx = vertexIds[i];
-    auto startPos = positions.segment<3>(vIdx * 3);
-    auto dir = directions.segment<3>(vIdx * 3);
+    const auto& startPos = positions[vIdx];
+    const auto& dir = directions[vIdx];
     auto endPos = startPos + dir * toi;
 
-    box.expand({startPos(0), startPos(1), startPos(2)});
-    box.expand({endPos(0), endPos(1), endPos(2)});
+    box.expand({startPos.x, startPos.y, startPos.z});
+    box.expand({endPos.x, endPos.y, endPos.z});
   }
   return box;
 }
 
 BBox<Real, 3> GeometryManager::TrajectoryAccessor::vertexBBox(int idx) const {
-  const Vector<Real, 3> startPos = positions.segment<3>(idx * 3);
-  const Vector<Real, 3> dir = directions.segment<3>(idx * 3);
-  const Vector<Real, 3> endPos = startPos + dir * toi;
+  const auto& startPos = positions[idx];
+  auto endPos = startPos + directions[idx] * toi;
 
-  return BBox<Real, 3>({startPos(0), startPos(1), startPos(2)})
-      .expand({endPos(0), endPos(1), endPos(2)});
+  return BBox<Real, 3>({startPos.x, startPos.y, startPos.z})
+      .expand({endPos.x, endPos.y, endPos.z});
 }
 
 } // namespace sim::fem

@@ -7,36 +7,54 @@
 
 namespace sim::fem {
 
-Real IpcImplicitEuler::incrementalPotentialKinematicEnergy(const VecXd &x_t, Real h) const {
-  const auto &v_t = system().xdot;
-  auto x_hat = x_t + h * v_t + h * h * system().computeAcceleration();
-  return 0.5 * (system().currentConfig() - x_hat).transpose() * system().mass() * (system().currentConfig() - x_hat);
+Real IpcImplicitEuler::incrementalPotentialKinematicEnergy(const maths::BlockVector<3> &x_t, Real h) const {
+  // x_hat = x_t + h*v + h²*a
+  maths::BlockVector<3> x_hat = x_t;
+  x_hat.axpy(h, system().xdot);
+  auto a = system().computeAcceleration();
+  x_hat.axpy(h * h, a);
+  // E = 0.5 * (x - x_hat)^T * M * (x - x_hat)
+  maths::BlockVector<3> diff = system().x;
+  diff -= x_hat;
+  maths::BlockVector<3> M_diff(diff.numBlocks());
+  system().blockMass().apply(diff, M_diff);
+  return 0.5 * diff.dot(M_diff);
 }
 
-VecXd IpcImplicitEuler::incrementalPotentialKinematicEnergyGradient(const VecXd &x_t, Real h) const {
-  const auto &v_t = system().xdot;
-  auto x_hat = x_t + h * v_t + h * h * system().computeAcceleration();
-  return system().mass() * (system().currentConfig() - x_hat);
+maths::BlockVector<3> IpcImplicitEuler::incrementalPotentialKinematicEnergyGradient(const maths::BlockVector<3> &x_t, Real h) const {
+  // x_hat = x_t + h*v + h²*a
+  maths::BlockVector<3> x_hat = x_t;
+  x_hat.axpy(h, system().xdot);
+  auto a = system().computeAcceleration();
+  x_hat.axpy(h * h, a);
+  // grad = M * (x - x_hat)
+  maths::BlockVector<3> diff = system().x;
+  diff -= x_hat;
+  maths::BlockVector<3> result(diff.numBlocks());
+  system().blockMass().apply(diff, result);
+  return result;
 }
 
-VecXd symbolicIncrementalPotentialEnergyGradient(IpcImplicitEuler &euler, const VecXd &x_t, Real h) {
+maths::BlockVector<3> symbolicIncrementalPotentialEnergyGradient(IpcImplicitEuler &euler, const maths::BlockVector<3> &x_t, Real h) {
   return euler.barrierAugmentedIncrementalPotentialEnergyGradient(x_t, h);
 }
 
-VecXd numericalIncrementalPotentialEnergyGradient(IpcImplicitEuler &euler, const VecXd &x_t, Real h) {
-  VecXd grad = VecXd::Zero(x_t.size());
+maths::BlockVector<3> numericalIncrementalPotentialEnergyGradient(IpcImplicitEuler &euler, const maths::BlockVector<3> &x_t, Real h) {
+  int n = euler.system().dof();
+  maths::BlockVector<3> grad(euler.system().x.numBlocks());
+  grad.setZero();
   Real dx = 1e-5;
-  VecXd current = euler.system().currentConfig();
-  for (int i = 0; i < x_t.size(); i++) {
-    VecXd x_t_plus = current;
-    x_t_plus(i) += dx;
-    euler.updateCandidateSolution(x_t_plus);
+  maths::BlockVector<3> current = euler.system().x;
+  for (int i = 0; i < n; i++) {
+    maths::BlockVector<3> x_plus = current;
+    x_plus.data()[i] += dx;
+    euler.updateCandidateSolution(x_plus);
     Real E_plus = euler.barrierAugmentedIncrementalPotentialEnergy(x_t, h);
-    VecXd x_t_minus = current;
-    x_t_minus(i) -= dx;
-    euler.updateCandidateSolution(x_t_minus);
+    maths::BlockVector<3> x_minus = current;
+    x_minus.data()[i] -= dx;
+    euler.updateCandidateSolution(x_minus);
     Real E_minus = euler.barrierAugmentedIncrementalPotentialEnergy(x_t, h);
-    grad(i) = (E_plus - E_minus) / (2 * dx);
+    grad.data()[i] = (E_plus - E_minus) / (2 * dx);
   }
   return grad;
 }

@@ -53,34 +53,38 @@ Real ElasticTetMesh::deformationEnergy() const {
   return sum;
 }
 
+// New BlockSparseMatrix interface (Phase 2B)
 void ElasticTetMesh::assembleEnergyHessian(
-    maths::SubMatrixBuilder<Real> &globalHessianSubView) const {
+    maths::BlockSparseMatrix<3> &globalH, int blockStart) const {
   for (int i = 0; i < numTets(); i++) {
     auto &dg = tetDeformationGradients[i];
     auto hessian_F = energy->filteredEnergyHessian(dg);
     auto p_F_p_x = dg.gradient();
-    auto hessian_x =
+    Eigen::Matrix<Real, 12, 12> hessian_x =
         p_F_p_x.transpose() * hessian_F * p_F_p_x * tetRefVolumes[i];
-    std::array<int, 4> tetArray = {mesh.tets[i][0], mesh.tets[i][1],
-                     mesh.tets[i][2], mesh.tets[i][3]};
-    globalHessianSubView.assembleBlock<12, 4>(hessian_x, tetArray);
+    std::array<int, 4> bi = {
+        blockStart + mesh.tets[i][0],
+        blockStart + mesh.tets[i][1],
+        blockStart + mesh.tets[i][2],
+        blockStart + mesh.tets[i][3]};
+    globalH.assembleBlock<4>(hessian_x, bi);
   }
 }
 
 void ElasticTetMesh::assembleMassMatrix(
-    maths::SubMatrixBuilder<Real> &globalMassSubView) const {
-  for (auto i = 0; i < numTets(); i++) {
+    maths::BlockSparseMatrix<3> &globalMass, int blockStart) const {
+  for (int i = 0; i < numTets(); i++) {
     Real volume = tetRefVolumes[i];
-    Matrix<Real, 12, 12> localMass;
-    localMass.setZero();
+    std::array<int, 4> bi = {
+        blockStart + mesh.tets[i][0],
+        blockStart + mesh.tets[i][1],
+        blockStart + mesh.tets[i][2],
+        blockStart + mesh.tets[i][3]};
     for (int j = 0; j < 4; j++)
-      for (int k = 0; k < 4; k++)
-        localMass.block<3, 3>(j * 3, k * 3) += density * volume *
-                                               (j == k ? 0.1 : 0.05) *
-                                               Matrix<Real, 3, 3>::Identity();
-    std::array<int, 4> tetArray = {mesh.tets[i][0], mesh.tets[i][1],
-                                   mesh.tets[i][2], mesh.tets[i][3]};
-    globalMassSubView.assembleBlock<12, 4>(localMass, tetArray);
+      for (int k = 0; k < 4; k++) {
+        Real coeff = density * volume * (j == k ? 0.1 : 0.05);
+        globalMass.addBlock(bi[j], bi[k], glm::dmat3(coeff));
+      }
   }
 }
 

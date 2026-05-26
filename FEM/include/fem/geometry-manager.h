@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <Maths/block-vector.h>
 #include <fem/types.h>
 #include <fem/primitive.h>
 #include <fem/colliders.h>
@@ -49,86 +50,86 @@ public:
   class TriangleAccessor {
   public:
     using CoordType = Real;
-    
-    TriangleAccessor(const GeometryManager& manager, const VecXd& positions) 
+
+    TriangleAccessor(const GeometryManager& manager, const maths::BlockVector<3>& positions)
       : manager(manager), positions(positions) {}
-    
+
     [[nodiscard]] BBox<Real, 3> bbox(int idx) const;
     [[nodiscard]] int size() const { return manager.triangleCount(); }
-    
+
   private:
     const GeometryManager& manager;
-    const VecXd& positions;
+    const maths::BlockVector<3>& positions;
   };
-  
+
   class EdgeAccessor {
   public:
     using CoordType = Real;
-    
-    EdgeAccessor(const GeometryManager& manager, const VecXd& positions) 
+
+    EdgeAccessor(const GeometryManager& manager, const maths::BlockVector<3>& positions)
       : manager(manager), positions(positions) {}
-    
+
     [[nodiscard]] BBox<Real, 3> bbox(int idx) const;
     [[nodiscard]] int size() const { return manager.edgeCount(); }
-    
+
   private:
     const GeometryManager& manager;
-    const VecXd& positions;
+    const maths::BlockVector<3>& positions;
   };
-  
+
   class VertexAccessor {
   public:
     using CoordType = Real;
-    
-    VertexAccessor(const GeometryManager& manager, const VecXd& positions)
+
+    VertexAccessor(const GeometryManager& manager, const maths::BlockVector<3>& positions)
       : manager(manager), positions(positions) {}
-    
+
     [[nodiscard]] BBox<Real, 3> bbox(int idx) const;
     [[nodiscard]] int size() const { return manager.vertexCount(); }
-    
+
   private:
     const GeometryManager& manager;
-    const VecXd& positions;
+    const maths::BlockVector<3>& positions;
   };
-  
+
   class TrajectoryAccessor {
   public:
     using CoordType = Real;
-    
-    TrajectoryAccessor(const GeometryManager& manager, const VecXd& positions, 
-                      const VecXd& directions, Real toi) 
-      : manager(manager), positions(positions), 
+
+    TrajectoryAccessor(const GeometryManager& manager, const maths::BlockVector<3>& positions,
+                      const maths::BlockVector<3>& directions, Real toi)
+      : manager(manager), positions(positions),
         directions(directions), toi(toi) {}
-    
+
     [[nodiscard]] BBox<Real, 3> triangleBBox(int idx) const;
     [[nodiscard]] BBox<Real, 3> edgeBBox(int idx) const;
     [[nodiscard]] BBox<Real, 3> vertexBBox(int idx) const;
-    
+
     [[nodiscard]] int triangleSize() const { return manager.triangleCount(); }
     [[nodiscard]] int edgeSize() const { return manager.edgeCount(); }
     [[nodiscard]] int vertexSize() const { return manager.vertexCount(); }
-    
+
   private:
     const GeometryManager& manager;
-    const VecXd& positions;
-    const VecXd& directions;
+    const maths::BlockVector<3>& positions;
+    const maths::BlockVector<3>& directions;
     Real toi{1.0};
   };
-  
-  [[nodiscard]] TriangleAccessor getTriangleAccessor(const VecXd& positions) const { 
-    return TriangleAccessor(*this, positions); 
+
+  [[nodiscard]] TriangleAccessor getTriangleAccessor(const maths::BlockVector<3>& positions) const {
+    return TriangleAccessor(*this, positions);
   }
-  
-  [[nodiscard]] EdgeAccessor getEdgeAccessor(const VecXd& positions) const { 
-    return EdgeAccessor(*this, positions); 
+
+  [[nodiscard]] EdgeAccessor getEdgeAccessor(const maths::BlockVector<3>& positions) const {
+    return EdgeAccessor(*this, positions);
   }
-  
-  [[nodiscard]] VertexAccessor getVertexAccessor(const VecXd& positions) const {
+
+  [[nodiscard]] VertexAccessor getVertexAccessor(const maths::BlockVector<3>& positions) const {
     return VertexAccessor(*this, positions);
   }
-  
-  [[nodiscard]] TrajectoryAccessor getTrajectoryAccessor(const VecXd& positions, 
-                                                        const VecXd& directions, 
+
+  [[nodiscard]] TrajectoryAccessor getTrajectoryAccessor(const maths::BlockVector<3>& positions,
+                                                        const maths::BlockVector<3>& directions,
                                                         Real toi) const {
     return TrajectoryAccessor(*this, positions, directions, toi);
   }

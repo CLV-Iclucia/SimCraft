@@ -2,8 +2,7 @@
 // Created by creeper on 23-9-1.
 //
 
-#ifndef SIMCRAFT_CORE_INCLUDE_CORE_PROPERTIES_H_
-#define SIMCRAFT_CORE_INCLUDE_CORE_PROPERTIES_H_
+#pragma once
 namespace sim::core {
 struct NonCopyable {
   NonCopyable() = default;
@@ -15,4 +14,3 @@ struct Resource {
   Resource(Resource &&) = delete;
 };
 }
-#endif // SIMCRAFT_CORE_INCLUDE_CORE_PROPERTIES_H_

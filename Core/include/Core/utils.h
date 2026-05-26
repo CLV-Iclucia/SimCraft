@@ -2,8 +2,7 @@
 // Created by creeper on 23-8-13.
 //
 
-#ifndef SIMCRAFT_CORE_INCLUDE_CORE_UTILS_H_
-#define SIMCRAFT_CORE_INCLUDE_CORE_UTILS_H_
+#pragma once
 #include <Core/core.h>
 namespace sim::core {
 constexpr Real PI = 3.141592653589793238462643383279502884197169399375105820974;
@@ -115,4 +114,3 @@ Vector<T, Dim> cwiseMax(const Vector<T, Dim> &a, const Vector<T, Dim> &b) {
 
 } // namespace core
 // namespace core
-#endif // SIMCRAFT_CORE_INCLUDE_CORE_UTILS_H_

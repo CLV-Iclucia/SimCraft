@@ -1,9 +1,8 @@
-#include <../include/fem/primitives/tet-mesh.h>
+#include <fem/primitives/tet-mesh.h>
 #include <Deform/strain-energy-density.h>
 #include <Maths/svd.h>
 #include <fem/ipc/implicit-euler.h>
 #include <fem/system.h>
-#include <ogl-render/window.h>
 using namespace fem;
 using namespace deform;
 

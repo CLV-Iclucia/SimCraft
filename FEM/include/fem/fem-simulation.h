@@ -3,7 +3,7 @@
 //
 
 #pragma once
-#include <core/animation.h>
+#include <Core/animation.h>
 #include <fem/integrator.h>
 #include <fem/system.h>
 
@@ -16,6 +16,10 @@ struct FEMSimulation final : public core::Animation {
     frame.onAdvance();
   }
   [[nodiscard]] bool canSimulate() const { return integrator != nullptr; }
+
+  /// 访问内部 System（只读 / 读写）
+  [[nodiscard]] System& getSystem() { return system; }
+  [[nodiscard]] const System& getSystem() const { return system; }
 
 private:
   friend struct FEMSimulationBuilder;

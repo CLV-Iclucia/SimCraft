@@ -2,8 +2,7 @@
 // Created by creeper on 6/3/24.
 //
 
-#ifndef SIMCRAFT_CORE_INCLUDE_CORE_ZIP_H_
-#define SIMCRAFT_CORE_INCLUDE_CORE_ZIP_H_
+#pragma once
 #include <concepts>
 #include <iterator>
 #include <tuple>
@@ -80,4 +79,3 @@ auto zip(Iterables &&... iterables) {
   return ZipRange<Iterables...>(std::forward<Iterables>(iterables)...);
 }
 }
-#endif //SIMCRAFT_CORE_INCLUDE_CORE_ZIP_H_

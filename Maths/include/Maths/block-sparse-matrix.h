@@ -99,7 +99,7 @@ public:
   }
 
   // --- Eigen bridge (copies data) ---
-  [[nodiscard]] SparseMatrix<Real> toEigen() const {
+  [[nodiscard, deprecated("Use block operations directly")]] SparseMatrix<Real> toEigen() const {
     std::vector<Eigen::Triplet<Real>> triplets;
     triplets.reserve(numEntries() * N * N);
     const int n = numEntries();
@@ -140,40 +140,38 @@ public:
       b *= s;
   }
 
-  /// Convert from Eigen::SparseMatrix (temporary bridge, removed after Phase 2B)
-  /// Interprets the scalar sparse matrix as N×N block structure.
-  static BlockSparseMatrix fromEigen(const SparseMatrix<Real> &eigen) {
-    assert(eigen.rows() % N == 0 && eigen.cols() % N == 0);
-    int bRows = eigen.rows() / N;
-    int bCols = eigen.cols() / N;
-    BlockSparseMatrix result(bRows, bCols);
+  /// Accumulate another same-sized BlockSparseMatrix: this += other (syntax sugar for addFrom)
+  BlockSparseMatrix &operator+=(const BlockSparseMatrix &other) {
+    addFrom(other);
+    return *this;
+  }
 
-    // Use map to aggregate all scalar elements belonging to the same block position
-    std::unordered_map<int64_t, Block> blockMap;
-    auto key = [bCols](int br, int bc) -> int64_t {
-      return static_cast<int64_t>(br) * bCols + bc;
-    };
+  /// AXPY: this += a * other
+  void axpy(Real a, const BlockSparseMatrix &other) {
+    assert(m_blockRows == other.m_blockRows && m_blockCols == other.m_blockCols);
+    for (int k = 0; k < other.numEntries(); k++)
+      addBlock(other.m_rowIdx[k], other.m_colIdx[k], a * other.m_blocks[k]);
+  }
 
-    for (int outerIdx = 0; outerIdx < eigen.outerSize(); ++outerIdx) {
-      for (typename SparseMatrix<Real>::InnerIterator it(eigen, outerIdx); it; ++it) {
-        int sr = it.row(), sc = it.col();
-        int br = sr / N, bc = sc / N;
-        int lr = sr % N, lc = sc % N;
-        auto k = key(br, bc);
-        if (blockMap.find(k) == blockMap.end())
-          blockMap[k] = Block(0);
-        // glm is column-major: Block[col][row]
-        blockMap[k][lc][lr] += it.value();
+  /// Assemble a local matrix (e.g., 12×12 = 4 blocks × 3 dof) into global matrix
+  /// localMat is in Eigen row-major format, will be converted to glm column-major
+  template <int LocalBlocks>
+  void assembleBlock(const Eigen::Matrix<Real, LocalBlocks * 3, LocalBlocks * 3> &localMat,
+                     const std::array<int, LocalBlocks> &blockIndices) {
+    for (int i = 0; i < LocalBlocks; i++) {
+      for (int j = 0; j < LocalBlocks; j++) {
+        Block b;
+        for (int c = 0; c < N; c++)       // col (glm column-major)
+          for (int r = 0; r < N; r++)     // row
+            b[c][r] = localMat(i * N + r, j * N + c);  // Eigen row-major -> glm col-major
+        addBlock(blockIndices[i], blockIndices[j], b);
       }
     }
+  }
 
-    result.reserve(static_cast<int>(blockMap.size()));
-    for (auto &[k, block] : blockMap) {
-      int br = static_cast<int>(k / bCols);
-      int bc = static_cast<int>(k % bCols);
-      result.addBlock(br, bc, block);
-    }
-    return result;
+  /// Add a diagonal scalar * Identity block at (blockIdx, blockIdx)
+  void addDiagonalScalar(int blockIdx, Real scalar) {
+    addBlock(blockIdx, blockIdx, Block(scalar));  // glm::dmat3(scalar) = scalar * I
   }
 
   // --- Utility ---

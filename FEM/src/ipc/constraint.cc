@@ -1,28 +1,35 @@
 //
 // Created by creeper on 7/19/24.
 //
+
 #include <fem/ipc/barrier-functions.h>
 #include <fem/ipc/constraint.h>
 #include <fem/ipc/mollifier.h>
-#include <Maths/sparse-matrix-builder.h>
-#include <fem/types.h>
+#include <Maths/block-types.h>
+#include <glm/geometric.hpp>
 #include <fem/system.h>
 
 namespace sim::fem::ipc {
+using maths::assembleLocalGrad;
+using maths::assembleLocalHessian;
+
+// =========================================================================
+// VertexTriangleConstraint
+// =========================================================================
 
 void VertexTriangleConstraint::updateDistanceType() {
-  auto p = xv.segment<3>(iv * 3);
-  auto a = xt.segment<3>(triangle.x * 3);
-  auto b = xt.segment<3>(triangle.y * 3);
-  auto c = xt.segment<3>(triangle.z * 3);
+  auto p = x[globalVertex];
+  auto a = x[globalTriVerts[0]];
+  auto b = x[globalTriVerts[1]];
+  auto c = x[globalTriVerts[2]];
   type = decidePointTriangleDistanceType(p, a, b, c);
 }
 
 Real VertexTriangleConstraint::distanceSqr() const {
-  auto p = xv.segment<3>(iv * 3);
-  auto a = xt.segment<3>(triangle.x * 3);
-  auto b = xt.segment<3>(triangle.y * 3);
-  auto c = xt.segment<3>(triangle.z * 3);
+  auto p = x[globalVertex];
+  auto a = x[globalTriVerts[0]];
+  auto b = x[globalTriVerts[1]];
+  auto c = x[globalTriVerts[2]];
   switch (type) {
     case PointTriangleDistanceType::P_A:return distanceSqrPointPoint(p, a);
     case PointTriangleDistanceType::P_B:return distanceSqrPointPoint(p, b);
@@ -35,223 +42,152 @@ Real VertexTriangleConstraint::distanceSqr() const {
   }
 }
 
-void VertexTriangleConstraint::assembleBarrierGradient(const LogBarrier &barrier,
-                                                       VecXd &globalGradient,
-                                                       Real kappa) const {
-  auto p = xv.segment<3>(iv * 3);
-  int ia = triangle.x;
-  auto a = xt.segment<3>(ia * 3);
-  int ib = triangle.y;
-  auto b = xt.segment<3>(ib * 3);
-  int ic = triangle.z;
-  auto c = xt.segment<3>(ic * 3);
+void VertexTriangleConstraint::assembleBarrierGradient(
+    const LogBarrier &barrier,
+    maths::BlockVector<3> &globalGradient,
+    Real kappa) const {
   Real dist = distanceSqr();
   if (dist >= barrier.dHatSqr()) return;
-  Real barrier_derivative = barrier.distanceSqrGradient(dist);
+  Real scale = kappa * barrier.distanceSqrGradient(dist);
+  
   switch (type) {
     case PointTriangleDistanceType::P_A: {
-      Vector<Real, 6> grad = kappa * barrier_derivative * localDistanceSqrPointPointGradient(p, a);
-      globalGradient.segment<3>(iv * 3) += grad.segment<3>(0);
-      globalGradient.segment<3>(ia * 3) += grad.segment<3>(3);
+      auto grad = localDistanceSqrPointPointGradient(x[globalVertex], x[globalTriVerts[0]]);
+      std::array<int, 2> idx = {globalVertex, globalTriVerts[0]};
+      assembleLocalGrad<2>(globalGradient, idx, grad, scale);
       return;
     }
     case PointTriangleDistanceType::P_B: {
-      Vector<Real, 6> grad = kappa * barrier_derivative * localDistanceSqrPointPointGradient(p, b);
-      globalGradient.segment<3>(iv * 3) += grad.segment<3>(0);
-      globalGradient.segment<3>(ib * 3) += grad.segment<3>(3);
+      auto grad = localDistanceSqrPointPointGradient(x[globalVertex], x[globalTriVerts[1]]);
+      std::array<int, 2> idx = {globalVertex, globalTriVerts[1]};
+      assembleLocalGrad<2>(globalGradient, idx, grad, scale);
       return;
     }
     case PointTriangleDistanceType::P_C: {
-      Vector<Real, 6> grad = kappa * barrier_derivative * localDistanceSqrPointPointGradient(p, c);
-      globalGradient.segment<3>(iv * 3) += grad.segment<3>(0);
-      globalGradient.segment<3>(ic * 3) += grad.segment<3>(3);
+      auto grad = localDistanceSqrPointPointGradient(x[globalVertex], x[globalTriVerts[2]]);
+      std::array<int, 2> idx = {globalVertex, globalTriVerts[2]};
+      assembleLocalGrad<2>(globalGradient, idx, grad, scale);
       return;
     }
     case PointTriangleDistanceType::P_AB: {
-      Vector<Real, 9> grad = kappa * barrier_derivative * localDistanceSqrPointLineGradient(p, a, b);
-      globalGradient.segment<3>(iv * 3) += grad.segment<3>(0);
-      globalGradient.segment<3>(ia * 3) += grad.segment<3>(3);
-      globalGradient.segment<3>(ib * 3) += grad.segment<3>(6);
+      auto grad = localDistanceSqrPointLineGradient(x[globalVertex], x[globalTriVerts[0]], x[globalTriVerts[1]]);
+      std::array<int, 3> idx = {globalVertex, globalTriVerts[0], globalTriVerts[1]};
+      assembleLocalGrad<3>(globalGradient, idx, grad, scale);
       return;
     }
     case PointTriangleDistanceType::P_BC: {
-      Vector<Real, 9> grad = kappa * barrier_derivative * localDistanceSqrPointLineGradient(p, b, c);
-      globalGradient.segment<3>(iv * 3) += grad.segment<3>(0);
-      globalGradient.segment<3>(ib * 3) += grad.segment<3>(3);
-      globalGradient.segment<3>(ic * 3) += grad.segment<3>(6);
+      auto grad = localDistanceSqrPointLineGradient(x[globalVertex], x[globalTriVerts[1]], x[globalTriVerts[2]]);
+      std::array<int, 3> idx = {globalVertex, globalTriVerts[1], globalTriVerts[2]};
+      assembleLocalGrad<3>(globalGradient, idx, grad, scale);
       return;
     }
     case PointTriangleDistanceType::P_CA: {
-      Vector<Real, 9> grad = kappa * barrier_derivative * localDistanceSqrPointLineGradient(p, a, c);
-      globalGradient.segment<3>(iv * 3) += grad.segment<3>(0);
-      globalGradient.segment<3>(ia * 3) += grad.segment<3>(3);
-      globalGradient.segment<3>(ic * 3) += grad.segment<3>(6);
+      auto grad = localDistanceSqrPointLineGradient(x[globalVertex], x[globalTriVerts[2]], x[globalTriVerts[0]]);
+      std::array<int, 3> idx = {globalVertex, globalTriVerts[2], globalTriVerts[0]};
+      assembleLocalGrad<3>(globalGradient, idx, grad, scale);
       return;
     }
     case PointTriangleDistanceType::P_ABC: {
-      Vector<Real, 12> grad = kappa * barrier_derivative * localDistanceSqrPointPlaneGradient(p, a, b, c);
-      globalGradient.segment<3>(iv * 3) += grad.segment<3>(0);
-      globalGradient.segment<3>(ia * 3) += grad.segment<3>(3);
-      globalGradient.segment<3>(ib * 3) += grad.segment<3>(6);
-      globalGradient.segment<3>(ic * 3) += grad.segment<3>(9);
-      return;
-    }
-    default:throw std::runtime_error("Unknown distance type encountered when assembling edge-edge constraint gradient");
-  }
-}
-
-void VertexTriangleConstraint::assembleBarrierHessian(const LogBarrier &barrier,
-                                                     maths::SparseMatrixBuilder<Real> &globalHessian,
-                                                     Real kappa) const {
-  auto p = xv.segment<3>(iv * 3);
-  int ia = triangle.x;
-  auto a = xt.segment<3>(ia * 3);
-  int ib = triangle.y;
-  auto b = xt.segment<3>(ib * 3);
-  int ic = triangle.z;
-  auto c = xt.segment<3>(ic * 3);
-  Real dist = distanceSqr();
-  if (dist >= barrier.dHatSqr()) return;
-  Real barrier_derivative = barrier.distanceSqrGradient(dist);
-  Real barrier_hessian = barrier.distanceSqrHessian(dist);
-  switch (type) {
-    case PointTriangleDistanceType::P_A: {
-      auto local_dist_grad = localDistanceSqrPointPointGradient(p, a);
-      Matrix<Real, 6, 6> local_hessian =
-          kappa * barrier_derivative * localDistanceSqrPointPointHessian(p, a)
-              + kappa * barrier_hessian * local_dist_grad * local_dist_grad.transpose();
-      globalHessian.assembleBlock<6, 3>(local_hessian, iv, ia);
-      return;
-    }
-    case PointTriangleDistanceType::P_B: {
-      auto local_dist_grad = localDistanceSqrPointPointGradient(p, b);
-      Matrix<Real, 6, 6> local_hessian =
-          kappa * barrier_derivative * localDistanceSqrPointPointHessian(p, b)
-              + kappa * barrier_hessian * local_dist_grad * local_dist_grad.transpose();
-      globalHessian.assembleBlock<6, 3>(local_hessian, iv, ib);
-      return;
-    }
-    case PointTriangleDistanceType::P_C: {
-      auto local_dist_grad = localDistanceSqrPointPointGradient(p, c);
-      Matrix<Real, 6, 6> local_hessian =
-          kappa * barrier_derivative * localDistanceSqrPointPointHessian(p, c)
-              + kappa * barrier_hessian * local_dist_grad * local_dist_grad.transpose();
-      globalHessian.assembleBlock<6, 3>(local_hessian, iv, ic);
-      return;
-    }
-    case PointTriangleDistanceType::P_AB: {
-      auto local_dist_grad = localDistanceSqrPointLineGradient(p, a, b);
-      Matrix<Real, 9, 9> local_hessian =
-          kappa * barrier_derivative * localDistanceSqrPointLineHessian(p, a, b)
-              + kappa * barrier_hessian * local_dist_grad * local_dist_grad.transpose();
-      globalHessian.assembleBlock<9, 3>(local_hessian, iv, ia, ib);
-      return;
-    }
-    case PointTriangleDistanceType::P_BC: {
-      auto local_dist_grad = localDistanceSqrPointLineGradient(p, b, c);
-      Matrix<Real, 9, 9> local_hessian =
-          kappa * barrier_derivative * localDistanceSqrPointLineHessian(p, b, c)
-              + kappa * barrier_hessian * local_dist_grad * local_dist_grad.transpose();
-      globalHessian.assembleBlock<9, 3>(local_hessian, iv, ib, ic);
-      return;
-    }
-    case PointTriangleDistanceType::P_CA: {
-      auto local_dist_grad = localDistanceSqrPointLineGradient(p, a, c);
-      Matrix<Real, 9, 9> local_hessian =
-          kappa * barrier_derivative * localDistanceSqrPointLineHessian(p, a, c)
-              + kappa * barrier_hessian * local_dist_grad * local_dist_grad.transpose();
-      globalHessian.assembleBlock<9, 3>(local_hessian, iv, ia, ic);
-      return;
-    }
-    case PointTriangleDistanceType::P_ABC: {
-      auto local_dist_grad = localDistanceSqrPointPlaneGradient(p, a, b, c);
-      Matrix<Real, 12, 12> local_hessian =
-          kappa * barrier_derivative * localDistanceSqrPointPlaneHessian(p, a, b, c)
-              + kappa * barrier_hessian * local_dist_grad * local_dist_grad.transpose();
-      globalHessian.assembleBlock<12, 3>(local_hessian, iv, ia, ib, ic);
+      auto grad = localDistanceSqrPointPlaneGradient(x[globalVertex], x[globalTriVerts[0]], x[globalTriVerts[1]], x[globalTriVerts[2]]);
+      std::array<int, 4> idx = {globalVertex, globalTriVerts[0], globalTriVerts[1], globalTriVerts[2]};
+      assembleLocalGrad<4>(globalGradient, idx, grad, scale);
       return;
     }
     default:
-      throw std::runtime_error("Unknown distance type encountered when assembling vertex-triangle constraint hessian");
+      throw std::runtime_error("Unknown distance type in VT constraint gradient");
   }
 }
 
-Vector<Real, 12> VertexTriangleConstraint::localBarrierGradient(const LogBarrier& barrier, Real kappa) const {
-  Vector<Real, 12> grad = Vector<Real, 12>::Zero();
-  auto p = xv.segment<3>(iv * 3);
-  int ia = triangle.x;
-  auto a = xt.segment<3>(ia * 3);
-  int ib = triangle.y;
-  auto b = xt.segment<3>(ib * 3);
-  int ic = triangle.z;
-  auto c = xt.segment<3>(ic * 3);
+void VertexTriangleConstraint::assembleBarrierHessian(
+    const LogBarrier &barrier,
+    maths::BlockSparseMatrix<3> &globalHessian,
+    Real kappa) const {
+  auto p = x[globalVertex];
+  auto a = x[globalTriVerts[0]];
+  auto b = x[globalTriVerts[1]];
+  auto c = x[globalTriVerts[2]];
+  Real dist = distanceSqr();
+  if (dist >= barrier.dHatSqr()) return;
+  Real bGrad = barrier.distanceSqrGradient(dist);
+  Real bHess = barrier.distanceSqrHessian(dist);
+  
   switch (type) {
     case PointTriangleDistanceType::P_A: {
-      grad.segment<3>(0) = localDistanceSqrPointPointGradient(p, a).segment<3>(0);
-      grad.segment<3>(3) = localDistanceSqrPointPointGradient(p, a).segment<3>(3);
-      break;
+      auto grad = localDistanceSqrPointPointGradient(p, a);
+      auto hess = localDistanceSqrPointPointHessian(p, a);
+      std::array<int, 2> idx = {globalVertex, globalTriVerts[0]};
+      assembleLocalHessian<2>(globalHessian, idx, hess, grad, bGrad, bHess, kappa);
+      return;
     }
     case PointTriangleDistanceType::P_B: {
-      grad.segment<3>(0) = localDistanceSqrPointPointGradient(p, b).segment<3>(0);
-      grad.segment<3>(6) = localDistanceSqrPointPointGradient(p, b).segment<3>(3);
-      break;
+      auto grad = localDistanceSqrPointPointGradient(p, b);
+      auto hess = localDistanceSqrPointPointHessian(p, b);
+      std::array<int, 2> idx = {globalVertex, globalTriVerts[1]};
+      assembleLocalHessian<2>(globalHessian, idx, hess, grad, bGrad, bHess, kappa);
+      return;
     }
     case PointTriangleDistanceType::P_C: {
-      grad.segment<3>(0) = localDistanceSqrPointPointGradient(p, c).segment<3>(0);
-      grad.segment<3>(9) = localDistanceSqrPointPointGradient(p, c).segment<3>(3);
-      break;
+      auto grad = localDistanceSqrPointPointGradient(p, c);
+      auto hess = localDistanceSqrPointPointHessian(p, c);
+      std::array<int, 2> idx = {globalVertex, globalTriVerts[2]};
+      assembleLocalHessian<2>(globalHessian, idx, hess, grad, bGrad, bHess, kappa);
+      return;
     }
     case PointTriangleDistanceType::P_AB: {
-      grad.segment<3>(0) = localDistanceSqrPointLineGradient(p, a, b).segment<3>(0);
-      grad.segment<3>(3) = localDistanceSqrPointLineGradient(p, a, b).segment<3>(3);
-      grad.segment<3>(6) = localDistanceSqrPointLineGradient(p, a, b).segment<3>(6);
-      break;
+      auto grad = localDistanceSqrPointLineGradient(p, a, b);
+      auto hess = localDistanceSqrPointLineHessian(p, a, b);
+      std::array<int, 3> idx = {globalVertex, globalTriVerts[0], globalTriVerts[1]};
+      assembleLocalHessian<3>(globalHessian, idx, hess, grad, bGrad, bHess, kappa);
+      return;
     }
     case PointTriangleDistanceType::P_BC: {
-      grad.segment<3>(0) = localDistanceSqrPointLineGradient(p, b, c).segment<3>(0);
-      grad.segment<3>(6) = localDistanceSqrPointLineGradient(p, b, c).segment<3>(3);
-      grad.segment<3>(9) = localDistanceSqrPointLineGradient(p, b, c).segment<3>(6);
-      break;
+      auto grad = localDistanceSqrPointLineGradient(p, b, c);
+      auto hess = localDistanceSqrPointLineHessian(p, b, c);
+      std::array<int, 3> idx = {globalVertex, globalTriVerts[1], globalTriVerts[2]};
+      assembleLocalHessian<3>(globalHessian, idx, hess, grad, bGrad, bHess, kappa);
+      return;
     }
     case PointTriangleDistanceType::P_CA: {
-      grad.segment<3>(0) = localDistanceSqrPointLineGradient(p, a, c).segment<3>(0);
-      grad.segment<3>(3) = localDistanceSqrPointLineGradient(p, a, c).segment<3>(3);
-      grad.segment<3>(9) = localDistanceSqrPointLineGradient(p, a, c).segment<3>(6);
-      break;
+      auto grad = localDistanceSqrPointLineGradient(p, c, a);
+      auto hess = localDistanceSqrPointLineHessian(p, c, a);
+      std::array<int, 3> idx = {globalVertex, globalTriVerts[2], globalTriVerts[0]};
+      assembleLocalHessian<3>(globalHessian, idx, hess, grad, bGrad, bHess, kappa);
+      return;
     }
     case PointTriangleDistanceType::P_ABC: {
-      grad.segment<3>(0) = localDistanceSqrPointPlaneGradient(p, a, b, c).segment<3>(0);
-      grad.segment<3>(3) = localDistanceSqrPointPlaneGradient(p, a, b, c).segment<3>(3);
-      grad.segment<3>(6) = localDistanceSqrPointPlaneGradient(p, a, b, c).segment<3>(6);
-      grad.segment<3>(9) = localDistanceSqrPointPlaneGradient(p, a, b, c).segment<3>(9);
-      break;
+      auto grad = localDistanceSqrPointPlaneGradient(p, a, b, c);
+      auto hess = localDistanceSqrPointPlaneHessian(p, a, b, c);
+      std::array<int, 4> idx = {globalVertex, globalTriVerts[0], globalTriVerts[1], globalTriVerts[2]};
+      assembleLocalHessian<4>(globalHessian, idx, hess, grad, bGrad, bHess, kappa);
+      return;
     }
     default:
-      throw std::runtime_error("Unknown distance type encountered when computing vertex-triangle constraint gradient");
+      throw std::runtime_error("Unknown distance type in VT constraint hessian");
   }
-  if (distanceSqr() >= barrier.dHatSqr()) return Vector<Real, 12>::Zero();
-  Real barrier_derivative = barrier.distanceSqrGradient(distanceSqr());
-  return kappa * barrier_derivative * grad;
 }
+
+// =========================================================================
+// EdgeEdgeConstraint
+// =========================================================================
 
 void EdgeEdgeConstraint::updateDistanceType() {
   constexpr double PARALLEL_THRESHOLD = 1.0e-20;
-  auto ea0 = xa.segment<3>(ea.x * 3);
-  auto ea1 = xa.segment<3>(ea.y * 3);
-  auto eb0 = xb.segment<3>(eb.x * 3);
-  auto eb1 = xb.segment<3>(eb.y * 3);
-  const Eigen::Vector3d u = ea1 - ea0;
-  const Eigen::Vector3d v = eb1 - eb0;
-  const Eigen::Vector3d w = ea0 - eb0;
-
-  Real a = u.squaredNorm(); // always ≥ 0
-  Real b = u.dot(v);
-  Real c = v.squaredNorm(); // always ≥ 0
-  Real d = u.dot(w);
-  Real e = v.dot(w);
-  Real D = a * c - b * b; // always ≥ 0
-
-  // Degenerate cases should not happen in practice, but we handle them
+  auto ea0 = x[globalEdgeA[0]];
+  auto ea1 = x[globalEdgeA[1]];
+  auto eb0 = x[globalEdgeB[0]];
+  auto eb1 = x[globalEdgeB[1]];
+  
+  const glm::dvec3 u = ea1 - ea0;
+  const glm::dvec3 v = eb1 - eb0;
+  const glm::dvec3 w = ea0 - eb0;
+  
+  Real a = glm::dot(u, u);
+  Real b = glm::dot(u, v);
+  Real c = glm::dot(v, v);
+  Real d = glm::dot(u, w);
+  Real e = glm::dot(v, w);
+  Real D = a * c - b * b;
+  
   if (a == 0.0 && c == 0.0) {
     type = EdgeEdgeDistanceType::A_C;
     return;
@@ -262,32 +198,30 @@ void EdgeEdgeConstraint::updateDistanceType() {
     type = EdgeEdgeDistanceType::AB_C;
     return;
   }
-
-  // Special handling for parallel edges
+  
   Real parallel_tolerance = PARALLEL_THRESHOLD * std::max(1.0, a * c);
-  if (u.cross(v).squaredNorm() < parallel_tolerance) {
+  if (glm::dot(glm::cross(u, v), glm::cross(u, v)) < parallel_tolerance) {
     type = decideEdgeEdgeParallelDistanceType(ea0, ea1, eb0, eb1);
+    return;
   }
-
+  
   EdgeEdgeDistanceType default_case = EdgeEdgeDistanceType::AB_CD;
-
-  // compute the line parameters of the two closest points
+  
   Real sN = (b * e - c * d);
-  double tN, tD;   // tc = tN / tD
-  if (sN <= 0.0) { // sc < 0 ⟹ the s=0 edge is visible
+  double tN, tD;
+  if (sN <= 0.0) {
     tN = e;
     tD = c;
     default_case = EdgeEdgeDistanceType::A_CD;
-  } else if (sN >= D) { // sc > 1 ⟹ the s=1 edge is visible
+  } else if (sN >= D) {
     tN = e + b;
     tD = c;
     default_case = EdgeEdgeDistanceType::B_CD;
   } else {
     tN = (a * e - b * d);
-    tD = D; // default tD = D ≥ 0
-    if (tN > 0.0 && tN < tD
-        && u.cross(v).squaredNorm() < parallel_tolerance) {
-      // avoid coplanar or nearly parallel EE
+    tD = D;
+    if (tN > 0.0 && tN < tD &&
+        glm::dot(glm::cross(u, v), glm::cross(u, v)) < parallel_tolerance) {
       if (sN < D / 2) {
         tN = e;
         tD = c;
@@ -298,11 +232,9 @@ void EdgeEdgeConstraint::updateDistanceType() {
         default_case = EdgeEdgeDistanceType::B_CD;
       }
     }
-    // else default_case stays EdgeEdgeDistanceType::EA_EB
   }
-
-  if (tN <= 0.0) { // tc < 0 ⟹ the t=0 edge is visible
-    // recompute sc for this edge
+  
+  if (tN <= 0.0) {
     if (-d <= 0.0) {
       type = EdgeEdgeDistanceType::A_C;
     } else if (-d >= a) {
@@ -310,8 +242,7 @@ void EdgeEdgeConstraint::updateDistanceType() {
     } else {
       type = EdgeEdgeDistanceType::AB_C;
     }
-  } else if (tN >= tD) { // tc > 1 ⟹ the t=1 edge is visible
-    // recompute sc for this edge
+  } else if (tN >= tD) {
     if ((-d + b) <= 0.0) {
       type = EdgeEdgeDistanceType::A_D;
     } else if ((-d + b) >= a) {
@@ -325,10 +256,10 @@ void EdgeEdgeConstraint::updateDistanceType() {
 }
 
 Real EdgeEdgeConstraint::distanceSqr() const {
-  auto A = xa.segment<3>(ea.x * 3);
-  auto B = xa.segment<3>(ea.y * 3);
-  auto C = xb.segment<3>(eb.x * 3);
-  auto D = xb.segment<3>(eb.y * 3);
+  auto A = x[globalEdgeA[0]];
+  auto B = x[globalEdgeA[1]];
+  auto C = x[globalEdgeB[0]];
+  auto D = x[globalEdgeB[1]];
   switch (type) {
     case EdgeEdgeDistanceType::A_C:return distanceSqrPointPoint(A, C);
     case EdgeEdgeDistanceType::A_D:return distanceSqrPointPoint(A, D);
@@ -339,48 +270,25 @@ Real EdgeEdgeConstraint::distanceSqr() const {
     case EdgeEdgeDistanceType::A_CD:return distanceSqrPointLine(A, C, D);
     case EdgeEdgeDistanceType::B_CD:return distanceSqrPointLine(B, C, D);
     case EdgeEdgeDistanceType::AB_CD:return distanceSqrLineLine(A, B, C, D);
-    default:throw std::runtime_error("Unknown distance type encountered when computing edge-edge distance");
+    default:throw std::runtime_error("Unknown distance type in EE constraint");
   }
 }
 
-void EdgeEdgeConstraint::assembleMollifiedBarrierGradient(const LogBarrier &barrier,
-                                                          VecXd &globalGradient,
-                                                          Real kappa) const {
-  int iA = ea.x;
-  int iB = ea.y;
-  int iC = eb.x;
-  int iD = eb.y;
-  Real dist = distanceSqr();
-  if (dist >= barrier.dHatSqr()) return;
-  auto localGradient = mollifiedBarrierGradient(barrier);
-  globalGradient.segment<3>(iA * 3) += kappa * localGradient.segment<3>(0);
-  globalGradient.segment<3>(iB * 3) += kappa * localGradient.segment<3>(3);
-  globalGradient.segment<3>(iC * 3) += kappa * localGradient.segment<3>(6);
-  globalGradient.segment<3>(iD * 3) += kappa * localGradient.segment<3>(9);
-}
-
-void EdgeEdgeConstraint::assembleMollifiedBarrierHessian(const LogBarrier &barrier,
-                                                         maths::SparseMatrixBuilder<Real> &globalHessian,
-                                                         Real kappa) const {
-  int iA = ea.x;
-  int iB = ea.y;
-  int iC = eb.x;
-  int iD = eb.y;
-  Real dist = distanceSqr();
-  if (dist >= barrier.dHatSqr()) return;
-  auto localHessian = mollifiedBarrierHessian(barrier);
-  globalHessian.assembleBlock<12, 3>(kappa * localHessian, iA, iB, iC, iD);
-}
-
 Real EdgeEdgeConstraint::epsCross() const {
-  return 1e-3 * (Xa.segment<3>(ea.y * 3) - Xa.segment<3>(ea.x * 3)).squaredNorm()
-      * (Xb.segment<3>(eb.y * 3) - Xb.segment<3>(eb.x * 3)).squaredNorm();
+  glm::dvec3 ea0 = X[globalEdgeA[0]];
+  glm::dvec3 ea1 = X[globalEdgeA[1]];
+  glm::dvec3 eb0 = X[globalEdgeB[0]];
+  glm::dvec3 eb1 = X[globalEdgeB[1]];
+  return 1e-3 * glm::dot(ea1 - ea0, ea1 - ea0) * glm::dot(eb1 - eb0, eb1 - eb0);
 }
 
 Real EdgeEdgeConstraint::crossSquaredNorm() const {
-  return (xa.segment<3>(ea.y * 3) - xa.segment<3>(ea.x * 3))
-      .cross(xb.segment<3>(eb.y * 3) - xb.segment<3>(eb.x * 3))
-      .squaredNorm();
+  glm::dvec3 ea0 = x[globalEdgeA[0]];
+  glm::dvec3 ea1 = x[globalEdgeA[1]];
+  glm::dvec3 eb0 = x[globalEdgeB[0]];
+  glm::dvec3 eb1 = x[globalEdgeB[1]];
+  glm::dvec3 cross = glm::cross(ea1 - ea0, eb1 - eb0);
+  return glm::dot(cross, cross);
 }
 
 Real EdgeEdgeConstraint::mollifier() const {
@@ -389,82 +297,132 @@ Real EdgeEdgeConstraint::mollifier() const {
   return mollifier(c, e_x);
 }
 
-Vector<Real, 12> EdgeEdgeConstraint::mollifierGradient() const {
-  Real e_x = 1e-3 * epsCross();
-  Real c = crossSquaredNorm();
-  if (c < e_x) return Vector<Real, 12>::Zero();
-  Real p_m_p_c = mollifierDerivative(c, e_x);
-  auto p_c_p_x = crossedNormGradient();
-  return p_m_p_c * p_c_p_x;
-}
-
-Matrix<Real, 12, 12> EdgeEdgeConstraint::mollifierHessian() const {
-  Real e_x = epsCross();
-  Real c = crossSquaredNorm();
-  if (c < e_x) return Matrix<Real, 12, 12>::Zero();
-  Real p_m_p_c = mollifierDerivative(c, e_x);
-  Vector<Real, 12> p_c_p_x = crossedNormGradient();
-  Matrix<Real, 12, 12> p2_c_p_x2 = crossedNormHessian();
-  Real p2_m_p_c2 = mollifierSecondDerivative(c, e_x);
-  return p2_m_p_c2 * p_c_p_x * p_c_p_x.transpose() + p_m_p_c * p2_c_p_x2;
-}
-
-Vector<Real, 12> EdgeEdgeConstraint::crossedNormGradient() const {
-  const auto &ea0 = xa.segment<3>(ea.x * 3);
-  const auto &ea1 = xa.segment<3>(ea.y * 3);
-  const auto &eb0 = xb.segment<3>(eb.x * 3);
-  const auto &eb1 = xb.segment<3>(eb.y * 3);
+LocalGrad<4> EdgeEdgeConstraint::crossedNormGradient() const {
+  auto ea0 = x[globalEdgeA[0]];
+  auto ea1 = x[globalEdgeA[1]];
+  auto eb0 = x[globalEdgeB[0]];
+  auto eb1 = x[globalEdgeB[1]];
   return edgeEdgeCrossSquareNormGradient(ea0, ea1, eb0, eb1);
 }
 
-Matrix<Real, 12, 12> EdgeEdgeConstraint::crossedNormHessian() const {
-  const auto &ea0 = xa.segment<3>(ea.x * 3);
-  const auto &ea1 = xa.segment<3>(ea.y * 3);
-  const auto &eb0 = xb.segment<3>(eb.x * 3);
-  const auto &eb1 = xb.segment<3>(eb.y * 3);
+LocalHessian<4> EdgeEdgeConstraint::crossedNormHessian() const {
+  auto ea0 = x[globalEdgeA[0]];
+  auto ea1 = x[globalEdgeA[1]];
+  auto eb0 = x[globalEdgeB[0]];
+  auto eb1 = x[globalEdgeB[1]];
   return edgeEdgeCrossSquaredNormHessian(ea0, ea1, eb0, eb1);
 }
 
-Vector<Real, 12> EdgeEdgeConstraint::mollifiedBarrierGradient(const LogBarrier &barrier) const {
+LocalGrad<4> EdgeEdgeConstraint::mollifierGradient() const {
+  Real e_x = 1e-3 * epsCross();
+  Real c = crossSquaredNorm();
+  if (c >= e_x) return {};  // zero-initialized
+  Real p_m_p_c = mollifierDerivative(c, e_x);
+  auto p_c_p_x = crossedNormGradient();
+  // p_m_p_x = p_m_p_c * p_c_p_x
+  LocalGrad<4> result{};
+  for (int i = 0; i < 4; i++)
+    result[i] = p_m_p_c * p_c_p_x[i];
+  return result;
+}
+
+LocalHessian<4> EdgeEdgeConstraint::mollifierHessian() const {
+  Real e_x = epsCross();
+  Real c = crossSquaredNorm();
+  if (c >= e_x) return {};  // zero-initialized
+  Real p_m_p_c = mollifierDerivative(c, e_x);
+  LocalGrad<4> p_c_p_x = crossedNormGradient();
+  LocalHessian<4> p2_c_p_x2 = crossedNormHessian();
+  Real p2_m_p_c2 = mollifierSecondDerivative(c, e_x);
+  // H = p2_m_p_c2 * outer(p_c_p_x) + p_m_p_c * p2_c_p_x2
+  LocalHessian<4> result{};
+  for (int i = 0; i < 4; i++) {
+    for (int j = 0; j < 4; j++) {
+      glm::dmat3 outer = glm::outerProduct(p_c_p_x[i], p_c_p_x[j]);
+      result[i][j] = p2_m_p_c2 * outer + p_m_p_c * p2_c_p_x2[i][j];
+    }
+  }
+  return result;
+}
+
+LocalGrad<4> EdgeEdgeConstraint::mollifiedBarrierGradient(const LogBarrier &barrier) const {
   Real c = crossSquaredNorm();
   Real e_x = epsCross();
   Real dist = distanceSqr();
   Real b = barrier(dist);
   Real p_b_p_d = barrier.distanceSqrGradient(dist);
-  Vector<Real, 12> p_b_p_x = p_b_p_d * localDistanceSqrEdgeEdgeGradient(
-      xa.segment<3>(ea.x * 3),
-      xa.segment<3>(ea.y * 3),
-      xb.segment<3>(eb.x * 3),
-      xb.segment<3>(eb.y * 3));
-  if (c > e_x) return p_b_p_x;
+  LocalGrad<4> p_d_p_x = localDistanceSqrEdgeEdgeGradient(
+      x[globalEdgeA[0]], x[globalEdgeA[1]],
+      x[globalEdgeB[0]], x[globalEdgeB[1]]);
+  if (c > e_x) return p_b_p_d * p_d_p_x;
   Real m = mollifier();
-  Vector<Real, 12> p_m_p_x = mollifierGradient();
-  return m * p_b_p_x + b * p_m_p_x;
+  LocalGrad<4> p_m_p_x = mollifierGradient();
+  LocalGrad<4> result{};
+  for (int i = 0; i < 4; i++)
+    result[i] = m * p_b_p_d * p_d_p_x[i] + b * p_m_p_x[i];
+  return result;
 }
 
-Matrix<Real, 12, 12> EdgeEdgeConstraint::mollifiedBarrierHessian(const LogBarrier &barrier) const {
+LocalHessian<4> EdgeEdgeConstraint::mollifiedBarrierHessian(const LogBarrier &barrier) const {
   Real c = crossSquaredNorm();
   Real e_x = epsCross();
   Real dist = distanceSqr();
   Real b = barrier(dist);
   Real p_b_p_d = barrier.distanceSqrGradient(dist);
   Real p2_b_p_d2 = barrier.distanceSqrHessian(dist);
-  Vector<Real, 12> p_d_p_x = localDistanceSqrEdgeEdgeGradient(
-      xa.segment<3>(ea.x * 3),
-      xa.segment<3>(ea.y * 3),
-      xb.segment<3>(eb.x * 3),
-      xb.segment<3>(eb.y * 3));
-  Vector<Real, 12> p_b_p_x = p_b_p_d * p_d_p_x;
-  Matrix<Real, 12, 12> p2_b_p_x2 = p_b_p_d * localDistanceSqrEdgeEdgeHessian(
-      xa.segment<3>(ea.x * 3),
-      xa.segment<3>(ea.y * 3),
-      xb.segment<3>(eb.x * 3),
-      xb.segment<3>(eb.y * 3)) + p2_b_p_d2 * p_d_p_x * p_d_p_x.transpose();
+  LocalGrad<4> p_d_p_x = localDistanceSqrEdgeEdgeGradient(
+      x[globalEdgeA[0]], x[globalEdgeA[1]],
+      x[globalEdgeB[0]], x[globalEdgeB[1]]);
+  LocalGrad<4> p_b_p_x = p_b_p_d * p_d_p_x;
+  LocalHessian<4> p2_b_p_x2 = p_b_p_d * localDistanceSqrEdgeEdgeHessian(
+      x[globalEdgeA[0]], x[globalEdgeA[1]],
+      x[globalEdgeB[0]], x[globalEdgeB[1]])
+      + p2_b_p_d2 * outerProductMatrix(p_d_p_x);
   if (c > e_x) return p2_b_p_x2;
   Real m = mollifier();
-  Vector<Real, 12> p_m_p_x = mollifierGradient();
-  Matrix<Real, 12, 12> p2_m_p_x2 = mollifierHessian();
-  return m * p2_b_p_x2 + p_b_p_x * p_m_p_x.transpose() + p_m_p_x * p_b_p_x.transpose() + b * p2_m_p_x2;
+  LocalGrad<4> p_m_p_x = mollifierGradient();
+  LocalHessian<4> p2_m_p_x2 = mollifierHessian();
+  LocalHessian<4> result{};
+  for (int i = 0; i < 4; i++) {
+    for (int j = 0; j < 4; j++) {
+      // m * p2_b_p_x2 + (b * p2_m_p_x2 + outer(p_b_p_x, p_m_p_x) + outer(p_m_p_x, p_b_p_x))
+      result[i][j] = m * p2_b_p_x2[i][j]
+                    + glm::outerProduct(p_b_p_x[i], p_m_p_x[j])
+                    + glm::outerProduct(p_m_p_x[i], p_b_p_x[j])
+                    + b * p2_m_p_x2[i][j];
+    }
+  }
+  return result;
 }
 
-}// namespace fem::ipc
+void EdgeEdgeConstraint::assembleMollifiedBarrierGradient(
+    const LogBarrier &barrier,
+    maths::BlockVector<3> &globalGradient,
+    Real kappa) const {
+  Real dist = distanceSqr();
+  if (dist >= barrier.dHatSqr()) return;
+  auto localGrad = kappa * mollifiedBarrierGradient(barrier);
+  std::array<int, 4> idx = {
+      globalEdgeA[0], globalEdgeA[1],
+      globalEdgeB[0], globalEdgeB[1]
+  };
+  assembleLocalGrad<4>(globalGradient, idx, localGrad, 1.0);
+}
+
+void EdgeEdgeConstraint::assembleMollifiedBarrierHessian(
+    const LogBarrier &barrier,
+    maths::BlockSparseMatrix<3> &globalHessian,
+    Real kappa) const {
+  Real dist = distanceSqr();
+  if (dist >= barrier.dHatSqr()) return;
+  auto localHess = mollifiedBarrierHessian(barrier);
+  std::array<int, 4> idx = {
+      globalEdgeA[0], globalEdgeA[1],
+      globalEdgeB[0], globalEdgeB[1]
+  };
+  // mollifiedBarrierHessian 已包含完整的 mollified barrier hessian 公式
+  // 直接使用简单重载组装，避免 barrier formula 被应用两次
+  assembleLocalHessian<4>(globalHessian, idx, localHess, kappa);
+}
+
+} // namespace fem::ipc

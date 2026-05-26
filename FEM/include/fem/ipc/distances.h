@@ -5,111 +5,151 @@
 #ifndef SIMCRAFT_FEM_INCLUDE_FEM_IPC_DISTANCES_H_
 #define SIMCRAFT_FEM_INCLUDE_FEM_IPC_DISTANCES_H_
 #include <cstdint>
-#include <fem/ipc/external/distances.h>
 #include <fem/types.h>
+#include <fem/ipc/external/distances.h>
+#include <Maths/block-types.h>
+#include <glm/glm.hpp>
+#include <glm/geometric.hpp>
+
 namespace sim::fem::ipc {
-inline Real distanceSqrPointPoint(const Vector<Real, 3> &p1,
-                                  const Vector<Real, 3> &p2) {
-  return (p1 - p2).squaredNorm();
-}
-inline Vector<Real, 6>
-localDistanceSqrPointPointGradient(const Vector<Real, 3> &p1,
-                                   const Vector<Real, 3> &p2) {
-  Vector<Real, 6> localGrad;
-  localGrad.segment<3>(0) = 2 * (p1 - p2);
-  localGrad.segment<3>(3) = -localGrad.segment<3>(0);
-  return localGrad;
-}
-inline Matrix<Real, 6, 6>
-localDistanceSqrPointPointHessian(const Vector<Real, 3> &p1,
-                                  const Vector<Real, 3> &p2) {
-  Matrix<Real, 6, 6> localHessian;
-  localHessian.block<3, 3>(0, 0) = 2 * Matrix<Real, 3, 3>::Identity();
-  localHessian.block<3, 3>(3, 3) = 2 * Matrix<Real, 3, 3>::Identity();
-  localHessian.block<3, 3>(0, 3) = -localHessian.block<3, 3>(0, 0);
-  localHessian.block<3, 3>(3, 0) = -localHessian.block<3, 3>(3, 3);
-  return localHessian;
-}
-inline Real distanceSqrPointLine(const Vector<Real, 3> &p,
-                                 const Vector<Real, 3> &l1,
-                                 const Vector<Real, 3> &l2) {
-  assert((l2 - l1).norm() != 0.0);
-  return ((l2 - l1).cross(p - l1)).squaredNorm() / (l2 - l1).squaredNorm();
-}
-inline Vector<Real, 9>
-localDistanceSqrPointLineGradient(const Vector<Real, 3> &p,
-                                  const Vector<Real, 3> &l1,
-                                  const Vector<Real, 3> &l2) {
-  Vector<Real, 9> localGrad;
-  autogen::point_line_distance_gradient_3D(p(0), p(1), p(2), l1(0), l1(1),
-                                           l1(2), l2(0), l2(1), l2(2),
-                                           localGrad.data());
-  return localGrad;
-}
-inline Matrix<Real, 9, 9>
-localDistanceSqrPointLineHessian(const Vector<Real, 3> &p,
-                                 const Vector<Real, 3> &l1,
-                                 const Vector<Real, 3> &l2) {
-  Matrix<Real, 9, 9> localHessian;
-  autogen::point_line_distance_hessian_3D(p(0), p(1), p(2), l1(0), l1(1), l1(2),
-                                          l2(0), l2(1), l2(2),
-                                          localHessian.data());
-  return localHessian;
+
+using maths::LocalGrad;
+using maths::LocalHessian;
+using maths::localGradFromFlat;
+using maths::localHessianFromFlat;
+
+// ============================================================================
+// 距离函数（标量返回值）— glm::dvec3 接口
+// ============================================================================
+
+inline Real distanceSqrPointPoint(const glm::dvec3 &p1,
+                                  const glm::dvec3 &p2) {
+  auto d = p1 - p2;
+  return glm::dot(d, d);
 }
 
-inline Real distanceSqrPointPlane(const Vector<Real, 3> &p,
-                                  const Vector<Real, 3> &p1,
-                                  const Vector<Real, 3> &p2,
-                                  const Vector<Real, 3> &p3) {
-  assert((p2 - p1).cross(p3 - p1).squaredNorm() != 0.0);
-  auto normal = (p2 - p1).cross(p3 - p1);
-  return (p - p1).dot(normal) * (p - p1).dot(normal) / normal.squaredNorm();
+inline Real distanceSqrPointLine(const glm::dvec3 &p,
+                                 const glm::dvec3 &l1,
+                                 const glm::dvec3 &l2) {
+  auto e = l2 - l1;
+  Real e_len2 = glm::dot(e, e);
+  assert(e_len2 != 0.0);
+  auto c = glm::cross(e, p - l1);
+  return glm::dot(c, c) / e_len2;
 }
-inline Vector<Real, 12> localDistanceSqrPointPlaneGradient(
-    const Vector<Real, 3> &p, const Vector<Real, 3> &p1,
-    const Vector<Real, 3> &p2, const Vector<Real, 3> &p3) {
-  Vector<Real, 12> local_grad;
-  autogen::point_plane_distance_gradient(p(0), p(1), p(2), p1(0), p1(1), p1(2),
-                                         p2(0), p2(1), p2(2), p3(0), p3(1),
-                                         p3(2), local_grad.data());
-  return local_grad;
+
+inline Real distanceSqrPointPlane(const glm::dvec3 &p,
+                                  const glm::dvec3 &p1,
+                                  const glm::dvec3 &p2,
+                                  const glm::dvec3 &p3) {
+  auto normal = glm::cross(p2 - p1, p3 - p1);
+  Real n_len2 = glm::dot(normal, normal);
+  assert(n_len2 != 0.0);
+  Real d = glm::dot(p - p1, normal);
+  return d * d / n_len2;
 }
-inline Matrix<Real, 12, 12> localDistanceSqrPointPlaneHessian(
-    const Vector<Real, 3> &p, const Vector<Real, 3> &p1,
-    const Vector<Real, 3> &p2, const Vector<Real, 3> &p3) {
-  Matrix<Real, 12, 12> local_hessian;
-  autogen::point_plane_distance_hessian(p(0), p(1), p(2), p1(0), p1(1), p1(2),
-                                        p2(0), p2(1), p2(2), p3(0), p3(1),
-                                        p3(2), local_hessian.data());
-  return local_hessian;
-}
-inline Real distanceSqrLineLine(const Vector<Real, 3> &l1,
-                                const Vector<Real, 3> &l2,
-                                const Vector<Real, 3> &m1,
-                                const Vector<Real, 3> &m2) {
-  Vector<Real, 3> normal = (l2 - l1).cross(m2 - m1);
-  if (normal.norm() == 0.0)
+
+inline Real distanceSqrLineLine(const glm::dvec3 &l1,
+                                const glm::dvec3 &l2,
+                                const glm::dvec3 &m1,
+                                const glm::dvec3 &m2) {
+  auto normal = glm::cross(l2 - l1, m2 - m1);
+  Real n_len2 = glm::dot(normal, normal);
+  if (n_len2 == 0.0)
     return distanceSqrPointLine(l1, m1, m2);
-  Real line_to_line = (l1 - m1).dot(normal) * (l1 - m1).dot(normal);
-  return line_to_line / normal.squaredNorm();
+  Real line_to_line = glm::dot(l1 - m1, normal);
+  line_to_line *= line_to_line;
+  return line_to_line / n_len2;
 }
-inline Vector<Real, 12> localDistanceSqrLineLineGradient(
-    const Vector<Real, 3> &l1, const Vector<Real, 3> &l2,
-    const Vector<Real, 3> &m1, const Vector<Real, 3> &m2) {
-  Vector<Real, 12> local_grad;
-  autogen::line_line_distance_gradient(l1(0), l1(1), l1(2), l2(0), l2(1), l2(2),
-                                       m1(0), m1(1), m1(2), m2(0), m2(1), m2(2),
-                                       local_grad.data());
-  return local_grad;
+
+// ============================================================================
+// 梯度函数 — 返回 LocalGrad<N>
+// ============================================================================
+
+/// Point-Point (2 vertices): grad = [2(p1-p2), -2(p1-p2)]
+inline LocalGrad<2> localDistanceSqrPointPointGradient(
+    const glm::dvec3 &p1, const glm::dvec3 &p2) {
+  auto d = 2.0 * (p1 - p2);
+  return LocalGrad<2>({d, -d});
 }
-inline Matrix<Real, 12, 12> localDistanceSqrLineLineHessian(
-    const Vector<Real, 3> &l1, const Vector<Real, 3> &l2,
-    const Vector<Real, 3> &m1, const Vector<Real, 3> &m2) {
-  Matrix<Real, 12, 12> local_hessian;
-  autogen::line_line_distance_hessian(l1(0), l1(1), l1(2), l2(0), l2(1), l2(2),
-                                      m1(0), m1(1), m1(2), m2(0), m2(1), m2(2),
-                                      local_hessian.data());
-  return local_hessian;
+
+/// Point-Line (3 vertices): p, l1, l2
+inline LocalGrad<3> localDistanceSqrPointLineGradient(
+    const glm::dvec3 &p, const glm::dvec3 &l1, const glm::dvec3 &l2) {
+  double buf[9];
+  autogen::point_line_distance_gradient_3D(
+      p.x, p.y, p.z, l1.x, l1.y, l1.z, l2.x, l2.y, l2.z, buf);
+  return localGradFromFlat<3>(buf);
+}
+
+/// Point-Plane (4 vertices): p, p1, p2, p3
+inline LocalGrad<4> localDistanceSqrPointPlaneGradient(
+    const glm::dvec3 &p, const glm::dvec3 &p1,
+    const glm::dvec3 &p2, const glm::dvec3 &p3) {
+  double buf[12];
+  autogen::point_plane_distance_gradient(
+      p.x, p.y, p.z, p1.x, p1.y, p1.z,
+      p2.x, p2.y, p2.z, p3.x, p3.y, p3.z, buf);
+  return localGradFromFlat<4>(buf);
+}
+
+/// Line-Line (4 vertices): l1, l2, m1, m2
+inline LocalGrad<4> localDistanceSqrLineLineGradient(
+    const glm::dvec3 &l1, const glm::dvec3 &l2,
+    const glm::dvec3 &m1, const glm::dvec3 &m2) {
+  double buf[12];
+  autogen::line_line_distance_gradient(
+      l1.x, l1.y, l1.z, l2.x, l2.y, l2.z,
+      m1.x, m1.y, m1.z, m2.x, m2.y, m2.z, buf);
+  return localGradFromFlat<4>(buf);
+}
+
+// ============================================================================
+// Hessian 函数 — 返回 LocalHessian<N>
+// ============================================================================
+
+/// Point-Point (2×2 blocks): H = [[2I, -2I], [-2I, 2I]]
+inline LocalHessian<2> localDistanceSqrPointPointHessian(
+    const glm::dvec3 &p1, const glm::dvec3 &p2) {
+  auto I = glm::dmat3(2.0);   // 2 * Identity
+  auto negI = glm::dmat3(-2.0);
+  LocalHessian<2> H{};
+  H[0][0] = I;
+  H[0][1] = negI;
+  H[1][0] = negI;
+  H[1][1] = I;
+  return H;
+}
+
+/// Point-Line (3×3 blocks)
+inline LocalHessian<3> localDistanceSqrPointLineHessian(
+    const glm::dvec3 &p, const glm::dvec3 &l1, const glm::dvec3 &l2) {
+  double buf[81];  // 9×9 flat
+  autogen::point_line_distance_hessian_3D(
+      p.x, p.y, p.z, l1.x, l1.y, l1.z, l2.x, l2.y, l2.z, buf);
+  return localHessianFromFlat<3>(buf);
+}
+
+/// Point-Plane (4×4 blocks)
+inline LocalHessian<4> localDistanceSqrPointPlaneHessian(
+    const glm::dvec3 &p, const glm::dvec3 &p1,
+    const glm::dvec3 &p2, const glm::dvec3 &p3) {
+  double buf[144];  // 12×12 flat
+  autogen::point_plane_distance_hessian(
+      p.x, p.y, p.z, p1.x, p1.y, p1.z,
+      p2.x, p2.y, p2.z, p3.x, p3.y, p3.z, buf);
+  return localHessianFromFlat<4>(buf);
+}
+
+/// Line-Line (4×4 blocks)
+inline LocalHessian<4> localDistanceSqrLineLineHessian(
+    const glm::dvec3 &l1, const glm::dvec3 &l2,
+    const glm::dvec3 &m1, const glm::dvec3 &m2) {
+  double buf[144];  // 12×12 flat
+  autogen::line_line_distance_hessian(
+      l1.x, l1.y, l1.z, l2.x, l2.y, l2.z,
+      m1.x, m1.y, m1.z, m2.x, m2.y, m2.z, buf);
+  return localHessianFromFlat<4>(buf);
 }
 
 enum class EdgeEdgeDistanceType : uint8_t {
@@ -136,13 +176,15 @@ enum class PointTriangleDistanceType : uint8_t {
   Unknown
 };
 
-// modified from ipc-toolkit
+// ============================================================================
+// decideEdgeEdgeParallelDistanceType — glm::dvec3 版本
+// ============================================================================
 inline EdgeEdgeDistanceType decideEdgeEdgeParallelDistanceType(
-    const Eigen::Vector3d &ea0, const Eigen::Vector3d &ea1,
-    const Eigen::Vector3d &eb0, const Eigen::Vector3d &eb1) {
-  const Eigen::Vector3d ea = ea1 - ea0;
-  const double alpha = (eb0 - ea0).dot(ea) / ea.squaredNorm();
-  const double beta = (eb1 - ea0).dot(ea) / ea.squaredNorm();
+    const glm::dvec3 &ea0, const glm::dvec3 &ea1,
+    const glm::dvec3 &eb0, const glm::dvec3 &eb1) {
+  const glm::dvec3 ea = ea1 - ea0;
+  const double alpha = glm::dot(eb0 - ea0, ea) / glm::dot(ea, ea);
+  const double beta  = glm::dot(eb1 - ea0, ea) / glm::dot(ea, ea);
 
   uint8_t eac; // 0: EA0, 1: EA1, 2: EA
   uint8_t ebc; // 0: EB0, 1: EB1, 2: EB
@@ -157,37 +199,29 @@ inline EdgeEdgeDistanceType decideEdgeEdgeParallelDistanceType(
     ebc = 0;
   }
 
-  // f(0, 0) = 0000 = 0 -> A_C
-  // f(0, 1) = 0001 = 1 -> A_D
-  // f(1, 0) = 0010 = 2 -> B_C
-  // f(1, 1) = 0011 = 3 -> B_D
-  // f(2, 0) = 0100 = 4 -> AB_C
-  // f(2, 1) = 0101 = 5 -> AB_D
-  // f(0, 2) = 0110 = 6 -> A_CD
-  // f(1, 2) = 0111 = 7 -> B_CD
-  // f(2, 2) = 1000 = 8 -> AB_CD
-
-  assert(eac != 2 || ebc != 2); // This case results in a degenerate line-line
+  assert(eac != 2 || ebc != 2);
   return EdgeEdgeDistanceType(ebc < 2 ? (eac << 1 | ebc) : (6 + eac));
 }
-// modified from ipc-toolkit
+
+// ============================================================================
+// decideEdgeEdgeDistanceType — glm::dvec3 版本
+// ============================================================================
 inline EdgeEdgeDistanceType decideEdgeEdgeDistanceType(
-    const Vector<Real, 3> &ea0, const Vector<Real, 3> &ea1,
-    const Vector<Real, 3> &eb0, const Vector<Real, 3> &eb1) {
+    const glm::dvec3 &ea0, const glm::dvec3 &ea1,
+    const glm::dvec3 &eb0, const glm::dvec3 &eb1) {
   constexpr double PARALLEL_THRESHOLD = 1.0e-20;
 
-  const Eigen::Vector3d u = ea1 - ea0;
-  const Eigen::Vector3d v = eb1 - eb0;
-  const Eigen::Vector3d w = ea0 - eb0;
+  const glm::dvec3 u = ea1 - ea0;
+  const glm::dvec3 v = eb1 - eb0;
+  const glm::dvec3 w = ea0 - eb0;
 
-  Real a = u.squaredNorm(); // always ≥ 0
-  Real b = u.dot(v);
-  Real c = v.squaredNorm(); // always ≥ 0
-  Real d = u.dot(w);
-  Real e = v.dot(w);
-  Real D = a * c - b * b; // always ≥ 0
+  Real a = glm::dot(u, u);
+  Real b = glm::dot(u, v);
+  Real c = glm::dot(v, v);
+  Real d = glm::dot(u, w);
+  Real e = glm::dot(v, w);
+  Real D = a * c - b * b;
 
-  // Degenerate cases should not happen in practice, but we handle them
   if (a == 0.0 && c == 0.0) {
     return EdgeEdgeDistanceType::A_C;
   } else if (a == 0.0) {
@@ -196,30 +230,28 @@ inline EdgeEdgeDistanceType decideEdgeEdgeDistanceType(
     return EdgeEdgeDistanceType::AB_C;
   }
 
-  // Special handling for parallel edges
   Real parallel_tolerance = PARALLEL_THRESHOLD * std::max(1.0, a * c);
-  if (u.cross(v).squaredNorm() < parallel_tolerance) {
+  if (glm::dot(glm::cross(u, v), glm::cross(u, v)) < parallel_tolerance) {
     return decideEdgeEdgeParallelDistanceType(ea0, ea1, eb0, eb1);
   }
 
   EdgeEdgeDistanceType default_case = EdgeEdgeDistanceType::AB_CD;
 
-  // compute the line parameters of the two closest points
   Real sN = (b * e - c * d);
-  double tN, tD;   // tc = tN / tD
-  if (sN <= 0.0) { // sc < 0 ⟹ the s=0 edge is visible
+  double tN, tD;
+  if (sN <= 0.0) {
     tN = e;
     tD = c;
     default_case = EdgeEdgeDistanceType::A_CD;
-  } else if (sN >= D) { // sc > 1 ⟹ the s=1 edge is visible
+  } else if (sN >= D) {
     tN = e + b;
     tD = c;
     default_case = EdgeEdgeDistanceType::B_CD;
   } else {
     tN = (a * e - b * d);
-    tD = D; // default tD = D ≥ 0
-    if (tN > 0.0 && tN < tD && u.cross(v).squaredNorm() < parallel_tolerance) {
-      // avoid coplanar or nearly parallel EE
+    tD = D;
+    if (tN > 0.0 && tN < tD &&
+        glm::dot(glm::cross(u, v), glm::cross(u, v)) < parallel_tolerance) {
       if (sN < D / 2) {
         tN = e;
         tD = c;
@@ -230,11 +262,9 @@ inline EdgeEdgeDistanceType decideEdgeEdgeDistanceType(
         default_case = EdgeEdgeDistanceType::B_CD;
       }
     }
-    // else default_case stays EdgeEdgeDistanceType::EA_EB
   }
 
-  if (tN <= 0.0) { // tc < 0 ⟹ the t=0 edge is visible
-    // recompute sc for this edge
+  if (tN <= 0.0) {
     if (-d <= 0.0) {
       return EdgeEdgeDistanceType::A_C;
     } else if (-d >= a) {
@@ -242,8 +272,7 @@ inline EdgeEdgeDistanceType decideEdgeEdgeDistanceType(
     } else {
       return EdgeEdgeDistanceType::AB_C;
     }
-  } else if (tN >= tD) { // tc > 1 ⟹ the t=1 edge is visible
-    // recompute sc for this edge
+  } else if (tN >= tD) {
     if ((-d + b) <= 0.0) {
       return EdgeEdgeDistanceType::A_D;
     } else if ((-d + b) >= a) {
@@ -256,76 +285,77 @@ inline EdgeEdgeDistanceType decideEdgeEdgeDistanceType(
   return default_case;
 }
 
+// ============================================================================
+// decidePointTriangleDistanceType — glm::dvec3 版本（手写 2×2 求解）
+// ============================================================================
 inline PointTriangleDistanceType
-decidePointTriangleDistanceType(const Eigen::Ref<const Eigen::Vector3d> &p,
-                                const Eigen::Ref<const Eigen::Vector3d> &t0,
-                                const Eigen::Ref<const Eigen::Vector3d> &t1,
-                                const Eigen::Ref<const Eigen::Vector3d> &t2) {
-  const Eigen::Vector3d normal = (t1 - t0).cross(t2 - t0);
+decidePointTriangleDistanceType(const glm::dvec3 &p,
+                                const glm::dvec3 &t0,
+                                const glm::dvec3 &t1,
+                                const glm::dvec3 &t2) {
+  auto normal = glm::cross(t1 - t0, t2 - t0);
 
-  Eigen::Matrix<Real, 2, 3> basis, param;
+  // 对每条边做投影判断 (内联 2×2 线性求解)
+  auto edgeTest = [&](const glm::dvec3 &from, const glm::dvec3 &to,
+                      const glm::dvec3 &point) -> std::pair<double, double> {
+    auto e = to - from;
+    auto n = glm::cross(e, normal);
+    // [e; n] * [s; t]^T = rhs (投影到 edge 切线+法线)
+    // 2×2 系统: [[e·e, e·n],[n·e, n·n]] * [s,t] = [e·rhs, n·rhs]
+    double a00 = glm::dot(e, e), a01 = glm::dot(e, n);
+    double a10 = a01,            a11 = glm::dot(n, n);
+    double b0 = glm::dot(e, point - from), b1 = glm::dot(n, point - from);
+    double det = a00 * a11 - a01 * a10;
+    return {(a11*b0 - a01*b1) / det, (a00*b1 - a10*b0) / det};
+  };
 
-  basis.row(0) = t1 - t0;
-  basis.row(1) = basis.row(0).cross(normal);
-  param.col(0) = (basis * basis.transpose()).ldlt().solve(basis * (p - t0));
-  if (param(0, 0) > 0.0 && param(0, 0) < 1.0 && param(1, 0) >= 0.0) {
-    return PointTriangleDistanceType::P_AB;
-  }
+  auto [s0, t0_val] = edgeTest(t0, t1, p);
+  if (s0 > 0.0 && s0 < 1.0 && t0_val >= 0.0) return PointTriangleDistanceType::P_AB;
 
-  basis.row(0) = t2 - t1;
-  basis.row(1) = basis.row(0).cross(normal);
-  param.col(1) = (basis * basis.transpose()).ldlt().solve(basis * (p - t1));
-  if (param(0, 1) > 0.0 && param(0, 1) < 1.0 && param(1, 1) >= 0.0) {
-    return PointTriangleDistanceType::P_BC;
-  }
+  auto [s1, t1_val] = edgeTest(t1, t2, p);
+  if (s1 > 0.0 && s1 < 1.0 && t1_val >= 0.0) return PointTriangleDistanceType::P_BC;
 
-  basis.row(0) = t0 - t2;
-  basis.row(1) = basis.row(0).cross(normal);
-  param.col(2) = (basis * basis.transpose()).ldlt().solve(basis * (p - t2));
-  if (param(0, 2) > 0.0 && param(0, 2) < 1.0 && param(1, 2) >= 0.0) {
-    return PointTriangleDistanceType::P_CA;
-  }
+  auto [s2, t2_val] = edgeTest(t2, t0, p);
+  if (s2 > 0.0 && s2 < 1.0 && t2_val >= 0.0) return PointTriangleDistanceType::P_CA;
 
-  if (param(0, 0) <= 0.0 && param(0, 2) >= 1.0) {
-    // vertex 0 is the closest
-    return PointTriangleDistanceType::P_A;
-  } else if (param(0, 1) <= 0.0 && param(0, 0) >= 1.0) {
-    // vertex 1 is the closest
-    return PointTriangleDistanceType::P_B;
-  } else if (param(0, 2) <= 0.0 && param(0, 1) >= 1.0) {
-    // vertex 2 is the closest
-    return PointTriangleDistanceType::P_C;
-  } else {
-    return PointTriangleDistanceType::P_ABC;
-  }
+  if (s0 <= 0.0 && s2 >= 1.0) return PointTriangleDistanceType::P_A;
+  if (s1 <= 0.0 && s0 >= 1.0) return PointTriangleDistanceType::P_B;
+  if (s2 <= 0.0 && s1 >= 1.0) return PointTriangleDistanceType::P_C;
+
+  return PointTriangleDistanceType::P_ABC;
 }
 
-Real distanceSqrPointTriangle(const Vector<Real, 3> &p,
-                              const Vector<Real, 3> &a,
-                              const Vector<Real, 3> &b,
-                              const Vector<Real, 3> &c);
+// ============================================================================
+// 剩余函数声明 — glm::dvec3 接口
+// ============================================================================
 
-Vector<Real, 12> localDistancePointTriangleGradient(const Vector<Real, 3> &p,
-                                                    const Vector<Real, 3> &a,
-                                                    const Vector<Real, 3> &b,
-                                                    const Vector<Real, 3> &c);
+Real distanceSqrPointTriangle(const glm::dvec3 &p,
+                              const glm::dvec3 &a,
+                              const glm::dvec3 &b,
+                              const glm::dvec3 &c);
 
-Matrix<Real, 12, 12> localDistancePointTriangleHessian(
-    const Vector<Real, 3> &p, const Vector<Real, 3> &a,
-    const Vector<Real, 3> &b, const Vector<Real, 3> &c);
+LocalGrad<4> localDistancePointTriangleGradient(const glm::dvec3 &p,
+                                                    const glm::dvec3 &a,
+                                                    const glm::dvec3 &b,
+                                                    const glm::dvec3 &c);
 
-Real distanceSqrEdgeEdge(const Vector<Real, 3> &ea0, const Vector<Real, 3> &ea1,
-                         const Vector<Real, 3> &eb0,
-                         const Vector<Real, 3> &eb1);
+LocalHessian<4> localDistancePointTriangleHessian(
+    const glm::dvec3 &p, const glm::dvec3 &a,
+    const glm::dvec3 &b, const glm::dvec3 &c);
 
-Vector<Real, 12> localDistanceSqrEdgeEdgeGradient(const Vector<Real, 3> &a,
-                                                  const Vector<Real, 3> &b,
-                                                  const Vector<Real, 3> &c,
-                                                  const Vector<Real, 3> &d);
+Real distanceSqrEdgeEdge(const glm::dvec3 &ea0, const glm::dvec3 &ea1,
+                         const glm::dvec3 &eb0,
+                         const glm::dvec3 &eb1);
 
-Matrix<Real, 12, 12> localDistanceSqrEdgeEdgeHessian(const Vector<Real, 3> &a,
-                                                     const Vector<Real, 3> &b,
-                                                     const Vector<Real, 3> &c,
-                                                     const Vector<Real, 3> &d);
-} // namespace fem::ipc
+LocalGrad<4> localDistanceSqrEdgeEdgeGradient(const glm::dvec3 &a,
+                                                  const glm::dvec3 &b,
+                                                  const glm::dvec3 &c,
+                                                  const glm::dvec3 &d);
+
+LocalHessian<4> localDistanceSqrEdgeEdgeHessian(const glm::dvec3 &a,
+                                                     const glm::dvec3 &b,
+                                                     const glm::dvec3 &c,
+                                                     const glm::dvec3 &d);
+
+} // namespace sim::fem::ipc
 #endif // SIMCRAFT_FEM_INCLUDE_FEM_IPC_DISTANCES_H_

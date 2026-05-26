@@ -4,53 +4,66 @@
 
 #ifndef SIMCRAFT_FEM_INCLUDE_FEM_IPC_MOLLIFIER_H_
 #define SIMCRAFT_FEM_INCLUDE_FEM_IPC_MOLLIFIER_H_
-#include <fem/types.h>
+
+#include <glm/glm.hpp>
 #include <fem/ipc/external/mollifier.h>
+#include <Maths/block-types.h>
+
 namespace sim::fem::ipc {
-inline Vector<Real, 12> edgeEdgeCrossSquareNormGradient(
-    const Vector<Real, 3> &ea0,
-    const Vector<Real, 3> &ea1,
-    const Vector<Real, 3> &eb0,
-    const Vector<Real, 3> &eb1) {
-  Vector<Real, 12> g;
+
+using maths::LocalGrad;
+using maths::LocalHessian;
+using maths::localGradFromFlat;
+using maths::localHessianFromFlat;
+
+/// edgeEdgeCrossSquareNormGradient — 返回 LocalGrad<4>
+inline LocalGrad<4> edgeEdgeCrossSquareNormGradient(
+    const glm::dvec3 &ea0,
+    const glm::dvec3 &ea1,
+    const glm::dvec3 &eb0,
+    const glm::dvec3 &eb1) {
+  double g[12];
   autogen::edge_edge_cross_squarednorm_gradient(
-      ea0[0], ea0[1], ea0[2],
-      ea1[0], ea1[1], ea1[2],
-      eb0[0], eb0[1], eb0[2],
-      eb1[0], eb1[1], eb1[2],
-      g.data());
-  return g;
+      ea0.x, ea0.y, ea0.z,
+      ea1.x, ea1.y, ea1.z,
+      eb0.x, eb0.y, eb0.z,
+      eb1.x, eb1.y, eb1.z,
+      g);
+  return localGradFromFlat<4>(g);
 }
 
-inline Matrix<Real, 12, 12> edgeEdgeCrossSquaredNormHessian(
-    const Vector<Real, 3> &ea0,
-    const Vector<Real, 3> &ea1,
-    const Vector<Real, 3> &eb0,
-    const Vector<Real, 3> &eb1) {
-  Matrix<Real, 12, 12> h;
+/// edgeEdgeCrossSquaredNormHessian — 返回 LocalHessian<4>
+inline LocalHessian<4> edgeEdgeCrossSquaredNormHessian(
+    const glm::dvec3 &ea0,
+    const glm::dvec3 &ea1,
+    const glm::dvec3 &eb0,
+    const glm::dvec3 &eb1) {
+  double h[144];
   autogen::edge_edge_cross_squarednorm_hessian(
-      ea0[0], ea0[1], ea0[2],
-      ea1[0], ea1[1], ea1[2],
-      eb0[0], eb0[1], eb0[2],
-      eb1[0], eb1[1], eb1[2],
-      h.data());
-  return h;
+      ea0.x, ea0.y, ea0.z,
+      ea1.x, ea1.y, ea1.z,
+      eb0.x, eb0.y, eb0.z,
+      eb1.x, eb1.y, eb1.z,
+      h);
+  return localHessianFromFlat<4>(h);
 }
 
-inline Vector<Real, 12> edgeEdgeMollifierThresholdGradient(
-    const Vector<Real, 3> &ea0,
-    const Vector<Real, 3> &ea1,
-    const Vector<Real, 3> &eb0,
-    const Vector<Real, 3> &eb1,
+/// edgeEdgeMollifierThresholdGradient — 返回 LocalGrad<4>
+inline LocalGrad<4> edgeEdgeMollifierThresholdGradient(
+    const glm::dvec3 &ea0,
+    const glm::dvec3 &ea1,
+    const glm::dvec3 &eb0,
+    const glm::dvec3 &eb1,
     Real scale) {
-  Vector<Real, 12> g;
+  double g[12];
   autogen::edge_edge_mollifier_threshold_gradient(
-      ea0[0], ea0[1], ea0[2],
-      ea1[0], ea1[1], ea1[2],
-      eb0[0], eb0[1], eb0[2],
-      eb1[0], eb1[1], eb1[2],
-      g.data(), scale);
-  return g;
+      ea0.x, ea0.y, ea0.z,
+      ea1.x, ea1.y, ea1.z,
+      eb0.x, eb0.y, eb0.z,
+      eb1.x, eb1.y, eb1.z,
+      g, scale);
+  return localGradFromFlat<4>(g);
 }
-}
-#endif //SIMCRAFT_FEM_INCLUDE_FEM_IPC_MOLLIFIER_H_
+
+} // namespace sim::fem::ipc
+#endif // SIMCRAFT_FEM_INCLUDE_FEM_IPC_MOLLIFIER_H_

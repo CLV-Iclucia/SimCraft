@@ -70,6 +70,15 @@ public:
 
   [[nodiscard]] Real norm() const { return std::sqrt(squaredNorm()); }
 
+  /// Infinity norm (max absolute value across all components)
+  [[nodiscard]] Real infNorm() const {
+    Real maxVal = 0.0;
+    for (int i = 0; i < numBlocks(); i++)
+      for (int d = 0; d < N; d++)
+        maxVal = std::max(maxVal, std::abs(m_data[i][d]));
+    return maxVal;
+  }
+
   /// this += a * other
   void axpy(Real a, const BlockVector &other) {
     assert(numBlocks() == other.numBlocks());

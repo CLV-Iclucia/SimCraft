@@ -6,7 +6,8 @@
 
 #include <variant>
 #include <fem/primitives/elastic-tet-mesh.h>
-#include <Maths/sparse-matrix-builder.h>
+#include <Maths/block-vector.h>
+#include <Maths/block-sparse-matrix.h>
 
 namespace sim::fem {
 struct Primitive {
@@ -36,16 +37,19 @@ struct Primitive {
       return arg.dofDim();
     }, impl);
   }
-  void assembleEnergyHessian(maths::SubMatrixBuilder<Real> &globalHessianSubView) const {
+
+  // New BlockSparseMatrix interfaces (Phase 2B)
+  void assembleEnergyHessian(maths::BlockSparseMatrix<3> &globalH, int blockStart) const {
     std::visit([&](auto &&arg) {
-      arg.assembleEnergyHessian(globalHessianSubView);
+      arg.assembleEnergyHessian(globalH, blockStart);
     }, impl);
   }
-  void assembleMassMatrix(maths::SubMatrixBuilder<Real> &globalMassSubView) const {
+  void assembleMassMatrix(maths::BlockSparseMatrix<3> &globalMass, int blockStart) const {
     std::visit([&](auto &&arg) {
-      arg.assembleMassMatrix(globalMassSubView);
+      arg.assembleMassMatrix(globalMass, blockStart);
     }, impl);
   }
+
   [[nodiscard]] std::span<const Triangle> getSurfaceView() const {
     return std::visit([&](auto &&arg) {
       return arg.getSurfaceView();
@@ -62,11 +66,13 @@ struct Primitive {
       return arg.getVertexCount();
     }, impl);
   }
-  
-  SubVector<Real> view(VecXd& vec) const {
+
+  [[nodiscard]] int getDofStart() const { return dofStart; }
+
+  SubVector<Real> view(maths::BlockVector<3>& vec) const {
     return SubVector<Real>(vec.data() + dofStart, dofDim());
   }
-  [[nodiscard]] CSubVector<Real> cview(const VecXd& vec) const {
+  [[nodiscard]] CSubVector<Real> cview(const maths::BlockVector<3>& vec) const {
     return CSubVector<Real>(vec.data() + dofStart, dofDim());
   }
 

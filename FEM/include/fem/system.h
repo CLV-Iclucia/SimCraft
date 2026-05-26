@@ -7,13 +7,13 @@
 #include "geometry-manager.h"
 #include <Core/zip.h>
 #include <Deform/strain-energy-density.h>
-#include <Maths/sparse-matrix-builder.h>
 #include <Maths/block-vector.h>
 #include <Maths/block-sparse-matrix.h>
 #include <Spatify/lbvh.h>
 #include <fem/colliders.h>
+#include <fem/constraints.h>
+#include <fem/kinematic-body.h>
 #include <fem/primitive.h>
-#include <fem/types.h>
 
 namespace sim {
 namespace fem::ipc {
@@ -34,10 +34,7 @@ struct System {
 
   [[nodiscard]] const maths::BlockSparseMatrix<3> &blockMass() const { return m_blockMass; }
 
-  /// Legacy Eigen mass accessor (temporary bridge for Phase 2A)
-  [[nodiscard]] const SparseMatrix<Real> &mass() const { return m_mass; }
-
-  void spdProjectHessian(maths::SparseMatrixBuilder<Real> &builder) const;
+  void spdProjectHessian(maths::BlockSparseMatrix<3> &blockH) const;
 
   void updateDeformationEnergy();
 
@@ -52,8 +49,9 @@ struct System {
   [[nodiscard]] size_t dof() const { return x.scalarSize(); }
   System &init();
   [[nodiscard]] Real kineticEnergy() const {
-    auto v = xdot.asEigen();
-    return 0.5 * v.dot(m_mass * v);
+    maths::BlockVector<3> Mv(x.numBlocks());
+    m_blockMass.apply(xdot, Mv);
+    return 0.5 * xdot.dot(Mv);
   }
 
   [[nodiscard]] Real potentialEnergy() const { return deformationEnergy(); }
@@ -98,7 +96,30 @@ struct System {
     return m_geometryManager.checkEdgeAdjacent(edgeA, edgeB);
   }
 
-  [[nodiscard]] VecXd computeAcceleration() const;
+  [[nodiscard]] maths::BlockVector<3> computeAcceleration() const;
+
+  // 弹性体管理 (Python bindings)
+  void addPrimitive(Primitive&& p) { prs.push_back(std::move(p)); }
+
+  // 约束管理
+  ConstraintManager& constraints() { return m_constraints; }
+  const ConstraintManager& constraints() const { return m_constraints; }
+  
+  // 重力设置
+  void setGravity(glm::dvec3 g) { m_gravity = g; }
+  [[nodiscard]] glm::dvec3 gravity() const { return m_gravity; }
+  
+  // 时间管理
+  void advanceTime(Real dt) { m_currentTime += dt; }
+  Real currentTime() const { return m_currentTime; }
+
+  // 运动学体管理
+  [[nodiscard]] std::vector<KinematicBody>& kinematicBodies() { return m_kinematicBodies; }
+  [[nodiscard]] const std::vector<KinematicBody>& kinematicBodies() const { return m_kinematicBodies; }
+  void advanceKinematicBodies(Real t) {
+    for (auto& body : m_kinematicBodies)
+      body.advanceTo(t);
+  }
 
   template <typename Func> void sequentialDispatch(Func &&func) const {
     for (auto i = 0; i < prs.size(); i++)
@@ -124,8 +145,8 @@ struct System {
     return m_geometryManager;
   }
 
-  friend VecXd symbolicDeformationEnergyGradient(System &system);
-  friend VecXd numericalDeformationEnergyGradient(System &system);
+  friend maths::BlockVector<3> symbolicDeformationEnergyGradient(System &system);
+  friend maths::BlockVector<3> numericalDeformationEnergyGradient(System &system);
   friend struct SystemBuilder;
 
 private:
@@ -143,33 +164,54 @@ private:
   int nEdges{0};
   int nVertices{0};
 
-  Eigen::SparseMatrix<Real> m_mass;
   maths::BlockSparseMatrix<3> m_blockMass;
   Real m_meshLengthScale{std::numeric_limits<Real>::infinity()};
 
+  // 约束和外力系统
+  ConstraintManager m_constraints;
+  glm::dvec3 m_gravity{0.0, -9.81, 0.0};
+  std::vector<Real> m_lumpedMass;      // 每顶点质量 (trace(M_ii)/3)
+  Real m_currentTime{0.0};
+
+  // 运动学碰撞体
+  std::vector<KinematicBody> m_kinematicBodies;
+
   void updateDeformationGradient();
-  void buildMassMatrix(maths::SparseMatrixBuilder<Real> &builder) const;
+  void buildBlockMassMatrix();
 };
 
-VecXd symbolicDeformationEnergyGradient(System &system);
-VecXd numericalDeformationEnergyGradient(System &system);
+maths::BlockVector<3> symbolicDeformationEnergyGradient(System &system);
+maths::BlockVector<3> numericalDeformationEnergyGradient(System &system);
 
 struct SystemConfig {
+  struct ConstraintConfig {
+    std::string type;          // "pin" | "pin_component" | "prescribed_motion"
+    std::vector<int> vertices{};
+    int vertex{0};
+    glm::bvec3 components{true, true, true};
+    glm::dvec3 value{0.0};
+    std::string component;      // "x", "y", "z" for pin_component
+    // 用于 prescribed_motion
+    struct MotionConfig {
+      std::string type;        // "sinusoidal"
+      glm::dvec3 axis{0.0};
+      Real amplitude{0.0};
+      Real frequency{0.0};
+    };
+    std::optional<MotionConfig> motion;
+  };
+
   std::vector<Primitive> primitives{};
   std::vector<Collider> colliders{};
   std::vector<ExternalForce> externalForces{};
+  std::vector<ConstraintConfig> constraints{};
+  glm::dvec3 gravity{0.0, -9.81, 0.0};
+
   REFLECT(primitives, colliders)
 };
 
 struct SystemBuilder {
-  System build(const core::JsonNode &json) {
-    auto cfg = core::deserialize<SystemConfig>(json);
-    System system;
-    system.prs = std::move(cfg.primitives);
-    system.colliders = std::move(cfg.colliders);
-    system.init();
-    return system;
-  }
+  System build(const core::JsonNode &json);
 };
 }
 }

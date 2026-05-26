@@ -7,8 +7,7 @@
 #include <Core/deserializer.h>
 #include <Core/reflection.h>
 #include <Deform/strain-energy-density.h>
-#include <Maths/sparse-matrix-builder.h>
-#include <fem/types.h>
+#include <Maths/block-sparse-matrix.h>
 #include <memory>
 #include "tet-mesh.h"
 
@@ -42,8 +41,11 @@ struct ElasticTetMesh {
   void updateDeformationEnergyGradient(SubVector<Real> x);
   void assembleEnergyGradient(const SubVector<Real>& primitiveGradSubView) const;
   [[nodiscard]] Real deformationEnergy() const;
-  void assembleEnergyHessian(maths::SubMatrixBuilder<Real> &globalHessianSubView) const;
-  void assembleMassMatrix(maths::SubMatrixBuilder<Real> &globalMassSubView) const;
+  
+  // New BlockSparseMatrix interfaces (Phase 2B)
+  void assembleEnergyHessian(maths::BlockSparseMatrix<3> &globalH, int blockStart) const;
+  void assembleMassMatrix(maths::BlockSparseMatrix<3> &globalMass, int blockStart) const;
+  
   [[nodiscard]] std::span<const Triangle> getSurfaceView() const {
     return mesh.surfaceView();
   }

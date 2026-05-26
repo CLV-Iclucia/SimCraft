@@ -1,6 +1,5 @@
 // add protection against multiple includes
-#ifndef CORE_RAND_GEN_H_
-#define CORE_RAND_GEN_H_
+#pragma once
 #include <Core/core.h>
 #include <random>
 #include <type_traits>
@@ -25,4 +24,3 @@ inline Vector<T, Dim> randomVec() {
 }
 
 }
-#endif
