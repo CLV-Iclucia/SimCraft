@@ -3,6 +3,8 @@
 //
 #include <Maths/tensor.h>
 #include <fem/primitives/elastic-tet-mesh.h>
+#include <tbb/parallel_for.h>
+#include <tbb/enumerable_thread_specific.h>
 namespace sim::fem {
 using maths::vectorize;
 
@@ -15,6 +17,7 @@ void ElasticTetMesh::init(const SubVector<Real>& x, const SubVector<Real>& xdot,
     for (int j = 0; j < 3; j++)
       local_x.col(j) = mesh.getVertices()[tet[j + 1]] - mesh.getVertices()[tet[0]];
     Real volume = local_x.determinant() / 6.0;
+    assert(volume > 0 && "Tet has non-positive volume after orientation fix — mesh is degenerate");
     tetRefVolumes.emplace_back(volume);
     tetDeformationGradients.emplace_back(local_x);
     tetDeformationGradients.back().updateCurrentConfig(local_x);
@@ -28,7 +31,7 @@ void ElasticTetMesh::updateDeformationEnergyGradient(SubVector<Real> x) {
     Matrix<Real, 3, 3> local_x;
     for (int j = 0; j < 3; j++)
       local_x.col(j) =
-          x.segment<3>(mesh.tets[i][j + 1]) - x.segment<3>(mesh.tets[i][0]);
+          x.segment<3>(mesh.tets[i][j + 1] * 3) - x.segment<3>(mesh.tets[i][0] * 3);
     dg.updateCurrentConfig(local_x);
   }
 }
@@ -53,10 +56,41 @@ Real ElasticTetMesh::deformationEnergy() const {
   return sum;
 }
 
-// New BlockSparseMatrix interface (Phase 2B)
+// New BlockSparseMatrix interface (Phase 2B) — Parallelized (Phase A-1)
 void ElasticTetMesh::assembleEnergyHessian(
     maths::BlockSparseMatrix<3> &globalH, int blockStart) const {
-  for (int i = 0; i < numTets(); i++) {
+  const int nTets = static_cast<int>(numTets());
+
+  // For small meshes, stay serial to avoid TBB overhead
+  if (nTets < 64) {
+    for (int i = 0; i < nTets; i++) {
+      auto &dg = tetDeformationGradients[i];
+      auto hessian_F = energy->filteredEnergyHessian(dg);
+      auto p_F_p_x = dg.gradient();
+      Eigen::Matrix<Real, 12, 12> hessian_x =
+          p_F_p_x.transpose() * hessian_F * p_F_p_x * tetRefVolumes[i];
+      std::array<int, 4> bi = {
+          blockStart + mesh.tets[i][0],
+          blockStart + mesh.tets[i][1],
+          blockStart + mesh.tets[i][2],
+          blockStart + mesh.tets[i][3]};
+      globalH.assembleBlock<4>(hessian_x, bi);
+    }
+    return;
+  }
+
+  // Parallel path: per-thread local BlockSparseMatrix, merged after
+  tbb::enumerable_thread_specific<maths::BlockSparseMatrix<3>> localH(
+      [&]() {
+        maths::BlockSparseMatrix<3> local(globalH.blockRows(), globalH.blockCols());
+        local.setSymmetric(globalH.isSymmetric());  // Inherit symmetric mode
+        // Estimate: each tet contributes 16 blocks (4x4 tet connectivity)
+        // In symmetric mode, ~10 blocks per tet (upper triangle only)
+        local.reserve(nTets * (globalH.isSymmetric() ? 10 : 16) / 4);
+        return local;
+      });
+
+  tbb::parallel_for(0, nTets, [&](int i) {
     auto &dg = tetDeformationGradients[i];
     auto hessian_F = energy->filteredEnergyHessian(dg);
     auto p_F_p_x = dg.gradient();
@@ -67,8 +101,12 @@ void ElasticTetMesh::assembleEnergyHessian(
         blockStart + mesh.tets[i][1],
         blockStart + mesh.tets[i][2],
         blockStart + mesh.tets[i][3]};
-    globalH.assembleBlock<4>(hessian_x, bi);
-  }
+    localH.local().assembleBlock<4>(hessian_x, bi);
+  });
+
+  // Merge thread-local results into globalH
+  for (auto &local : localH)
+    globalH.addFrom(local);
 }
 
 void ElasticTetMesh::assembleMassMatrix(

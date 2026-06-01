@@ -30,17 +30,30 @@ mesh_path = Path(__file__).resolve().parents[2] / "FEM" / "assets" / "tets" / "c
 mesh = simcraft.TetMesh.from_file(str(mesh_path))
 print(f"Mesh: {mesh.num_vertices} vertices, {mesh.num_elements} tets")
 
+# Read vertex positions BEFORE add_elastic_body (which moves the mesh)
+verts = mesh.vertices
+
 material = simcraft.NeoHookean(young=2e5, poisson=0.45)
 
 system = simcraft.System()
-system.add_elastic_body(mesh, material, density=800.0)
+system.add_elastic_body(mesh, material, density=800.0, color=(0.35, 0.80, 0.80))
 system.gravity = np.array([0.0, -9.81, 0.0])
 
-# Pin bottom vertices
-system.constraints.pin_vertices(np.array([0, 1, 2, 3], dtype=np.int32))
+# Find all vertices on the x_min face (one end of the cube)
+x_min = verts[:, 0].min()
+eps = (verts[:, 0].max() - x_min) * 1e-6
+fixed_face = np.where(np.abs(verts[:, 0] - x_min) < eps)[0].astype(np.int32)
+system.constraints.pin_vertices(fixed_face)
+print(f"Pinned {len(fixed_face)} vertices on x_min face")
 
-# Prescribe sinusoidal motion on vertex 10
-system.constraints.prescribe_motion(10, lambda t: np.array([0.5 * np.sin(2 * np.pi * t), 0.0, 0.0]))
+# Find all vertices on the x_max face (other end) for prescribed motion
+x_max = verts[:, 0].max()
+driven_face = np.where(np.abs(verts[:, 0] - x_max) < eps)[0]
+
+# Prescribe sinusoidal y-motion on the entire driven face
+amplitude = 0.3
+freq = 1.0  # Hz
+print(f"Prescribed sinusoidal motion on {len(driven_face)} vertices (x_max face)")
 
 # ─── Run ─────────────────────────────────────────────────────────────────────
 integrator = simcraft.IpcIntegrator(dHat=1e-3, kappa=1e8)

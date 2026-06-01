@@ -11,6 +11,37 @@
 using namespace sim;
 using namespace sim::fem;
 
+/// 计算加权平滑法线（area-weighted vertex normals）
+static void computeSmoothNormals(renderer::MeshProxy& mesh) {
+  const auto& pos = mesh.positions;
+  const auto& tris = mesh.triangles;
+
+  mesh.normals.assign(pos.size(), glm::vec3(0.0f));
+
+  for (const auto& tri : tris) {
+    const auto& p0 = pos[tri.x];
+    const auto& p1 = pos[tri.y];
+    const auto& p2 = pos[tri.z];
+
+    glm::vec3 e1 = p1 - p0;
+    glm::vec3 e2 = p2 - p0;
+    glm::vec3 faceNormal = glm::cross(e1, e2); // 未归一化 = 面积加权
+
+    mesh.normals[tri.x] += faceNormal;
+    mesh.normals[tri.y] += faceNormal;
+    mesh.normals[tri.z] += faceNormal;
+  }
+
+  for (auto& n : mesh.normals) {
+    float len = glm::length(n);
+    if (len > 1e-8f) {
+      n /= len;
+    } else {
+      n = glm::vec3(0.0f, 1.0f, 0.0f); // 退化三角形给个安全默认
+    }
+  }
+}
+
 /// 从 System 构建渲染用的 SceneProxy
 std::unique_ptr<renderer::SceneProxy> buildSceneProxy(const fem::System& system, int frame) {
   auto proxy = std::make_unique<renderer::SceneProxy>();
@@ -46,9 +77,8 @@ std::unique_ptr<renderer::SceneProxy> buildSceneProxy(const fem::System& system,
           static_cast<unsigned>(tri.z)};
     }
 
-    // 计算面法线（如果没有平滑法线）
-    // TODO: 计算平滑法线
-    mesh.normals.clear(); // 使用面法线或留空让 shader 处理
+    // 计算加权平滑法线
+    computeSmoothNormals(mesh);
 
     proxy->meshes.push_back(std::move(mesh));
   }

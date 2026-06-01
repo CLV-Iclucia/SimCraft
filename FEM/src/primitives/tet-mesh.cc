@@ -1,6 +1,7 @@
 #include <fem/primitives/tet-mesh.h>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <set>
 
 namespace sim::fem {
@@ -25,10 +26,23 @@ std::optional<TetMesh> readTetMeshFromTOBJ(const std::filesystem::path &path) {
     } else if (prefix == "t") {
       int x, y, z, w;
       stream >> x >> y >> z >> w;
-      indices.emplace_back(x - 1, y - 1, z - 1, w - 1);
+      indices.emplace_back(x, y, z, w);
     }
   }
   file.close();
+  // Auto-detect 0-based vs 1-based indexing:
+  // If max index == numVertices, it's 1-based; convert to 0-based.
+  if (!indices.empty()) {
+    int maxIdx = 0;
+    for (const auto& tet : indices)
+      for (int k = 0; k < 4; k++)
+        maxIdx = std::max(maxIdx, tet[k]);
+    if (maxIdx == static_cast<int>(vertices.size())) {
+      // 1-based → convert to 0-based
+      for (auto& tet : indices)
+        tet -= 1;
+    }
+  }
   return std::make_optional<TetMesh>(vertices, indices);
 }
 
@@ -69,33 +83,40 @@ void TetMesh::computeSurface() {
       return a.z < b.z;
     }
   };
-  std::set<Triangle, TriangleCmp> face_set{};
 
-  auto resolveInternalFace = [&](const Triangle &face) {
-    auto sortedFace = [](Triangle unsortedFace) {
-    std::array<int, 3> sorted = {unsortedFace[0], unsortedFace[1],
-                                 unsortedFace[2]};
-    std::ranges::sort(sorted);
-    return Triangle{sorted[0], sorted[1], sorted[2]};
-  }(face);
-  if (face_set.contains(sortedFace))
-    face_set.erase(sortedFace);
-  else
-    face_set.insert(sortedFace);
+  // Key: sorted triangle (for identifying shared faces)
+  // Value: oriented triangle (correct outward-normal winding)
+  std::map<Triangle, Triangle, TriangleCmp> face_map{};
+
+  auto sortTriangle = [](const Triangle &t) -> Triangle {
+    std::array<int, 3> s = {t[0], t[1], t[2]};
+    std::ranges::sort(s);
+    return Triangle{s[0], s[1], s[2]};
   };
 
   for (const auto &tet : tets) {
-    resolveInternalFace({tet[0], tet[1], tet[2]});
-    resolveInternalFace({tet[0], tet[1], tet[3]});
-    resolveInternalFace({tet[0], tet[2], tet[3]});
-    resolveInternalFace({tet[1], tet[2], tet[3]});
+    // For a positively-oriented tet (v0, v1, v2, v3) where
+    // det([v1-v0, v2-v0, v3-v0]) > 0, the outward-normal windings are:
+    Triangle outwardFaces[4] = {
+        {tet[1], tet[2], tet[3]},  // opposite v0
+        {tet[0], tet[3], tet[2]},  // opposite v1
+        {tet[0], tet[1], tet[3]},  // opposite v2
+        {tet[0], tet[2], tet[1]},  // opposite v3
+    };
+
+    for (const auto &face : outwardFaces) {
+      auto key = sortTriangle(face);
+      if (face_map.contains(key))
+        face_map.erase(key);      // internal face (shared by two tets)
+      else
+        face_map[key] = face;     // boundary face with correct orientation
+    }
   }
-  surfaces.resize(static_cast<int>(face_set.size()));
-  int i = 0;
-  for (const auto &array : face_set) {
-    surfaces[i] = {array[0], array[1], array[2]};
-    i++;
-  }
+
+  surfaces.clear();
+  surfaces.reserve(face_map.size());
+  for (const auto &[_, orientedFace] : face_map)
+    surfaces.push_back(orientedFace);
 }
 
 void TetMesh::computeSurfaceEdges() {

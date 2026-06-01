@@ -1,5 +1,4 @@
-#ifndef SPATIFY_INCLUDE_SPATIFY_TYPES_H_
-#define SPATIFY_INCLUDE_SPATIFY_TYPES_H_
+#pragma once
 #include <glm/glm.hpp>
 #include <vector>
 namespace spatify {
@@ -23,7 +22,6 @@ using Mat4f = glm::mat4;
 using Mat2d = glm::highp_mat2;
 using Mat3d = glm::highp_mat3;
 using Mat4d = glm::highp_mat4;
-using std::vector;
 template <typename T, int Dim> struct TVector {
   static_assert(Dim == 2 || Dim == 3 || Dim == 4, "Dim must be 2, 3 or 4");
 };
@@ -51,5 +49,3 @@ template <typename T> struct TMatrix<T, 4> {
 };
 
 }
-
-#endif

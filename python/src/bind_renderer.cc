@@ -10,12 +10,51 @@ using namespace sim::renderer;
 using sim::core::Vec3f;
 using sim::core::Vec3u;
 
+/// Compute area-weighted smooth vertex normals
+static void computeSmoothNormals(MeshProxy& mesh) {
+  const auto& pos = mesh.positions;
+  const auto& tris = mesh.triangles;
+
+  mesh.normals.assign(pos.size(), Vec3f(0.0f));
+
+  for (const auto& tri : tris) {
+    const auto& p0 = pos[tri.x];
+    const auto& p1 = pos[tri.y];
+    const auto& p2 = pos[tri.z];
+
+    Vec3f e1 = p1 - p0;
+    Vec3f e2 = p2 - p0;
+    Vec3f faceNormal = glm::cross(e1, e2); // unnormalized = area-weighted
+
+    mesh.normals[tri.x] += faceNormal;
+    mesh.normals[tri.y] += faceNormal;
+    mesh.normals[tri.z] += faceNormal;
+  }
+
+  for (auto& n : mesh.normals) {
+    float len = glm::length(n);
+    if (len > 1e-8f)
+      n /= len;
+    else
+      n = Vec3f(0.0f, 1.0f, 0.0f);
+  }
+}
+
 /// Build a SceneProxy from the current System state
-static std::unique_ptr<SceneProxy> buildSceneProxy(System& system, int frameIdx, float simTime)
+static std::unique_ptr<SceneProxy> buildSceneProxy(System& system,
+                                                    const std::vector<glm::vec3>& colors,
+                                                    int frameIdx, float simTime)
 {
   auto scene = std::make_unique<SceneProxy>();
   scene->frameIndex = frameIdx;
   scene->simulationTime = simTime;
+
+  // Diagnostic: log first vertex position periodically
+  if (frameIdx % 10 == 0 && system.x.numBlocks() > 0) {
+    auto v0 = system.x[0];
+    spdlog::debug("[SceneProxy] frame={} body0_vert0=({:.6f},{:.6f},{:.6f})",
+                  frameIdx, v0.x, v0.y, v0.z);
+  }
 
   // Extract each primitive's surface mesh
   int dofStart = 0;
@@ -27,6 +66,10 @@ static std::unique_ptr<SceneProxy> buildSceneProxy(System& system, int frameIdx,
 
     MeshProxy mesh;
     mesh.name = "body_" + std::to_string(i);
+
+    // Per-object color
+    if (i < static_cast<int>(colors.size()))
+      mesh.objectColor = colors[i];
 
     // Extract vertex positions from system.x (BlockVector<3>)
     mesh.positions.resize(vertCount);
@@ -48,6 +91,9 @@ static std::unique_ptr<SceneProxy> buildSceneProxy(System& system, int frameIdx,
           static_cast<unsigned>(tri[1]),
           static_cast<unsigned>(tri[2]));
     }
+
+    // Compute smooth vertex normals
+    computeSmoothNormals(mesh);
 
     scene->meshes.push_back(std::move(mesh));
   }
@@ -113,23 +159,30 @@ void bind_renderer(py::module_& m)
     auto& rend = *renderer->impl;
 
     // Push initial frame
-    auto initScene = buildSceneProxy(sim->py_system->system, 0,
+    const auto& colors = sim->py_system->primitive_colors;
+    auto initScene = buildSceneProxy(sim->py_system->system, colors, 0,
                                      static_cast<float>(sim->py_system->system.currentTime()));
     rend.queue().push(std::move(initScene));
 
     // Simulation runs in background thread, pushes frames
+    std::exception_ptr sim_exception;
     std::thread simThread([&]() {
-      py::gil_scoped_release release; // Release GIL for sim thread
-      for (int i = 0; i < steps; i++) {
-        if (!rend.isRunning()) break;
+      // Note: this is a new OS thread with no Python thread state.
+      // All work here is pure C++ (no Python callbacks), so no GIL needed.
+      try {
+        for (int i = 0; i < steps; i++) {
+          if (!rend.isRunning()) break;
 
-        sim->integrator->step(dt);
-        sim->py_system->system.advanceTime(dt);
-        sim->steps_completed++;
+          sim->integrator->step(dt);
+          // Note: IpcIntegrator::step() already calls advanceTime(dt)
+          sim->steps_completed++;
 
-        auto scene = buildSceneProxy(sim->py_system->system, i + 1,
-                                     static_cast<float>(sim->py_system->system.currentTime()));
-        rend.queue().push(std::move(scene));
+          auto scene = buildSceneProxy(sim->py_system->system, colors, i + 1,
+                                       static_cast<float>(sim->py_system->system.currentTime()));
+          rend.queue().push(std::move(scene));
+        }
+      } catch (...) {
+        sim_exception = std::current_exception();
       }
       // Signal renderer to stop after all frames consumed
       // (renderer will drain queue then exit)
@@ -143,6 +196,9 @@ void bind_renderer(py::module_& m)
     }
 
     simThread.join();
+
+    // Re-throw simulation exceptions on main thread (with GIL held)
+    if (sim_exception) std::rethrow_exception(sim_exception);
 
   }, py::arg("simulation"), py::arg("renderer"),
      py::arg("dt") = 0.01, py::arg("steps") = 1000,

@@ -10,6 +10,7 @@
 #include <fem/ipc/distances.h>
 #include <fem/system.h>
 #include <tbb/tbb.h>
+#include <spdlog/spdlog.h>
 
 namespace sim::fem::ipc {
 
@@ -40,9 +41,12 @@ std::optional<Contact> eeCCD(const CCDQuery &query, Real toi) {
   auto solution = solveCoplanarTime(query, toi);
   if (!solution.numRoots)
     return std::nullopt;
-  if (solution.infiniteSolutions)
-    throw std::runtime_error(
-        "Infinite solutions detected in eeCCD, cannot be handled");
+  if (solution.infiniteSolutions) {
+    // Degenerate case: all four points are always coplanar.
+    // Return conservative nullopt instead of throwing — the ACCD path handles this safely.
+    spdlog::debug("[CCD] eeCCD: infinite coplanar solutions detected, returning nullopt");
+    return std::nullopt;
+  }
   const auto &[x1, x2_x1, x3_x1, x4_x1, u1, u2_u1, u3_u1, u4_u1] = query;
   std::optional<maths::BinaryLinearSolution> sol{};
   for (int i = 0; i < solution.numRoots; i++) {
@@ -110,9 +114,12 @@ std::optional<Contact> vtCCD(const CCDQuery &query, Real toi) {
   auto solution = solveCoplanarTime(query, toi);
   if (!solution.numRoots)
     return std::nullopt;
-  if (solution.infiniteSolutions)
-    throw std::runtime_error(
-        "Infinite solutions detected in vtCCD, cannot be handled");
+  if (solution.infiniteSolutions) {
+    // Degenerate case: vertex always on the triangle plane.
+    // Return conservative nullopt — the ACCD path handles this safely.
+    spdlog::debug("[CCD] vtCCD: infinite coplanar solutions detected, returning nullopt");
+    return std::nullopt;
+  }
   const auto &[x1, x2_x1, x3_x1, x4_x1, u1, u2_u1, u3_u1, u4_u1] = query;
   std::optional<maths::BinaryLinearSolution> sol{};
   for (int i = 0; i < solution.numRoots; i++) {
@@ -176,6 +183,8 @@ std::optional<Real> CollisionDetector::runACCDReserved(
   Real t = 0.0;
   Real tl = (1.0 - s) * (dSqr - reservedDistance * reservedDistance) /
             ((std::sqrt(dSqr) + reservedDistance) * lp);
+  constexpr int kMaxACCDIterations = 2000;
+  int accdIter = 0;
   while (true) {
     for (int i = 0; i < 4; i++)
       x[i] += p[i] * tl;
@@ -189,6 +198,11 @@ std::optional<Real> CollisionDetector::runACCDReserved(
       return std::nullopt;
     tl = 0.9 * (dSqr - reservedDistance * reservedDistance) /
          ((std::sqrt(dSqr) + reservedDistance) * lp);
+    // Guard against infinite loop when tl approaches zero
+    if (++accdIter >= kMaxACCDIterations) {
+      spdlog::warn("[ACCD-Reserved] hit max iterations ({}), returning conservative toi={}", kMaxACCDIterations, t);
+      return t > 0.0 ? std::optional<Real>(t) : std::nullopt;
+    }
   }
   return t;
 }
@@ -215,6 +229,8 @@ CollisionDetector::runACCD(CCDMode mode, std::array<glm::dvec3, 4> &x,
   Real g = s * dis;
   Real t = 0.0;
   Real tl = (1.0 - s) * (dis / lp);
+  constexpr int kMaxACCDIterations = 2000;
+  int accdIter = 0;
   while (true) {
     for (int i = 0; i < 4; i++)
       x[i] += p[i] * tl;
@@ -228,6 +244,11 @@ CollisionDetector::runACCD(CCDMode mode, std::array<glm::dvec3, 4> &x,
     if (t > toi)
       return std::nullopt;
     tl = 0.9 * dis / lp;
+    // Guard against infinite loop when tl approaches zero
+    if (++accdIter >= kMaxACCDIterations) {
+      spdlog::warn("[ACCD] hit max iterations ({}), returning conservative toi={}", kMaxACCDIterations, t);
+      return t > 0.0 ? std::optional<Real>(t) : std::nullopt;
+    }
   }
   return t;
 }

@@ -13,11 +13,13 @@ Real IpcImplicitEuler::incrementalPotentialKinematicEnergy(const maths::BlockVec
   x_hat.axpy(h, system().xdot);
   auto a = system().computeAcceleration();
   x_hat.axpy(h * h, a);
-  // E = 0.5 * (x - x_hat)^T * M * (x - x_hat)
+
   maths::BlockVector<3> diff = system().x;
   diff -= x_hat;
+
   maths::BlockVector<3> M_diff(diff.numBlocks());
   system().blockMass().apply(diff, M_diff);
+
   return 0.5 * diff.dot(M_diff);
 }
 

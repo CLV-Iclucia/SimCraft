@@ -2,10 +2,16 @@
 #include <Renderer/renderer.h>
 #include <unordered_map>
 #include <string>
+#include <glm/glm.hpp>
 
 struct GLFWwindow;
 
 namespace sim::renderer {
+
+struct SceneBounds {
+  glm::vec3 center{0.0f};
+  float radius = 1.0f;
+};
 
 class GLRenderer final : public Renderer {
 protected:
@@ -35,9 +41,18 @@ private:
   // 相机交互状态
   bool m_mousePressed = false;
   double m_lastMouseX = 0, m_lastMouseY = 0;
-  float m_yaw = -90.0f;  // 水平角度
-  float m_pitch = 0.0f;   // 垂直角度
-  float m_distance = 5.0f; // 距离目标的距离
+  float m_yaw = -60.0f;     // 水平角度（F2.3: 原 -90.0f）
+  float m_pitch = 25.0f;    // 垂直角度（F2.3: 原 0.0f）
+  float m_distance = 5.0f;   // 距离目标的距离
+
+  // 相机自适应与跟踪（F2.2）
+  bool m_cameraInitialized = false;
+  bool m_autoTrack = true;
+
+  // 地面参考网格（F3.2）
+  unsigned int m_groundGridVao = 0;
+  unsigned int m_groundGridVbo = 0;
+  int m_groundGridVertexCount = 0;
 
   void uploadMesh(const MeshProxy& mesh);
   void drawMesh(const MeshProxy& mesh);
@@ -45,10 +60,17 @@ private:
   void drawParticles(const ParticleProxy& particles);
   glm::mat4 computeViewMatrix() const;
   glm::mat4 computeProjectionMatrix() const;
-  
+
   // 相机交互
   void setupInputCallbacks();
   void updateCameraFromInput();
+
+  // 场景包围盒计算（F2.1）
+  SceneBounds computeSceneBounds(const SceneProxy& scene) const;
+
+  // 地面参考网格（F3.2）
+  void drawGroundGrid(const glm::mat4& view, const glm::mat4& projection);
+  void buildGroundGrid();
 };
 
 } // namespace sim::renderer

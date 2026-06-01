@@ -28,6 +28,7 @@ using maths::vectorize;
 // the only thing System do is dispatching tasks to primitives
 // and gather the dof to solve the system globally
 struct System {
+
   maths::BlockVector<3> x{}, X{}, xdot{}, energyGradient{};
 
   [[nodiscard]] Real meshLengthScale() const { return m_meshLengthScale; }
@@ -58,6 +59,17 @@ struct System {
 
   [[nodiscard]] Real totalEnergy() const {
     return kineticEnergy() + potentialEnergy();
+  }
+
+  [[nodiscard]] Real gravitationalPotentialEnergy() const {
+    maths::BlockVector<3> g_vec(x.numBlocks());
+    for (int i = 0; i < x.numBlocks(); i++)
+      g_vec[i] = m_gravity;
+    // M * g_vec
+    maths::BlockVector<3> Mg(x.numBlocks());
+    m_blockMass.apply(g_vec, Mg);
+    // Vg = -(M * g) · x = -Mg · x
+    return -Mg.dot(x);
   }
 
   [[nodiscard]] const Primitive &primitive(int id) const { return prs[id]; }

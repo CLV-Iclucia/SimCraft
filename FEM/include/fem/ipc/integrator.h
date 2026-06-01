@@ -9,6 +9,7 @@
 #include <fem/ipc/collision-detector.h>
 #include <fem/ipc/barrier-functions.h>
 #include <Maths/block-linear-solver.h>
+#include <functional>
 
 namespace sim::fem {
 struct ConstraintSet {
@@ -19,7 +20,6 @@ struct ConstraintSet {
   }
   std::vector<ipc::VertexTriangleConstraint> vtConstraints{};
   std::vector<ipc::EdgeEdgeConstraint> eeConstraints{};
-  // 运动学体约束 (弹性体顶点 vs 运动学三角形)
   std::vector<ipc::DeformableKinematicVTConstraint> kinematicVTConstraints{};
 };
 
@@ -47,6 +47,9 @@ class IpcIntegrator : public Integrator {
     void step(Real dt) override;
     std::unique_ptr<maths::BlockLinearSolver> solver;
     static std::unique_ptr<Integrator> create(System &system, const core::JsonNode &json);
+
+    /// Optional callback invoked after each Newton iteration (for debug visualization)
+    std::function<void(int iter)> onNewtonIter;
 
   protected:
 
@@ -92,7 +95,7 @@ class IpcIntegrator : public Integrator {
       return t.value_or(1.0);
     }
 
-    maths::BlockSparseMatrix<3> spdProjectHessian(Real h);
+    [[nodiscard]] maths::BlockSparseMatrix<3> spdProjectHessian(Real h) const;
     void updateConstraintStatus();
     void precomputeConstraintSet(const ConstraintSetPrecomputeRequest &config);
     void computeVertexTriangleConstraints(const ConstraintSetPrecomputeRequest &config);

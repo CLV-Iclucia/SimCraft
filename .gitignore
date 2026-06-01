@@ -1,0 +1,7 @@
+.planning/
+build/
+.claude/
+.idea/
+cmake-build-*/
+docs/
+dev_setup.py

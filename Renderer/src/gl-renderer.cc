@@ -5,6 +5,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 #include <cmath>
+#include <limits>
 
 namespace sim::renderer {
 
@@ -24,10 +25,11 @@ static const char* vertexShaderSource = R"(
     out vec3 VertexColor;
 
     void main() {
-        FragPos = vec3(model * vec4(aPos, 1.0));
+        vec4 worldPos = model * vec4(aPos, 1.0);
+        FragPos = worldPos.xyz;
         Normal = mat3(transpose(inverse(model))) * aNormal;
         VertexColor = aColor;
-        gl_Position = projection * view * vec4(FragPos, 1.0);
+        gl_Position = projection * view * worldPos;
     }
 )";
 
@@ -40,27 +42,68 @@ static const char* fragmentShaderSource = R"(
     in vec3 VertexColor;
 
     uniform vec3 lightPos;
+    uniform vec3 lightPos2;
     uniform vec3 viewPos;
+    uniform vec3 objectColor;
+
+    // Blinn-Phong 单光源计算
+    vec3 calcBlinnPhong(vec3 lightDir, vec3 viewDir, vec3 norm,
+                        vec3 baseColor, vec3 lightColor, float intensity) {
+        // Diffuse (半 Lambert wrap — 暗面不完全黑)
+        float NdotL = dot(norm, lightDir);
+        float diff = max(NdotL, 0.0);
+        // wrap lighting: 把 [-1,1] 映射到 [0.2, 1.0]，暗面保留一点光
+        float wrapDiff = diff * 0.8 + 0.2;
+        vec3 diffuse = wrapDiff * baseColor * lightColor * intensity;
+
+        // Specular — Blinn-Phong half-vector
+        vec3 halfDir = normalize(lightDir + viewDir);
+        float NdotH = max(dot(norm, halfDir), 0.0);
+        // shininess = 32: 适中的高光大小，肉眼明显可见
+        float spec = pow(NdotH, 32.0);
+        // 只在正面才有高光（避免背面穿透）
+        spec *= step(0.0, NdotL);
+        vec3 specular = spec * lightColor * intensity * 0.5;
+
+        return diffuse + specular;
+    }
 
     void main() {
-        // Ambient
-        float ambientStrength = 0.3;
-        vec3 ambient = ambientStrength * VertexColor;
+        // 材质基础色
+        vec3 baseColor = (dot(VertexColor, VertexColor) > 0.001)
+                         ? VertexColor : objectColor;
 
-        // Diffuse
         vec3 norm = normalize(Normal);
-        vec3 lightDir = normalize(lightPos - FragPos);
-        float diff = max(dot(norm, lightDir), 0.0);
-        vec3 diffuse = diff * VertexColor;
-
-        // Specular
-        float specularStrength = 0.5;
         vec3 viewDir = normalize(viewPos - FragPos);
-        vec3 reflectDir = reflect(-lightDir, norm);
-        float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
-        vec3 specular = specularStrength * spec * vec3(1.0, 1.0, 1.0);
 
-        vec3 result = ambient + diffuse + specular;
+        // --- Ambient（环境光，模拟天光 — 上方偏暖，下方偏冷）---
+        float upFactor = dot(norm, vec3(0.0, 1.0, 0.0)) * 0.5 + 0.5; // [0, 1]
+        vec3 ambientColor = mix(vec3(0.08, 0.10, 0.14),   // 地面反射冷色
+                                vec3(0.18, 0.16, 0.14),    // 天光暖色
+                                upFactor);
+        vec3 ambient = ambientColor * baseColor;
+
+        // --- 主光源（Key light）---
+        vec3 lightDir1 = normalize(lightPos - FragPos);
+        vec3 key = calcBlinnPhong(lightDir1, viewDir, norm,
+                                  baseColor, vec3(1.0, 0.95, 0.9), 1.0);
+
+        // --- 填充光（Fill light）---
+        vec3 lightDir2 = normalize(lightPos2 - FragPos);
+        vec3 fill = calcBlinnPhong(lightDir2, viewDir, norm,
+                                   baseColor, vec3(0.85, 0.9, 1.0), 0.35);
+
+        // --- Fresnel 边缘光（让轮廓从背景中脱出）---
+        float fresnel = 1.0 - max(dot(norm, viewDir), 0.0);
+        fresnel = pow(fresnel, 3.0) * 0.25;
+        vec3 rim = fresnel * vec3(0.6, 0.7, 0.8);
+
+        // --- 合成 ---
+        vec3 result = ambient + key + fill + rim;
+
+        // Gamma 校正（线性空间 → sRGB）
+        result = pow(result, vec3(1.0 / 2.2));
+
         FragColor = vec4(result, 1.0);
     }
 )";
@@ -169,7 +212,8 @@ void GLRenderer::initialize(const RendererConfig& config) {
     // Set up OpenGL state
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
-    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    // 浅灰白背景（专业软件风，干净中性）
+    glClearColor(0.92f, 0.92f, 0.94f, 1.0f);
 
     // Set up input callbacks
     setupInputCallbacks();
@@ -178,17 +222,47 @@ void GLRenderer::initialize(const RendererConfig& config) {
 }
 
 void GLRenderer::drawFrame(const SceneProxy& scene) {
+    // === 相机自适应与跟踪 ===
+    auto bounds = computeSceneBounds(scene);
+
+    if (!m_cameraInitialized) {
+        // 首帧：根据包围球和 FOV 计算安全观察距离
+        m_camera.target = bounds.center;
+
+        // 正确公式：distance = radius / tan(fov/2) * margin
+        // 保证物体完整在视锥内，带 60% 呼吸空间
+        float halfFovTan = std::tan(glm::radians(m_camera.fov * 0.5f));
+        m_distance = (bounds.radius / halfFovTan) * 1.6f;
+        // 保底：至少是包围球半径的 4 倍
+        m_distance = std::max(m_distance, bounds.radius * 4.0f);
+
+        m_pitch = 25.0f;   // 稍微俯视
+        m_yaw = -60.0f;    // 略偏，增加立体感
+        m_cameraInitialized = true;
+
+        // 立即重算相机位置，确保本帧就用正确的视角渲染
+        updateCameraFromInput();
+
+        std::cout << "[Camera] Auto-fit: center=(" << bounds.center.x << ","
+                  << bounds.center.y << "," << bounds.center.z
+                  << "), radius=" << bounds.radius
+                  << ", distance=" << m_distance << std::endl;
+    } else if (m_autoTrack) {
+        // 后续帧：平滑跟踪场景质心
+        float trackSpeed = 0.08f;
+        m_camera.target = glm::mix(m_camera.target, bounds.center, trackSpeed);
+    }
+
+    // 动态调整近远平面 — 防止大场景被裁剪
+    m_camera.nearPlane = std::max(0.01f, m_distance * 0.01f);
+    m_camera.farPlane = std::max(100.0f, m_distance * 5.0f);
+
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Use mesh shader
     glUseProgram(m_meshShader);
 
-    // Set up lighting
-    glm::vec3 lightPos(5.0f, 5.0f, 5.0f);
-    glUniform3fv(glGetUniformLocation(m_meshShader, "lightPos"), 1, glm::value_ptr(lightPos));
-    glUniform3fv(glGetUniformLocation(m_meshShader, "viewPos"), 1, glm::value_ptr(m_camera.position));
-
-    // Set up matrices
+    // 相机相关矩阵
     glm::mat4 model = glm::mat4(1.0f);
     glm::mat4 view = computeViewMatrix();
     glm::mat4 projection = computeProjectionMatrix();
@@ -196,6 +270,22 @@ void GLRenderer::drawFrame(const SceneProxy& scene) {
     glUniformMatrix4fv(glGetUniformLocation(m_meshShader, "model"), 1, GL_FALSE, glm::value_ptr(model));
     glUniformMatrix4fv(glGetUniformLocation(m_meshShader, "view"), 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(glGetUniformLocation(m_meshShader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+    // 光照 — 光源位置随场景大小缩放（确保光在网格外部）
+    float lightScale = std::max(bounds.radius * 2.0f, 3.0f);
+    glm::vec3 lightPos = m_camera.target + glm::vec3(lightScale * 0.6f, lightScale, lightScale * 0.8f);
+    glUniform3fv(glGetUniformLocation(m_meshShader, "lightPos"), 1, glm::value_ptr(lightPos));
+
+    // 填充光（另一侧，较远，补暗面）
+    glm::vec3 lightPos2 = m_camera.target + glm::vec3(-lightScale * 0.5f, lightScale * 0.3f, -lightScale * 0.7f);
+    glUniform3fv(glGetUniformLocation(m_meshShader, "lightPos2"), 1, glm::value_ptr(lightPos2));
+
+    // 视点
+    glUniform3fv(glGetUniformLocation(m_meshShader, "viewPos"), 1, glm::value_ptr(m_camera.position));
+
+    // 默认材质色（温暖的陶土/粘土色）
+    glm::vec3 defaultColor(0.75f, 0.55f, 0.38f);
+    glUniform3fv(glGetUniformLocation(m_meshShader, "objectColor"), 1, glm::value_ptr(defaultColor));
 
     // Draw meshes
     for (const auto& mesh : scene.meshes) {
@@ -217,6 +307,9 @@ void GLRenderer::drawFrame(const SceneProxy& scene) {
     for (const auto& particle : scene.particles) {
         drawParticles(particle);
     }
+
+    // 绘制地面参考网格
+    drawGroundGrid(view, projection);
 }
 
 void GLRenderer::uploadMesh(const MeshProxy& mesh) {
@@ -259,21 +352,18 @@ void GLRenderer::uploadMesh(const MeshProxy& mesh) {
     glEnableVertexAttribArray(0);
 
     // Normals
+    glBindBuffer(GL_ARRAY_BUFFER, state.nbo);
     if (!mesh.normals.empty()) {
-        glBindBuffer(GL_ARRAY_BUFFER, state.nbo);
         glBufferData(GL_ARRAY_BUFFER, mesh.normals.size() * sizeof(core::Vec3f),
                      mesh.normals.data(), GL_DYNAMIC_DRAW);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(core::Vec3f), (void*)0);
-        glEnableVertexAttribArray(1);
     } else {
-        // TODO: compute face normals or skip
-        glDisableVertexAttribArray(1);
+        // 安全后备：全部朝上的法线（保证不全黑）
+        std::vector<core::Vec3f> defaultNormals(mesh.positions.size(), core::Vec3f(0.0f, 1.0f, 0.0f));
+        glBufferData(GL_ARRAY_BUFFER, defaultNormals.size() * sizeof(core::Vec3f),
+                     defaultNormals.data(), GL_DYNAMIC_DRAW);
     }
-
-    // Colors (use default if not provided)
-    if (!mesh.colors.empty()) {
-        // Would need another VBO for colors
-    }
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(core::Vec3f), (void*)0);
+    glEnableVertexAttribArray(1);
 
     // Indices
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, state.ebo);
@@ -294,6 +384,13 @@ void GLRenderer::drawMesh(const MeshProxy& mesh) {
     const auto& state = it->second;
 
     glUseProgram(m_meshShader);
+
+    // Per-object color: 负值表示使用全局默认色
+    if (mesh.objectColor.x >= 0.0f) {
+        glUniform3fv(glGetUniformLocation(m_meshShader, "objectColor"), 1,
+                     glm::value_ptr(mesh.objectColor));
+    }
+
     glBindVertexArray(state.vao);
     glDrawElements(GL_TRIANGLES, state.indexCount, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
@@ -361,6 +458,25 @@ void GLRenderer::setupInputCallbacks() {
 
     glfwSetWindowUserPointer(m_window, this);
 
+    // 键盘回调：R 重置相机，T 切换自动跟踪
+    glfwSetKeyCallback(m_window, [](GLFWwindow* window, int key, int scancode, int action, int mods) {
+        auto* renderer = static_cast<GLRenderer*>(glfwGetWindowUserPointer(window));
+        if (action != GLFW_PRESS) return;
+
+        switch (key) {
+            case GLFW_KEY_R:  // Reset camera
+                renderer->m_cameraInitialized = false;
+                break;
+            case GLFW_KEY_T:  // Toggle auto-track
+                renderer->m_autoTrack = !renderer->m_autoTrack;
+                std::cout << "[Camera] auto-track " << (renderer->m_autoTrack ? "ON" : "OFF") << std::endl;
+                break;
+            case GLFW_KEY_ESCAPE:
+                glfwSetWindowShouldClose(window, GLFW_TRUE);
+                break;
+        }
+    });
+
     glfwSetMouseButtonCallback(m_window, [](GLFWwindow* window, int button, int action, int mods) {
         auto* renderer = static_cast<GLRenderer*>(glfwGetWindowUserPointer(window));
         if (button == GLFW_MOUSE_BUTTON_LEFT) {
@@ -390,8 +506,10 @@ void GLRenderer::setupInputCallbacks() {
 
     glfwSetScrollCallback(m_window, [](GLFWwindow* window, double xoffset, double yoffset) {
         auto* renderer = static_cast<GLRenderer*>(glfwGetWindowUserPointer(window));
-        renderer->m_distance -= (float)yoffset * 0.5f;
-        renderer->m_distance = std::max(0.1f, renderer->m_distance);
+        // 缩放步长与当前距离成比例（15% 每 tick），保证远近手感一致
+        float zoomFactor = 1.0f - (float)yoffset * 0.15f;
+        renderer->m_distance *= zoomFactor;
+        renderer->m_distance = std::max(0.01f, renderer->m_distance);
     });
 }
 
@@ -410,9 +528,90 @@ void GLRenderer::updateCameraFromInput() {
     }
 }
 
+// --- SceneBounds & Camera Tracking ---
+
+SceneBounds GLRenderer::computeSceneBounds(const SceneProxy& scene) const {
+    SceneBounds bounds;
+
+    if (scene.meshes.empty()) return bounds;
+
+    glm::vec3 minP(std::numeric_limits<float>::max());
+    glm::vec3 maxP(std::numeric_limits<float>::lowest());
+
+    for (const auto& mesh : scene.meshes) {
+        for (const auto& p : mesh.positions) {
+            glm::vec3 pos(p.x, p.y, p.z);
+            minP = glm::min(minP, pos);
+            maxP = glm::max(maxP, pos);
+        }
+    }
+
+    if (minP.x > maxP.x) return bounds; // 无有效顶点
+
+    // 使用 AABB 中心（而非顶点质心）— 与 radius 计算一致
+    bounds.center = (minP + maxP) * 0.5f;
+
+    // radius = 从 AABB 中心到最远角的距离（即包围球半径）
+    bounds.radius = glm::length(maxP - bounds.center);
+
+    // 保证最小半径
+    bounds.radius = std::max(bounds.radius, 0.1f);
+
+    return bounds;
+}
+
+// --- Ground Grid ---
+
+void GLRenderer::buildGroundGrid() {
+    const int halfExtent = 5;       // -5 到 +5
+    const float spacing = 0.5f;
+    std::vector<glm::vec3> lines;
+
+    for (int i = -halfExtent; i <= halfExtent; i++) {
+        float fi = static_cast<float>(i) * spacing;
+        float ext = static_cast<float>(halfExtent) * spacing;
+        // X 方向线段
+        lines.push_back({-ext, 0.0f, fi});
+        lines.push_back({ ext, 0.0f, fi});
+        // Z 方向线段
+        lines.push_back({fi, 0.0f, -ext});
+        lines.push_back({fi, 0.0f,  ext});
+    }
+
+    m_groundGridVertexCount = static_cast<int>(lines.size());
+
+    glGenVertexArrays(1, &m_groundGridVao);
+    glGenBuffers(1, &m_groundGridVbo);
+    glBindVertexArray(m_groundGridVao);
+    glBindBuffer(GL_ARRAY_BUFFER, m_groundGridVbo);
+    glBufferData(GL_ARRAY_BUFFER, lines.size() * sizeof(glm::vec3), lines.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0);
+}
+
+void GLRenderer::drawGroundGrid(const glm::mat4& view, const glm::mat4& projection) {
+    glUseProgram(m_wireShader);
+    glUniformMatrix4fv(glGetUniformLocation(m_wireShader, "view"), 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(m_wireShader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+    glm::vec3 gridColor(0.72f, 0.72f, 0.75f);
+    glUniform3fv(glGetUniformLocation(m_wireShader, "wireColor"), 1, glm::value_ptr(gridColor));
+
+    if (m_groundGridVao == 0) {
+        buildGroundGrid();  // 只构建一次
+    }
+
+    glBindVertexArray(m_groundGridVao);
+    glDrawArrays(GL_LINES, 0, m_groundGridVertexCount);
+    glBindVertexArray(0);
+}
+
 // Factory function
 std::unique_ptr<Renderer> createRenderer(const RendererConfig& config) {
-    return std::make_unique<GLRenderer>();
+    auto renderer = std::make_unique<GLRenderer>();
+    renderer->setConfig(config);
+    return renderer;
 }
 
 } // namespace sim::renderer

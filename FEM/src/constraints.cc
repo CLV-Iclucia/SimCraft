@@ -1,4 +1,5 @@
 #include <fem/constraints.h>
+#include <fem/system.h>
 #include <spdlog/spdlog.h>
 
 namespace sim::fem {
@@ -51,12 +52,12 @@ void ConstraintManager::prescribeMotion(int vertexIdx,
   VertexConstraint c;
   c.globalBlockIdx = vertexIdx;
   c.mask = {true, true, true};
-  TimeVaryingConstraint tvc;
-  tvc.positionFunc = std::move(positionFunc);
+  MotionConstraint mc;
+  mc.positionFunc = std::move(positionFunc);
   if (velocityFunc.has_value()) {
-    tvc.velocityFunc = std::move(velocityFunc.value());
+    mc.velocityFunc = std::move(velocityFunc.value());
   }
-  c.data = tvc;
+  c.data = mc;
   m_constraints.push_back(c);
 }
 
@@ -71,7 +72,6 @@ void ConstraintManager::prescribeVelocity(int vertexIdx, std::function<glm::dvec
 void ConstraintManager::build(int totalBlocks) {
   m_constraintMask.assign(totalBlocks, {false, false, false});
   for (const auto& c : m_constraints) {
-    // 手动合并 mask (glm::bvec3 没有 operator|)
     auto& mask = m_constraintMask[c.globalBlockIdx];
     mask.x = mask.x || c.mask.x;
     mask.y = mask.y || c.mask.y;
@@ -94,22 +94,25 @@ void ConstraintManager::build(int totalBlocks) {
   }
 }
 
-void ConstraintManager::enforcePosition(maths::BlockVector<3>& x, Real t) const {
+void ConstraintManager::enforcePosition(System& system, Real t) const {
+  auto modified_x = system.x;
   for (const auto& c : m_constraints) {
     if (!c.isPositionConstraint()) continue;
     auto target = c.targetAt(t);
-    if (c.globalBlockIdx < 0 || c.globalBlockIdx >= x.numBlocks()) continue;
-    auto& block = x[c.globalBlockIdx];
+    if (c.globalBlockIdx < 0 || c.globalBlockIdx >= modified_x.numBlocks()) continue;
+    auto& block = modified_x[c.globalBlockIdx];
     if (c.mask.x) block.x = target.x;
     if (c.mask.y) block.y = target.y;
     if (c.mask.z) block.z = target.z;
   }
+  system.updateCurrentConfig(modified_x);
 }
 
-void ConstraintManager::enforceVelocity(maths::BlockVector<3>& xdot, Real t) const {
+void ConstraintManager::enforceVelocity(System& system, Real t) const {
+  auto modified_xdot = system.xdot;
   for (const auto& c : m_constraints) {
-    if (c.globalBlockIdx < 0 || c.globalBlockIdx >= xdot.numBlocks()) continue;
-    auto& block = xdot[c.globalBlockIdx];
+    if (c.globalBlockIdx < 0 || c.globalBlockIdx >= modified_xdot.numBlocks()) continue;
+    auto& block = modified_xdot[c.globalBlockIdx];
     
     if (c.isVelocityConstraint()) {
       auto v = c.targetVelocityAt(t);
@@ -117,14 +120,11 @@ void ConstraintManager::enforceVelocity(maths::BlockVector<3>& xdot, Real t) con
       if (c.mask.y) block.y = v.y;
       if (c.mask.z) block.z = v.z;
     } else if (c.isPositionConstraint()) {
-      // 位置约束的顶点速度由约束类型决定
       if (std::holds_alternative<FixedConstraint>(c.data)) {
-        // Fixed → 速度 = 0
         if (c.mask.x) block.x = 0.0;
         if (c.mask.y) block.y = 0.0;
         if (c.mask.z) block.z = 0.0;
-      } else if (std::holds_alternative<TimeVaryingConstraint>(c.data)) {
-        // TimeVarying → 使用提供的速度函数或数值差分
+      } else if (std::holds_alternative<MotionConstraint>(c.data)) {
         auto v = c.targetVelocityAt(t);
         if (c.mask.x) block.x = v.x;
         if (c.mask.y) block.y = v.y;
@@ -132,6 +132,7 @@ void ConstraintManager::enforceVelocity(maths::BlockVector<3>& xdot, Real t) con
       }
     }
   }
+  system.xdot = modified_xdot;
 }
 
 void ConstraintManager::projectToFreeSpace(maths::BlockVector<3>& v) const {

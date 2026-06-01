@@ -1,17 +1,17 @@
 project(Spatify LANGUAGES CXX)
 add_library(Spatify INTERFACE)
-# if can find tbb, link tbb to Spatify
-option(SPATIFY_ENABLE_GUI "Enable GUI support" OFF)
-option(SPATIFY_BUILD_CUDA "Build CUDA Spatify toolkits" OFF)
+
 find_package(TBB)
 if(TBB_FOUND)
     target_link_libraries(Spatify INTERFACE TBB::tbb)
     target_compile_definitions(Spatify INTERFACE USE_TBB)
 endif()
+
 target_include_directories(Spatify INTERFACE
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
 )
+# glm comes transitively from Core; also add directly for standalone use
 target_include_directories(Spatify INTERFACE ${EXTERNAL_PATH}/glm)
 
 # Add test

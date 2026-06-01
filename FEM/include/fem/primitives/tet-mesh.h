@@ -16,7 +16,8 @@ struct TetMesh {
   TetMesh(const std::vector<Vector<Real, 3>> &vertices,
           const std::vector<Tetrahedron> &tets,
           const std::vector<Vector<Real, 3>> &velocities = {})
-      : vertices(vertices), tets(tets) {
+      : vertices(vertices), tets(tets), velocities(velocities) {
+    ensurePositiveOrientation();
     computeSurface();
     computeSurfaceEdges();
   }
@@ -61,6 +62,17 @@ private:
   }
   void computeSurface();
   void computeSurfaceEdges();
+
+  /// 确保所有四面体正定向（det > 0）。若为负则交换顶点 0 和 1。
+  void ensurePositiveOrientation() {
+    for (auto &tet : tets) {
+      Matrix<Real, 3, 3> edges;
+      for (int j = 0; j < 3; j++)
+        edges.col(j) = vertices[tet[j + 1]] - vertices[tet[0]];
+      if (edges.determinant() < 0)
+        std::swap(tet[0], tet[1]);
+    }
+  }
 };
 
 std::optional<TetMesh> readTetMeshFromTOBJ(const std::filesystem::path &path);

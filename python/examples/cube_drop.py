@@ -29,7 +29,7 @@ from pathlib import Path
 print(f"simcraft {simcraft.__version__}")
 
 # ─── 1. Mesh ────────────────────────────────────────────────────────────────
-mesh_path = Path(__file__).resolve().parents[2] / "FEM" / "assets" / "tets" / "cube2x2.tobj"
+mesh_path = Path(__file__).resolve().parents[2] / "FEM" / "assets" / "tets" / "cube10x10.tobj"
 mesh = simcraft.TetMesh.from_file(str(mesh_path))
 print(f"Mesh: {mesh.num_vertices} vertices, {mesh.num_elements} tets")
 
@@ -38,7 +38,7 @@ material = simcraft.NeoHookean(young=1e5, poisson=0.4)
 
 # ─── 3. System ──────────────────────────────────────────────────────────────
 system = simcraft.System()
-system.add_elastic_body(mesh, material, density=1000.0)
+system.add_elastic_body(mesh, material, density=1000.0, color=(0.40, 0.70, 0.95))
 system.gravity = np.array([0.0, -9.81, 0.0])
 
 # Ground plane at y = -1

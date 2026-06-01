@@ -1,5 +1,4 @@
-#ifndef SIMCRAFT_CORE_INCLUDE_CORE_DATA_STRUCTURES_GRIDS_H_
-#define SIMCRAFT_CORE_INCLUDE_CORE_DATA_STRUCTURES_GRIDS_H_
+#pragma once
 #include <Spatify/types.h>
 #include <Spatify/type-utils.h>
 #include <Spatify/parallel.h>
@@ -8,8 +7,6 @@
 #include <type_traits>
 
 namespace spatify {
-using std::max;
-using std::min;
 template <typename Scalar, typename T, int Dim, typename Offset, int PaddingSize
               = 0>
 class TGrid {
@@ -35,11 +32,11 @@ class TGrid<Scalar, T, 2, Offset, PaddingSize> {
       : m_size(size), m_grid_spacing(grid_spacing), m_data(size.x * size.y) {
     }
     explicit TGrid(const Vec2i& size, const Vector<T, 2>& grid_spacing,
-                   const vector<T>& data)
+                   const std::vector<T>& data)
       : m_size(size), m_grid_spacing(grid_spacing), m_data(data) {
     }
     explicit TGrid(const Vec2i& size, const Vector<T, 2>& grid_spacing,
-                   vector<T>&& data)
+                   std::vector<T>&& data)
       : m_size(size), m_grid_spacing(grid_spacing), m_data(std::move(data)) {
     }
 
@@ -151,36 +148,36 @@ class TGrid<Scalar, T, 2, Offset, PaddingSize> {
     template <typename Func>
     void forNeighbours(const Vector<T, 2>& p, T r, Func&& func) {
       int lower_bound_x =
-          max(static_cast<int>(std::ceil(p.x / m_grid_spacing.x - r)), 0);
+          std::max(static_cast<int>(std::ceil(p.x / m_grid_spacing.x - r)), 0);
       int upper_bound_x =
-          min(static_cast<int>(p.x / m_grid_spacing.x + r), m_size.x - 1);
+          std::min(static_cast<int>(p.x / m_grid_spacing.x + r), m_size.x - 1);
       int lower_bound_y =
-          max(static_cast<int>(std::ceil(p.y / m_grid_spacing.y - r)), 0);
+          std::max(static_cast<int>(std::ceil(p.y / m_grid_spacing.y - r)), 0);
       int upper_bound_y =
-          min(static_cast<int>(p.y / m_grid_spacing.y + r), m_size.y - 1);
+          std::min(static_cast<int>(p.y / m_grid_spacing.y + r), m_size.y - 1);
       for (int i = lower_bound_x; i <= upper_bound_x; i++)
         for (int j = lower_bound_y; j <= upper_bound_y; j++) func(i, j);
     }
     template <typename Func>
     void forNeighbours(const Vec2i& p, T r, Func&& func) {
       int lower_bound_x =
-          max(static_cast<int>(std::ceil(p.x / m_grid_spacing.x - r)), 0);
+          std::max(static_cast<int>(std::ceil(p.x / m_grid_spacing.x - r)), 0);
       int upper_bound_x =
-          min(static_cast<int>(p.x / m_grid_spacing.x + r), m_size.x - 1);
+          std::min(static_cast<int>(p.x / m_grid_spacing.x + r), m_size.x - 1);
       int lower_bound_y =
-          max(static_cast<int>(std::ceil(p.y / m_grid_spacing.y - r)), 0);
+          std::max(static_cast<int>(std::ceil(p.y / m_grid_spacing.y - r)), 0);
       int upper_bound_y =
-          min(static_cast<int>(p.y / m_grid_spacing.y + r), m_size.y - 1);
+          std::min(static_cast<int>(p.y / m_grid_spacing.y + r), m_size.y - 1);
       for (int i = lower_bound_x; i <= upper_bound_x; i++)
         for (int j = lower_bound_y; j <= upper_bound_y; j++) func(Vec2i(i, j));
     }
     template <typename Func>
     void forGridNeighbours(const Vec2i& p, T r, Func&& func) {
-      int lower_bound_x = max(p.x - static_cast<int>(std::ceil(r)), 0);
-      int upper_bound_x = min(p.x + static_cast<int>(std::ceil(r)),
+      int lower_bound_x = std::max(p.x - static_cast<int>(std::ceil(r)), 0);
+      int upper_bound_x = std::min(p.x + static_cast<int>(std::ceil(r)),
                               m_size.x - 1);
-      int lower_bound_y = max(p.y - static_cast<int>(std::ceil(r)), 0);
-      int upper_bound_y = min(p.y + static_cast<int>(std::ceil(r)),
+      int lower_bound_y = std::max(p.y - static_cast<int>(std::ceil(r)), 0);
+      int upper_bound_y = std::min(p.y + static_cast<int>(std::ceil(r)),
                               m_size.y - 1);
 
       for (int i = lower_bound_x; i <= upper_bound_x; i++)
@@ -188,22 +185,22 @@ class TGrid<Scalar, T, 2, Offset, PaddingSize> {
     }
     Range computeIntersectionNeighbourhoods(const Vec2i& p1, const Vec2i& p2,
                                             T r) {
-      int lower_bound_x1 = max(p1.x - static_cast<int>(std::ceil(r)), 0);
+      int lower_bound_x1 = std::max(p1.x - static_cast<int>(std::ceil(r)), 0);
       int upper_bound_x1 =
-          min(p1.x + static_cast<int>(std::ceil(r)), m_size.x - 1);
-      int lower_bound_y1 = max(p1.y - static_cast<int>(std::ceil(r)), 0);
+          std::min(p1.x + static_cast<int>(std::ceil(r)), m_size.x - 1);
+      int lower_bound_y1 = std::max(p1.y - static_cast<int>(std::ceil(r)), 0);
       int upper_bound_y1 =
-          min(p1.y + static_cast<int>(std::ceil(r)), m_size.y - 1);
-      int lower_bound_x2 = max(p2.x - static_cast<int>(std::ceil(r)), 0);
+          std::min(p1.y + static_cast<int>(std::ceil(r)), m_size.y - 1);
+      int lower_bound_x2 = std::max(p2.x - static_cast<int>(std::ceil(r)), 0);
       int upper_bound_x2 =
-          min(p2.x + static_cast<int>(std::ceil(r)), m_size.x - 1);
-      int lower_bound_y2 = max(p2.y - static_cast<int>(std::ceil(r)), 0);
+          std::min(p2.x + static_cast<int>(std::ceil(r)), m_size.x - 1);
+      int lower_bound_y2 = std::max(p2.y - static_cast<int>(std::ceil(r)), 0);
       int upper_bound_y2 =
-          min(p2.y + static_cast<int>(std::ceil(r)), m_size.y - 1);
-      int lower_bound_x = max(lower_bound_x1, lower_bound_x2);
-      int upper_bound_x = min(upper_bound_x1, upper_bound_x2);
-      int lower_bound_y = max(lower_bound_y1, lower_bound_y2);
-      int upper_bound_y = min(upper_bound_y1, upper_bound_y2);
+          std::min(p2.y + static_cast<int>(std::ceil(r)), m_size.y - 1);
+      int lower_bound_x = std::max(lower_bound_x1, lower_bound_x2);
+      int upper_bound_x = std::min(upper_bound_x1, upper_bound_x2);
+      int lower_bound_y = std::max(lower_bound_y1, lower_bound_y2);
+      int upper_bound_y = std::min(upper_bound_y1, upper_bound_y2);
       return std::make_tuple(Vec2i(lower_bound_x, lower_bound_y),
                              Vec2i(upper_bound_x, upper_bound_y));
     }
@@ -219,7 +216,7 @@ class TGrid<Scalar, T, 2, Offset, PaddingSize> {
     Vec2i m_size{0, 0};
     Vector<T, 2> m_origin{0.0, 0.0};
     Vector<T, 2> m_grid_spacing{1.0, 1.0};
-    vector<Scalar> m_data;
+    std::vector<Scalar> m_data;
 };
 
 template <typename StoredType, typename T, typename Offset, int Padding>
@@ -362,17 +359,17 @@ class TGrid<StoredType, T, 3, Offset, Padding> final {
     template <typename Func>
     void forNeighbours(const Vector<T, 3>& p, T r, Func&& func) {
       int lower_bound_x =
-          max(static_cast<int>(std::ceil(p.x / m_grid_spacing.x - r)), 0);
+          std::max(static_cast<int>(std::ceil(p.x / m_grid_spacing.x - r)), 0);
       int upper_bound_x =
-          min(static_cast<int>(p.x / m_grid_spacing.x + r), m_size.x - 1);
+          std::min(static_cast<int>(p.x / m_grid_spacing.x + r), m_size.x - 1);
       int lower_bound_y =
-          max(static_cast<int>(std::ceil(p.y / m_grid_spacing.y - r)), 0);
+          std::max(static_cast<int>(std::ceil(p.y / m_grid_spacing.y - r)), 0);
       int upper_bound_y =
-          min(static_cast<int>(p.y / m_grid_spacing.y + r), m_size.y - 1);
+          std::min(static_cast<int>(p.y / m_grid_spacing.y + r), m_size.y - 1);
       int lower_bound_z =
-          max(static_cast<int>(std::ceil(p.z / m_grid_spacing.z - r)), 0);
+          std::max(static_cast<int>(std::ceil(p.z / m_grid_spacing.z - r)), 0);
       int upper_bound_z =
-          min(static_cast<int>(p.z / m_grid_spacing.z + r), m_size.z - 1);
+          std::min(static_cast<int>(p.z / m_grid_spacing.z + r), m_size.z - 1);
       for (int i = lower_bound_x; i <= upper_bound_x; i++)
         for (int j = lower_bound_y; j <= upper_bound_y; j++)
           for (int k = lower_bound_z; k <= upper_bound_z; k++) func(i, j, k);
@@ -382,17 +379,17 @@ class TGrid<StoredType, T, 3, Offset, Padding> final {
     template <typename Func>
     void forNeighbours(const Vec3i& p, T r, Func&& func) {
       int lower_bound_x =
-          max(static_cast<int>(std::ceil(p.x / m_grid_spacing.x - r)), 0);
+          std::max(static_cast<int>(std::ceil(p.x / m_grid_spacing.x - r)), 0);
       int upper_bound_x =
-          min(static_cast<int>(p.x / m_grid_spacing.x + r), m_size.x - 1);
+          std::min(static_cast<int>(p.x / m_grid_spacing.x + r), m_size.x - 1);
       int lower_bound_y =
-          max(static_cast<int>(std::ceil(p.y / m_grid_spacing.y - r)), 0);
+          std::max(static_cast<int>(std::ceil(p.y / m_grid_spacing.y - r)), 0);
       int upper_bound_y =
-          min(static_cast<int>(p.y / m_grid_spacing.y + r), m_size.y - 1);
+          std::min(static_cast<int>(p.y / m_grid_spacing.y + r), m_size.y - 1);
       int lower_bound_z =
-          max(static_cast<int>(std::ceil(p.z / m_grid_spacing.z - r)), 0);
+          std::max(static_cast<int>(std::ceil(p.z / m_grid_spacing.z - r)), 0);
       int upper_bound_z =
-          min(static_cast<int>(p.z / m_grid_spacing.z + r), m_size.z - 1);
+          std::min(static_cast<int>(p.z / m_grid_spacing.z + r), m_size.z - 1);
       for (int i = lower_bound_x; i <= upper_bound_x; i++)
         for (int j = lower_bound_y; j <= upper_bound_y; j++)
           for (int k = lower_bound_z; k <= upper_bound_z; k++)
@@ -402,14 +399,14 @@ class TGrid<StoredType, T, 3, Offset, Padding> final {
     // the difference is that the centre must be grid indices
     template <typename Func>
     void forGridNeighbours(const Vec3i& p, T r, Func&& func) {
-      int lower_bound_x = max(p.x - static_cast<int>(std::ceil(r)), 0);
-      int upper_bound_x = min(p.x + static_cast<int>(std::ceil(r)),
+      int lower_bound_x = std::max(p.x - static_cast<int>(std::ceil(r)), 0);
+      int upper_bound_x = std::min(p.x + static_cast<int>(std::ceil(r)),
                               m_size.x - 1);
-      int lower_bound_y = max(p.y - static_cast<int>(std::ceil(r)), 0);
-      int upper_bound_y = min(p.y + static_cast<int>(std::ceil(r)),
+      int lower_bound_y = std::max(p.y - static_cast<int>(std::ceil(r)), 0);
+      int upper_bound_y = std::min(p.y + static_cast<int>(std::ceil(r)),
                               m_size.y - 1);
-      int lower_bound_z = max(p.z - static_cast<int>(std::ceil(r)), 0);
-      int upper_bound_z = min(p.z + static_cast<int>(std::ceil(r)),
+      int lower_bound_z = std::max(p.z - static_cast<int>(std::ceil(r)), 0);
+      int upper_bound_z = std::min(p.z + static_cast<int>(std::ceil(r)),
                               m_size.z - 1);
       for (int i = lower_bound_x; i <= upper_bound_x; i++)
         for (int j = lower_bound_y; j <= upper_bound_y; j++)
@@ -420,30 +417,30 @@ class TGrid<StoredType, T, 3, Offset, Padding> final {
     // that's actually the intersection of two cubes
     Range computeIntersectionNeighbourhoods(const Vec3i& p1, const Vec3i& p2,
                                             T r) {
-      int lower_bound_x1 = max(p1.x - static_cast<int>(std::ceil(r)), 0);
+      int lower_bound_x1 = std::max(p1.x - static_cast<int>(std::ceil(r)), 0);
       int upper_bound_x1 =
-          min(p1.x + static_cast<int>(std::ceil(r)), m_size.x - 1);
-      int lower_bound_y1 = max(p1.y - static_cast<int>(std::ceil(r)), 0);
+          std::min(p1.x + static_cast<int>(std::ceil(r)), m_size.x - 1);
+      int lower_bound_y1 = std::max(p1.y - static_cast<int>(std::ceil(r)), 0);
       int upper_bound_y1 =
-          min(p1.y + static_cast<int>(std::ceil(r)), m_size.y - 1);
-      int lower_bound_z1 = max(p1.z - static_cast<int>(std::ceil(r)), 0);
+          std::min(p1.y + static_cast<int>(std::ceil(r)), m_size.y - 1);
+      int lower_bound_z1 = std::max(p1.z - static_cast<int>(std::ceil(r)), 0);
       int upper_bound_z1 =
-          min(p1.z + static_cast<int>(std::ceil(r)), m_size.z - 1);
-      int lower_bound_x2 = max(p2.x - static_cast<int>(std::ceil(r)), 0);
+          std::min(p1.z + static_cast<int>(std::ceil(r)), m_size.z - 1);
+      int lower_bound_x2 = std::max(p2.x - static_cast<int>(std::ceil(r)), 0);
       int upper_bound_x2 =
-          min(p2.x + static_cast<int>(std::ceil(r)), m_size.x - 1);
-      int lower_bound_y2 = max(p2.y - static_cast<int>(std::ceil(r)), 0);
+          std::min(p2.x + static_cast<int>(std::ceil(r)), m_size.x - 1);
+      int lower_bound_y2 = std::max(p2.y - static_cast<int>(std::ceil(r)), 0);
       int upper_bound_y2 =
-          min(p2.y + static_cast<int>(std::ceil(r)), m_size.y - 1);
-      int lower_bound_z2 = max(p2.z - static_cast<int>(std::ceil(r)), 0);
+          std::min(p2.y + static_cast<int>(std::ceil(r)), m_size.y - 1);
+      int lower_bound_z2 = std::max(p2.z - static_cast<int>(std::ceil(r)), 0);
       int upper_bound_z2 =
-          min(p2.z + static_cast<int>(std::ceil(r)), m_size.z - 1);
-      int lower_bound_x = max(lower_bound_x1, lower_bound_x2);
-      int upper_bound_x = min(upper_bound_x1, upper_bound_x2);
-      int lower_bound_y = max(lower_bound_y1, lower_bound_y2);
-      int upper_bound_y = min(upper_bound_y1, upper_bound_y2);
-      int lower_bound_z = max(lower_bound_z1, lower_bound_z2);
-      int upper_bound_z = min(upper_bound_z1, upper_bound_z2);
+          std::min(p2.z + static_cast<int>(std::ceil(r)), m_size.z - 1);
+      int lower_bound_x = std::max(lower_bound_x1, lower_bound_x2);
+      int upper_bound_x = std::min(upper_bound_x1, upper_bound_x2);
+      int lower_bound_y = std::max(lower_bound_y1, lower_bound_y2);
+      int upper_bound_y = std::min(upper_bound_y1, upper_bound_y2);
+      int lower_bound_z = std::max(lower_bound_z1, lower_bound_z2);
+      int upper_bound_z = std::min(upper_bound_z1, upper_bound_z2);
       return std::make_tuple(Vec3i(lower_bound_x, lower_bound_y, lower_bound_z),
                              Vec3i(upper_bound_x, upper_bound_y,
                                    upper_bound_z));
@@ -492,5 +489,4 @@ using ScalarGrid = Grid<Scalar, Real, Dim>;
 
 template <typename Scalar, int Dim>
 using VectorGrid = Grid<Vector<Scalar, Dim>, Real, Dim>;
-} // namespace core
-#endif  // SIMCRAFT_CORE_INCLUDE_CORE_DATA_STRUCTURES_GRIDS_H_
+} // namespace spatify

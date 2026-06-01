@@ -22,47 +22,47 @@ static int ipc_auto_reg = ([]() {
   }(), 0);
 
 void IpcIntegrator::step(Real dt) {
-  // ===== 运动学体: 推进到下一时刻 =====
   Real t_next = system().currentTime() + dt;
   system().advanceKinematicBodies(t_next);
 
-  // ===== 设置 collision detector 的运动学体 =====
   collisionDetector->setKinematicBodies(&system().kinematicBodies());
 
-  x_prev = system().x;
+  system().constraints().enforcePosition(system(), t_next);
   maths::BlockVector<3> x_t = system().x;
-
-  // ===== enforce 约束到目标位置 =====
-  system().constraints().enforcePosition(system().x, t_next);
+  x_prev = system().x;
 
   Real h = dt;
+  spdlog::info("[IPC] computing initial energy...");
   Real E_prev = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
+  spdlog::info("[IPC] E_prev = {}", E_prev);
   maths::BlockVector<3> p(x_t.numBlocks());
   int iter = 0;
   while (true) {
     // Compute negative gradient directly as BlockVector<3>
+    spdlog::info("[IPC] iter {}: computing gradient...", iter);
     auto negG = barrierAugmentedIncrementalPotentialEnergyGradient(x_t, h);
-    negG *= Real(-1);
+    negG *= -1.0;
 
-    // ===== 投影梯度（清零被约束分量）=====
     system().constraints().zeroConstrainedGradient(negG);
-
     // Compute Hessian directly as BlockSparseMatrix<3>
+    spdlog::info("[IPC] iter {}: computing Hessian...", iter);
     auto H_block = spdProjectHessian(h);
 
+    spdlog::info("[IPC] iter {}: solving linear system...", iter);
     p.setZero();
+    spdlog::info("[IPC] nnz: {}", H_block.blocks().size());
     auto result = solver->solve(H_block, negG, p);
     if (!result.converged)
       spdlog::warn("BlockPCG: {} iters, residual={}", result.iterations, result.residualNorm);
 
-    // ===== 投影搜索方向 =====
     system().constraints().projectToFreeSpace(p);
 
+    std::cout << "norm: " << p.infNorm() << " " << negG.infNorm() << std::endl;
     if (p.infNorm() <
         config.eps * system().meshLengthScale() * h)
       break;
 
-    // ===== 计算步长上限 (弹性体 + 运动学体) =====
+    spdlog::info("[IPC] iter {}: computing step size upper bound...", iter);
     Real alphaElastic = computeStepSizeUpperBound(p);
     Real alphaKinematic = 1.0;
     if (!system().kinematicBodies().empty()) {
@@ -70,6 +70,7 @@ void IpcIntegrator::step(Real dt) {
       if (toiKin) alphaKinematic = *toiKin;
     }
     Real alpha = config.stepSizeScale * std::min({1.0, alphaElastic, alphaKinematic});
+    spdlog::info("[IPC] iter {}: alpha={}", iter, alpha);
 
     if (alpha == 0.0)
       throw std::runtime_error(
@@ -81,27 +82,41 @@ void IpcIntegrator::step(Real dt) {
       maths::BlockVector<3> x_candidate = x_prev;
       x_candidate.axpy(alpha, p);
       updateCandidateSolution(x_candidate);
-      // ===== line search 后再次 enforce =====
-      system().constraints().enforcePosition(system().x, t_next);
+      system().constraints().enforcePosition(system(), t_next);
       alpha = alpha * 0.5;
       E = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
     } while (E > E_prev);
     iter++;
     x_prev = system().x;
+    std::cout << E << " " << E_prev << std::endl;
     E_prev = E;
+
+    if (onNewtonIter) onNewtonIter(iter);
   }
   velocityUpdate(x_t, h);
 
-  // ===== enforce 速度约束 =====
-  system().constraints().enforceVelocity(system().xdot, t_next);
+  system().constraints().enforceVelocity(system(), t_next);
 
-  // ===== 推进时间 =====
   system().advanceTime(dt);
+
+  Real T = system().kineticEnergy();
+  Real V = system().potentialEnergy();
+  Real Vg = system().gravitationalPotentialEnergy();
+  Real total = T + V + Vg;
+  spdlog::info("[IPC] t={:.4f}  T={:.6e}  V_elastic={:.6e}  V_gravity={:.6e}  Total={:.6e}",
+               system().currentTime(), T, V, Vg, total);
+  // Diagnostic: log first vertex position to verify system.x is changing
+  if (system().x.numBlocks() > 0) {
+    auto v0 = system().x[0];
+    spdlog::debug("[IPC] step done: x[0]=({:.6f},{:.6f},{:.6f})", v0.x, v0.y, v0.z);
+  }
 }
 
-maths::BlockSparseMatrix<3> IpcIntegrator::spdProjectHessian(Real h) {
+maths::BlockSparseMatrix<3> IpcIntegrator::spdProjectHessian(Real h) const
+{
   int nBlocks = system().x.numBlocks();
   maths::BlockSparseMatrix<3> H(nBlocks, nBlocks);
+  H.setSymmetric(true);
 
   // Elastic Hessian
   system().spdProjectHessian(H);
@@ -159,8 +174,6 @@ void IpcIntegrator::computeKinematicVTConstraints(
     
     const auto& triangles = mg->mesh->triangles;
     
-    // 使用运动学体的 BVH 进行空间查询
-    // 为简化，先遍历所有顶点
     for (int vertexIdx = 0; vertexIdx < system().numVertices(); vertexIdx++) {
       // 弹性体顶点轨迹 bbox
       auto startPos = system().x[vertexIdx];
@@ -200,50 +213,59 @@ void IpcIntegrator::computeKinematicVTConstraints(
 void IpcIntegrator::computeVertexTriangleConstraints(
     const ConstraintSetPrecomputeRequest &config) {
   const auto &[p, toi, dHat] = config;
+  const int nVerts = system().numVertices();
 
-  tbb::parallel_for(0, system().numVertices(), [&](int vertexIdx) {
+  tbb::enumerable_thread_specific<std::vector<ipc::VertexTriangleConstraint>> threadLocalVT;
+
+  tbb::parallel_for(0, nVerts, [&](int vertexIdx) {
     auto vertexTrajectoryBBox =
-        system()
-            .geometryManager()
+        system().geometryManager()
             .getTrajectoryAccessor(system().x, p, toi)
             .vertexBBox(vertexIdx);
     vertexTrajectoryBBox = vertexTrajectoryBBox.dilate(dHat);
+
+    auto &local = threadLocalVT.local();
     collisionDetector->trianglesBVH().runSpatialQuery(
         [&](int triangleIdx) -> bool {
           if (system().triangleContainsVertex(triangleIdx, vertexIdx))
             return false;
 
           auto globalTri = system().geometryManager().getGlobalTriangle(triangleIdx);
-
-          constraintSet.vtConstraints.push_back({
+          local.push_back({
               .x = system().x,
               .globalVertex = vertexIdx,
               .globalTriVerts = {globalTri.x, globalTri.y, globalTri.z},
               .type = ipc::PointTriangleDistanceType::Unknown,
           });
-
-          constraintSet.vtConstraints.back().updateDistanceType();
-
+          local.back().updateDistanceType();
           return true;
         },
         [&](const BBox<Real, 3> &bbox) -> bool {
           return vertexTrajectoryBBox.overlap(bbox);
         });
   });
+
+  // Sequential merge
+  for (auto &local : threadLocalVT)
+    for (auto &c : local)
+      constraintSet.vtConstraints.push_back(c);
 }
 
 void IpcIntegrator::computeEdgeEdgeConstraints(
     const ConstraintSetPrecomputeRequest &config) {
   const auto &[p, toi, dHat] = config;
+  const int nEdges = system().numEdges();
 
-  tbb::parallel_for(0, system().numEdges(), [&](int edgeIdx) {
+  tbb::enumerable_thread_specific<std::vector<ipc::EdgeEdgeConstraint>> threadLocalEE;
+
+  tbb::parallel_for(0, nEdges, [&](int edgeIdx) {
     auto edgeTrajectoryBBox =
-        system()
-            .geometryManager()
+        system().geometryManager()
             .getTrajectoryAccessor(system().x, p, toi)
             .edgeBBox(edgeIdx);
     edgeTrajectoryBBox = edgeTrajectoryBBox.dilate(dHat);
 
+    auto &local = threadLocalEE.local();
     collisionDetector->edgesBVH().runSpatialQuery(
         [&](int otherEdgeIdx) -> bool {
           if (system().checkEdgeAdjacent(edgeIdx, otherEdgeIdx))
@@ -252,22 +274,25 @@ void IpcIntegrator::computeEdgeEdgeConstraints(
           auto globalEa = system().geometryManager().getGlobalEdge(edgeIdx);
           auto globalEb = system().geometryManager().getGlobalEdge(otherEdgeIdx);
 
-          constraintSet.eeConstraints.push_back({
+          local.push_back({
               .x = system().x,
               .X = system().X,
               .globalEdgeA = {globalEa.x, globalEa.y},
               .globalEdgeB = {globalEb.x, globalEb.y},
               .type = ipc::EdgeEdgeDistanceType::Unknown,
           });
-
-          constraintSet.eeConstraints.back().updateDistanceType();
-
+          local.back().updateDistanceType();
           return true;
         },
         [&](const BBox<Real, 3> &bbox) -> bool {
           return edgeTrajectoryBBox.overlap(bbox);
         });
   });
+
+  // Sequential merge
+  for (auto &local : threadLocalEE)
+    for (auto &c : local)
+      constraintSet.eeConstraints.push_back(c);
 }
 
 maths::BlockVector<3> IpcIntegrator::barrierEnergyGradient() const {
@@ -278,7 +303,6 @@ maths::BlockVector<3> IpcIntegrator::barrierEnergyGradient() const {
     c.assembleBarrierGradient(barrier, gradient, kappa);
   for (const auto &c : constraintSet.eeConstraints)
     c.assembleMollifiedBarrierGradient(barrier, gradient, kappa);
-  // 运动学约束梯度
   for (const auto &c : constraintSet.kinematicVTConstraints)
     c.assembleBarrierGradient(barrier, gradient, kappa);
   return gradient;

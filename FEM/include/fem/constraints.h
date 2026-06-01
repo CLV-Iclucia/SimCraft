@@ -12,12 +12,12 @@ namespace sim::fem {
 /// overloaded helper (C++17 pattern for std::visit)
 template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
-
+struct System;
 struct FixedConstraint {
   glm::dvec3 targetPosition{0.0};
 };
 
-struct TimeVaryingConstraint {
+struct MotionConstraint {
   std::function<glm::dvec3(Real t)> positionFunc;
   std::function<glm::dvec3(Real t)> velocityFunc;
 };
@@ -26,7 +26,7 @@ struct VelocityConstraint {
   std::function<glm::dvec3(Real t)> velocityFunc;
 };
 
-using ConstraintData = std::variant<FixedConstraint, TimeVaryingConstraint, VelocityConstraint>;
+using ConstraintData = std::variant<FixedConstraint, MotionConstraint, VelocityConstraint>;
 
 struct VertexConstraint {
   int globalBlockIdx;
@@ -36,7 +36,7 @@ struct VertexConstraint {
   [[nodiscard]] glm::dvec3 targetAt(Real t) const {
     return std::visit(overloaded{
       [](const FixedConstraint& c) { return c.targetPosition; },
-      [t](const TimeVaryingConstraint& c) { return c.positionFunc(t); },
+      [t](const MotionConstraint& c) { return c.positionFunc(t); },
       [](const VelocityConstraint&) { return glm::dvec3(0.0); },
     }, data);
   }
@@ -44,7 +44,7 @@ struct VertexConstraint {
   [[nodiscard]] glm::dvec3 targetVelocityAt(Real t) const {
     return std::visit(overloaded{
       [](const FixedConstraint&) { return glm::dvec3(0.0); },
-      [t](const TimeVaryingConstraint& c) { 
+      [t](const MotionConstraint& c) {
         if (c.velocityFunc) return c.velocityFunc(t);
         return glm::dvec3(0.0); 
       },
@@ -54,7 +54,7 @@ struct VertexConstraint {
 
   [[nodiscard]] bool isPositionConstraint() const {
     return std::holds_alternative<FixedConstraint>(data)
-        || std::holds_alternative<TimeVaryingConstraint>(data);
+        || std::holds_alternative<MotionConstraint>(data);
   }
   [[nodiscard]] bool isVelocityConstraint() const {
     return std::holds_alternative<VelocityConstraint>(data);
@@ -103,11 +103,11 @@ public:
   /// 获取所有约束（用于迭代）
   [[nodiscard]] const std::vector<VertexConstraint>& allConstraints() const { return m_constraints; }
   
-  /// 在 t 时刻，将约束目标写入 x（强制设置 constrained DOFs）
-  void enforcePosition(maths::BlockVector<3>& x, Real t) const;
+  /// 在 t 时刻，将约束目标应用至System（强制设置 constrained DOFs）
+  void enforcePosition(System& system, Real t) const;
   
   /// 在 t 时刻，将约束速度写入 xdot
-  void enforceVelocity(maths::BlockVector<3>& xdot, Real t) const;
+  void enforceVelocity(System& system, Real t) const;
   
   /// 将方向向量中被约束的分量清零（投影到 free 子空间）
   void projectToFreeSpace(maths::BlockVector<3>& direction) const;

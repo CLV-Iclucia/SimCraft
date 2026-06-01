@@ -24,3 +24,11 @@ foreach(test_src ${test_srcs})
     target_link_libraries(${test_name} PUBLIC FEM GTest::gtest GTest::gtest_main)
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
+
+# Benchmarks
+file(GLOB bench_srcs CONFIGURE_DEPENDS benchmarks/*.cc)
+foreach(bench_src ${bench_srcs})
+    get_filename_component(bench_name ${bench_src} NAME_WE)
+    add_executable(${bench_name} ${bench_src})
+    target_link_libraries(${bench_name} PUBLIC FEM)
+endforeach()

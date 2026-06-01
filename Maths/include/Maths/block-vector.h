@@ -5,6 +5,9 @@
 #include <vector>
 #include <cassert>
 #include <cmath>
+#include <tbb/parallel_for.h>
+#include <tbb/parallel_reduce.h>
+#include <tbb/blocked_range.h>
 
 namespace sim::maths {
 
@@ -53,19 +56,45 @@ public:
   }
 
   // --- Vector space operations ---
+  static constexpr int PARALLEL_THRESHOLD = 10000;
+
   [[nodiscard]] Real dot(const BlockVector &other) const {
     assert(numBlocks() == other.numBlocks());
-    Real sum = 0.0;
-    for (int i = 0; i < numBlocks(); i++)
-      sum += glm::dot(m_data[i], other.m_data[i]);
-    return sum;
+    const int n = numBlocks();
+    if (n < PARALLEL_THRESHOLD) {
+      Real sum = 0.0;
+      for (int i = 0; i < n; i++)
+        sum += glm::dot(m_data[i], other.m_data[i]);
+      return sum;
+    }
+    return tbb::parallel_reduce(
+        tbb::blocked_range<int>(0, n),
+        Real(0.0),
+        [&](const tbb::blocked_range<int> &range, Real partial) {
+          for (int i = range.begin(); i < range.end(); i++)
+            partial += glm::dot(m_data[i], other.m_data[i]);
+          return partial;
+        },
+        std::plus<Real>());
   }
 
   [[nodiscard]] Real squaredNorm() const {
-    Real sum = 0.0;
-    for (int i = 0; i < numBlocks(); i++)
-      sum += glm::dot(m_data[i], m_data[i]);
-    return sum;
+    const int n = numBlocks();
+    if (n < PARALLEL_THRESHOLD) {
+      Real sum = 0.0;
+      for (int i = 0; i < n; i++)
+        sum += glm::dot(m_data[i], m_data[i]);
+      return sum;
+    }
+    return tbb::parallel_reduce(
+        tbb::blocked_range<int>(0, n),
+        Real(0.0),
+        [&](const tbb::blocked_range<int> &range, Real partial) {
+          for (int i = range.begin(); i < range.end(); i++)
+            partial += glm::dot(m_data[i], m_data[i]);
+          return partial;
+        },
+        std::plus<Real>());
   }
 
   [[nodiscard]] Real norm() const { return std::sqrt(squaredNorm()); }
@@ -82,8 +111,17 @@ public:
   /// this += a * other
   void axpy(Real a, const BlockVector &other) {
     assert(numBlocks() == other.numBlocks());
-    for (int i = 0; i < numBlocks(); i++)
-      m_data[i] += static_cast<Real>(a) * other.m_data[i];
+    const int n = numBlocks();
+    if (n < PARALLEL_THRESHOLD) {
+      for (int i = 0; i < n; i++)
+        m_data[i] += static_cast<Real>(a) * other.m_data[i];
+      return;
+    }
+    tbb::parallel_for(tbb::blocked_range<int>(0, n),
+        [&](const tbb::blocked_range<int> &range) {
+          for (int i = range.begin(); i < range.end(); i++)
+            m_data[i] += static_cast<Real>(a) * other.m_data[i];
+        });
   }
 
   void setZero() {

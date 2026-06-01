@@ -1,32 +1,54 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.20)
+
+# Auto-detect vcpkg if VCPKG_ROOT is set and no toolchain specified
+if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+  set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+      CACHE STRING "Vcpkg toolchain file")
+endif()
+
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CUDA_ARCHITECTURES 52;70;75;86)
 project(SimCraft)
 
 if (MSVC)
     add_compile_options(/Zc:preprocessor)
 endif()
+
 find_package(TBB REQUIRED)
 find_package(GTest REQUIRED)
-
-set(GLAD_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/glad/include)
-set(EXTERNAL_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external)
-set(IMGUI_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui-cmake)
-set(ASSETS_PATH ${CMAKE_CURRENT_SOURCE_DIR}/assets)
-
 find_package(Eigen3 REQUIRED)
 
-file (GLOB EXTERNALS ${EXTERNAL_PATH}/*)
-foreach(EXTERNAL ${EXTERNALS})
-    if(IS_DIRECTORY ${EXTERNAL})
-        add_subdirectory(${EXTERNAL})
-    endif()
-endforeach()
+set(EXTERNAL_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external)
+set(ASSETS_PATH ${CMAKE_CURRENT_SOURCE_DIR}/assets)
 
+# External libraries
+add_subdirectory(${EXTERNAL_PATH}/glm)
+add_subdirectory(${EXTERNAL_PATH}/spdlog)
+add_subdirectory(${EXTERNAL_PATH}/cxxopts)
+
+# Internal libraries (ordered by dependency)
 add_subdirectory(Core)
-add_subdirectory(Maths)
 add_subdirectory(Spatify)
-add_subdirectory(FluidSim)
+add_subdirectory(Maths)
 add_subdirectory(Deform)
+add_subdirectory(FluidSim)
 add_subdirectory(FEM)
-#add_subdirectory(HairSim)
+
+# RHI (Vulkan) module — gated behind option so users without Vulkan SDK
+# can still build the rest of the project.
+option(SIMCRAFT_BUILD_RHI "Build RHI (Vulkan) module" ON)
+if(SIMCRAFT_BUILD_RHI)
+  add_subdirectory(Rhi)
+endif()
+
+add_subdirectory(Renderer)
+
+# Applications
+add_subdirectory(Apps)
+
+# Python bindings
+option(SIMCRAFT_BUILD_PYTHON "Build Python bindings" ON)
+if(SIMCRAFT_BUILD_PYTHON)
+  add_subdirectory(python)
+endif()
+
+# add_subdirectory(HairSim)  # WIP: requires Intel MKL

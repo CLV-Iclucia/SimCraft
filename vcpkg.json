@@ -4,6 +4,14 @@
   "dependencies": [
     "tbb",
     "eigen3",
-    "gtest"
+    "gtest",
+    "glfw3",
+    "glad",
+    "pybind11",
+    "vulkan",
+    "vulkan-memory-allocator",
+    "vk-bootstrap",
+    "directx-dxc",
+    "spirv-reflect"
   ]
 }

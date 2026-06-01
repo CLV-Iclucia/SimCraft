@@ -1,3 +1,6 @@
+# HairSim - WIP: requires Intel MKL
+# Uncomment add_subdirectory(HairSim) in top-level CMakeLists.txt to enable
+
 file(GLOB_RECURSE srcs CONFIGURE_DEPENDS src/*.cc src/*.cpp include/*.h)
 set(MKL_THREADING "tbb_thread")
 set(MKL_INTERFACE "lp64")
@@ -7,8 +10,7 @@ add_library(HairSim STATIC ${srcs})
 
 target_include_directories(HairSim PUBLIC include)
 target_include_directories(HairSim PUBLIC ${MKL_INCLUDE})
-target_link_libraries(HairSim PUBLIC Core Eigen MKL::MKL)
-target_include_directories(HairSim PUBLIC ${EIGEN3_INCLUDE_DIR})
+target_link_libraries(HairSim PUBLIC Core Eigen3::Eigen MKL::MKL)
 
 add_executable(hair-sim apps/hair-sim-app.cc)
 target_link_libraries(hair-sim PUBLIC Core HairSim)
@@ -16,9 +18,7 @@ target_link_libraries(hair-sim PUBLIC Core HairSim)
 file(GLOB_RECURSE test_srcs CONFIGURE_DEPENDS tests/*.cc)
 foreach(test_src ${test_srcs})
     get_filename_component(test_name ${test_src} NAME_WE)
-    add_executable(${test_name} ${test_src}
-            include/HairSim/time-steppers.h
-            ../Collision/include/collision/lbvh.h)
-    target_link_libraries(${test_name} PUBLIC Core gtest gtest_main HairSim)
-    add_test(NAME ${test_name} CONFIGURATIONS Release COMMAND ${test_name})
+    add_executable(${test_name} ${test_src})
+    target_link_libraries(${test_name} PUBLIC Core GTest::gtest GTest::gtest_main HairSim)
+    add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()

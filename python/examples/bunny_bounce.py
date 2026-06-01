@@ -1,12 +1,17 @@
 """
-SimCraft Example: Bunny Bounce
-==============================
+SimCraft Example: Hanging Bunny
+================================
 
-Stanford bunny with pinned vertices, dropping onto a rising ground plane.
-Demonstrates: pin_vertices + kinematic body with constant velocity.
+Stanford bunny hangs from its ears (top vertices pinned) and
+deforms under gravity like a soft jelly.
+
+Demonstrates:
+  - Automatic selection of top-face vertices via coordinate query
+  - Pin constraints on a subset of vertices
+  - Large soft-body deformation under gravity
+  - Real-time rendering
 
 Usage:
-    set PYTHONPATH=<build-dir>
     python examples/bunny_bounce.py
 """
 import numpy as np
@@ -30,25 +35,29 @@ mesh_path = Path(__file__).resolve().parents[2] / "FEM" / "assets" / "tets" / "b
 mesh = simcraft.TetMesh.from_file(str(mesh_path))
 print(f"Bunny: {mesh.num_vertices} vertices, {mesh.num_elements} tets")
 
-material = simcraft.NeoHookean(young=5e5, poisson=0.4)
+# Get vertex positions before add_elastic_body moves the mesh
+verts = mesh.vertices
+
+material = simcraft.NeoHookean(young=1e4, poisson=0.45)
 
 system = simcraft.System()
-system.add_elastic_body(mesh, material, density=1000.0)
+system.add_elastic_body(mesh, material, density=1000.0, color=(0.95, 0.55, 0.35))
 system.gravity = np.array([0.0, -9.81, 0.0])
 
-# Pin top vertices
-system.constraints.pin_vertices(np.array([0, 1, 2], dtype=np.int32))
+# Pin the topmost vertices (top 5% by y-coordinate)
+y_max = verts[:, 1].max()
+y_min = verts[:, 1].min()
+y_threshold = y_max - 0.05 * (y_max - y_min)  # top 5%
 
-# Rising ground plane
-ground = simcraft.KinematicBody.plane(normal=np.array([0.0, 1.0, 0.0]), offset=-2.0)
-ground.set_constant_velocity(np.array([0.0, 0.5, 0.0]))
-system.add_kinematic_body(ground)
+top_verts = np.where(verts[:, 1] >= y_threshold)[0].astype(np.int32)
+system.constraints.pin_vertices(top_verts)
+print(f"Pinned {len(top_verts)} vertices at the top (y >= {y_threshold:.3f})")
 
 # ─── Run ─────────────────────────────────────────────────────────────────────
-integrator = simcraft.IpcIntegrator(dHat=1e-3, kappa=1e9)
+integrator = simcraft.IpcIntegrator(dHat=1e-3, kappa=1e8)
 sim = simcraft.Simulation(system, integrator)
-renderer = simcraft.Renderer(width=1280, height=720, title="Bunny Bounce")
+renderer = simcraft.Renderer(width=1280, height=720, title="Hanging Bunny")
 
 print("Running... close window to stop.")
-simcraft.run_and_display(sim, renderer, dt=0.005, steps=1000)
+simcraft.run_and_display(sim, renderer, dt=0.01, steps=500)
 print(f"Done. {sim.steps_completed} steps.")
