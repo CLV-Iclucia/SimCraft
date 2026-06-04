@@ -88,6 +88,20 @@ class Device : public sim::core::NonCopyable {
   // True once the device is bound to a swapchain (Tier 1 path active).
   // Always false in R0–R6 since we use explicit sync model.
   virtual bool frameLoopActive() const = 0;
+    ShaderRef createVertexShader(std::span<const std::byte> bytecode, std::string_view entryPoint = "main")
+    {
+        return createShader(bytecode, ShaderStage::Vertex, entryPoint);
+    }
+
+    ShaderRef createFragmentShader(std::span<const std::byte> bytecode, std::string_view entryPoint = "main")
+    {
+        return createShader(bytecode, ShaderStage::Fragment, entryPoint);
+    }
+    ShaderRef createComputeShader(std::span<const std::byte> bytecode, std::string_view entryPoint = "main")
+    {
+        return createShader(bytecode, ShaderStage::Compute, entryPoint);
+    }
+
 };
 
 }  // namespace sim::rhi

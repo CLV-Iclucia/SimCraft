@@ -63,7 +63,7 @@ class VulkanDevice final : public Device {
 
   void submitAndWait(CommandList& cmd, QueueType queue) override;
 
-  Backend backend() const override { return Backend::Vulkan; }
+  [[nodiscard]] Backend backend() const override { return Backend::Vulkan; }
   bool frameLoopActive() const override { return m_frameLoopActive; }
 
   // ---- Backend-internal accessors --------------------------------------

@@ -6,12 +6,16 @@
 #include <Core/debug.h>
 #include <fem/integrator.h>
 #include <fem/ipc/constraint.h>
+#include <fem/ipc/collision-pair.h>
 #include <fem/ipc/collision-detector.h>
-#include <fem/ipc/barrier-functions.h>
+#include <fem/ipc/gipc/barrier.h>
 #include <Maths/block-linear-solver.h>
 #include <functional>
 
 namespace sim::fem {
+
+// 临时的旧约束集，用于 barrier energy/gradient/hessian 计算
+// 后续 Phase 3 迁移到统一的 ConstraintPairSet
 struct ConstraintSet {
   void clear() {
     vtConstraints.clear();
@@ -21,12 +25,6 @@ struct ConstraintSet {
   std::vector<ipc::VertexTriangleConstraint> vtConstraints{};
   std::vector<ipc::EdgeEdgeConstraint> eeConstraints{};
   std::vector<ipc::DeformableKinematicVTConstraint> kinematicVTConstraints{};
-};
-
-struct ConstraintSetPrecomputeRequest {
-  const maths::BlockVector<3> &descentDir;
-  Real toi;
-  Real dHat;
 };
 
 class IpcIntegrator : public Integrator {
@@ -40,7 +38,7 @@ class IpcIntegrator : public Integrator {
     } config;
 
     explicit IpcIntegrator(System &system, const Config &config)
-      : Integrator(system), config(config), barrier(config.dHat) {
+      : Integrator(system), config(config), barrier_(config.dHat) {
       collisionDetector = std::make_unique<ipc::CollisionDetector>(system);
     }
 
@@ -86,7 +84,7 @@ class IpcIntegrator : public Integrator {
 
     void updateCandidateSolution(const maths::BlockVector<3> &x) {
       system().updateCurrentConfig(x);
-      updateConstraintStatus();
+      refreshActiveConstraintPairs();
     }
 
     [[nodiscard]] Real computeStepSizeUpperBound(const maths::BlockVector<3> &p) const {
@@ -96,15 +94,24 @@ class IpcIntegrator : public Integrator {
     }
 
     [[nodiscard]] maths::BlockSparseMatrix<3> spdProjectHessian(Real h) const;
-    void updateConstraintStatus();
-    void precomputeConstraintSet(const ConstraintSetPrecomputeRequest &config);
-    void computeVertexTriangleConstraints(const ConstraintSetPrecomputeRequest &config);
-    void computeEdgeEdgeConstraints(const ConstraintSetPrecomputeRequest &config);
-    void computeKinematicVTConstraints(const ConstraintSetPrecomputeRequest &config);
+    
+    /// 从 collision pair 重建 active constraint pair 集合
+    void refreshActiveConstraintPairs();
+    
+    /// Newton precompute 步骤：构建 collision pair
+    void precomputeCollisionPairs(const maths::BlockVector<3>& p, Real alpha);
+    
+    void computeVertexTriangleCollisionPairs(const maths::BlockVector<3>& p, Real alpha);
+    void computeEdgeEdgeCollisionPairs(const maths::BlockVector<3>& p, Real alpha);
+    void computeColliderVTCollisionPairs(const maths::BlockVector<3>& p, Real alpha);
 
-    ConstraintSet constraintSet;
+    ipc::CollisionPairSet collisionPairs;    // broad phase 候选层
+    ipc::ConstraintPairSet constraintPairs;  // active 约束层
+    ConstraintSet constraintSet;              // 临时的旧约束集，用于 barrier 计算
+    
     std::unique_ptr<ipc::CollisionDetector> collisionDetector{};
-    ipc::LogBarrier barrier;
+    ipc::gipc::Barrier barrier_;
     maths::BlockVector<3> x_prev;
 };
 }
+

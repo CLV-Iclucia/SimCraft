@@ -10,8 +10,159 @@
 #include <fem/ipc/integrator.h>
 #include <fem/system.h>
 #include <tbb/parallel_for.h>
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <format>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+
 
 namespace sim::fem {
+
+namespace {
+
+bool isFiniteVec3(const glm::dvec3& value) {
+  return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
+}
+
+bool isFiniteMat3(const glm::dmat3& value) {
+  for (int c = 0; c < 3; ++c)
+    for (int r = 0; r < 3; ++r)
+      if (!std::isfinite(value[c][r]))
+        return false;
+  return true;
+}
+
+void ensureFiniteValue(std::string_view label, Real value) {
+  if (!std::isfinite(value)) {
+    throw std::runtime_error(std::format("[IPC] {} is not finite: {}", label, value));
+  }
+}
+
+void ensureFiniteAllBlocks(std::string_view label, const maths::BlockVector<3>& value) {
+  for (int i = 0; i < value.numBlocks(); ++i) {
+    const auto& block = value[i];
+    if (!isFiniteVec3(block)) {
+      throw std::runtime_error(std::format(
+          "[IPC] {} has non-finite block {} = ({}, {}, {})",
+          label, i, block.x, block.y, block.z));
+    }
+  }
+}
+
+template <std::size_t N>
+void ensureFiniteTouchedBlocks(std::string_view label,
+                               const maths::BlockVector<3>& value,
+                               const std::array<int, N>& touchedBlocks) {
+  for (int blockIdx : touchedBlocks) {
+    if (blockIdx < 0 || blockIdx >= value.numBlocks()) {
+      throw std::runtime_error(std::format(
+          "[IPC] {} touched invalid block index {}", label, blockIdx));
+    }
+    const auto& block = value[blockIdx];
+    if (!isFiniteVec3(block))
+    {
+      assert(false);
+    }
+  }
+}
+
+void ensureFiniteAllMatrixEntries(std::string_view label,
+                                  const maths::BlockSparseMatrix<3>& value) {
+  const auto& blocks = value.blocks();
+  const auto& rowIndices = value.rowIndices();
+  const auto& colIndices = value.colIndices();
+  for (int entry = 0; entry < value.numEntries(); ++entry) {
+    if (!isFiniteMat3(blocks[entry])) {
+      throw std::runtime_error(std::format(
+          "[IPC] {} has non-finite block entry {} at ({}, {})",
+          label, entry, rowIndices[entry], colIndices[entry]));
+    }
+  }
+}
+
+void ensureFiniteNewMatrixEntries(std::string_view label,
+                                  const maths::BlockSparseMatrix<3>& value,
+                                  int firstNewEntry) {
+  const auto& blocks = value.blocks();
+  const auto& rowIndices = value.rowIndices();
+  const auto& colIndices = value.colIndices();
+  for (int entry = firstNewEntry; entry < value.numEntries(); ++entry) {
+    if (!isFiniteMat3(blocks[entry])) {
+      throw std::runtime_error(std::format(
+          "[IPC] {} produced non-finite block entry {} at ({}, {})",
+          label, entry, rowIndices[entry], colIndices[entry]));
+    }
+  }
+}
+
+std::string toString(ipc::PointTriangleDistanceType type) {
+  switch (type) {
+    case ipc::PointTriangleDistanceType::P_A: return "P_A";
+    case ipc::PointTriangleDistanceType::P_B: return "P_B";
+    case ipc::PointTriangleDistanceType::P_C: return "P_C";
+    case ipc::PointTriangleDistanceType::P_AB: return "P_AB";
+    case ipc::PointTriangleDistanceType::P_BC: return "P_BC";
+    case ipc::PointTriangleDistanceType::P_CA: return "P_CA";
+    case ipc::PointTriangleDistanceType::P_ABC: return "P_ABC";
+    case ipc::PointTriangleDistanceType::Unknown: return "Unknown";
+  }
+  return "Unknown";
+}
+
+std::string toString(ipc::EdgeEdgeDistanceType type) {
+  switch (type) {
+    case ipc::EdgeEdgeDistanceType::A_C: return "A_C";
+    case ipc::EdgeEdgeDistanceType::A_D: return "A_D";
+    case ipc::EdgeEdgeDistanceType::B_C: return "B_C";
+    case ipc::EdgeEdgeDistanceType::B_D: return "B_D";
+    case ipc::EdgeEdgeDistanceType::AB_C: return "AB_C";
+    case ipc::EdgeEdgeDistanceType::AB_D: return "AB_D";
+    case ipc::EdgeEdgeDistanceType::A_CD: return "A_CD";
+    case ipc::EdgeEdgeDistanceType::B_CD: return "B_CD";
+    case ipc::EdgeEdgeDistanceType::AB_CD: return "AB_CD";
+    case ipc::EdgeEdgeDistanceType::Unknown: return "Unknown";
+  }
+  return "Unknown";
+}
+
+std::string describeVTConstraint(std::size_t idx,
+                                 const ipc::VertexTriangleConstraint& c) {
+  return std::format(
+      "vt[{}] v={} tri=({}, {}, {}) type={}",
+      idx,
+      c.globalVertex,
+      c.globalTriVerts[0],
+      c.globalTriVerts[1],
+      c.globalTriVerts[2],
+      toString(c.type));
+}
+
+std::string describeEEConstraint(std::size_t idx,
+                                 const ipc::EdgeEdgeConstraint& c) {
+  return std::format(
+      "ee[{}] edgeA=({}, {}) edgeB=({}, {}) type={}",
+      idx,
+      c.globalEdgeA[0],
+      c.globalEdgeA[1],
+      c.globalEdgeB[0],
+      c.globalEdgeB[1],
+      toString(c.type));
+}
+
+std::string describeKinematicVTConstraint(
+    std::size_t idx,
+    const ipc::DeformableKinematicVTConstraint& c) {
+  return std::format(
+      "kinematic-vt[{}] v={} type={}",
+      idx,
+      c.deformableVertex,
+      toString(c.type));
+}
+
+} // namespace
 
 static int ipc_auto_reg = ([]() {
     IntegratorFactory::instance().registerCreator(
@@ -22,6 +173,7 @@ static int ipc_auto_reg = ([]() {
   }(), 0);
 
 void IpcIntegrator::step(Real dt) {
+  ensureFiniteValue("time step dt", dt);
   Real t_next = system().currentTime() + dt;
   system().advanceKinematicBodies(t_next);
 
@@ -29,11 +181,13 @@ void IpcIntegrator::step(Real dt) {
 
   system().constraints().enforcePosition(system(), t_next);
   maths::BlockVector<3> x_t = system().x;
+  ensureFiniteAllBlocks("initial configuration x_t", x_t);
   x_prev = system().x;
 
   Real h = dt;
   spdlog::info("[IPC] computing initial energy...");
   Real E_prev = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
+  ensureFiniteValue("initial barrier augmented energy", E_prev);
   spdlog::info("[IPC] E_prev = {}", E_prev);
   maths::BlockVector<3> p(x_t.numBlocks());
   int iter = 0;
@@ -44,18 +198,23 @@ void IpcIntegrator::step(Real dt) {
     negG *= -1.0;
 
     system().constraints().zeroConstrainedGradient(negG);
+    ensureFiniteAllBlocks(std::format("Newton rhs after constraints at iter {}", iter), negG);
+
     // Compute Hessian directly as BlockSparseMatrix<3>
     spdlog::info("[IPC] iter {}: computing Hessian...", iter);
     auto H_block = spdProjectHessian(h);
+    ensureFiniteAllMatrixEntries(std::format("Newton Hessian before solve at iter {}", iter), H_block);
 
     spdlog::info("[IPC] iter {}: solving linear system...", iter);
     p.setZero();
     spdlog::info("[IPC] nnz: {}", H_block.blocks().size());
     auto result = solver->solve(H_block, negG, p);
+    ensureFiniteValue(std::format("BlockPCG residual at iter {}", iter), result.residualNorm);
     if (!result.converged)
       spdlog::warn("BlockPCG: {} iters, residual={}", result.iterations, result.residualNorm);
 
     system().constraints().projectToFreeSpace(p);
+    ensureFiniteAllBlocks(std::format("projected Newton direction at iter {}", iter), p);
 
     std::cout << "norm: " << p.infNorm() << " " << negG.infNorm() << std::endl;
     if (p.infNorm() <
@@ -64,34 +223,37 @@ void IpcIntegrator::step(Real dt) {
 
     spdlog::info("[IPC] iter {}: computing step size upper bound...", iter);
     Real alphaElastic = computeStepSizeUpperBound(p);
+    ensureFiniteValue(std::format("alphaElastic at iter {}", iter), alphaElastic);
     Real alphaKinematic = 1.0;
     if (!system().kinematicBodies().empty()) {
       auto toiKin = collisionDetector->detectDeformableVsKinematic(p, dt);
       if (toiKin) alphaKinematic = *toiKin;
     }
+    ensureFiniteValue(std::format("alphaKinematic at iter {}", iter), alphaKinematic);
     Real alpha = config.stepSizeScale * std::min({1.0, alphaElastic, alphaKinematic});
+    ensureFiniteValue(std::format("alpha at iter {}", iter), alpha);
     spdlog::info("[IPC] iter {}: alpha={}", iter, alpha);
 
     if (alpha == 0.0)
       throw std::runtime_error(
           "Invalid state: collision happened within an integration step");
-    precomputeConstraintSet(
-        {.descentDir = p, .toi = alpha, .dHat = config.dHat});
+    precomputeCollisionPairs(p, alpha);
     Real E;
     do {
       maths::BlockVector<3> x_candidate = x_prev;
       x_candidate.axpy(alpha, p);
+      ensureFiniteAllBlocks(std::format("line-search candidate x at iter {}", iter), x_candidate);
       updateCandidateSolution(x_candidate);
       system().constraints().enforcePosition(system(), t_next);
       alpha = alpha * 0.5;
+      ensureFiniteValue(std::format("backtracked alpha at iter {}", iter), alpha);
       E = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
+      ensureFiniteValue(std::format("line-search energy at iter {}", iter), E);
     } while (E > E_prev);
-    iter++;
-    x_prev = system().x;
-    std::cout << E << " " << E_prev << std::endl;
-    E_prev = E;
 
     if (onNewtonIter) onNewtonIter(iter);
+
+
   }
   velocityUpdate(x_t, h);
 
@@ -103,6 +265,10 @@ void IpcIntegrator::step(Real dt) {
   Real V = system().potentialEnergy();
   Real Vg = system().gravitationalPotentialEnergy();
   Real total = T + V + Vg;
+  ensureFiniteValue("kinetic energy", T);
+  ensureFiniteValue("elastic potential energy", V);
+  ensureFiniteValue("gravity potential energy", Vg);
+  ensureFiniteValue("total energy", total);
   spdlog::info("[IPC] t={:.4f}  T={:.6e}  V_elastic={:.6e}  V_gravity={:.6e}  Total={:.6e}",
                system().currentTime(), T, V, Vg, total);
   // Diagnostic: log first vertex position to verify system.x is changing
@@ -114,88 +280,416 @@ void IpcIntegrator::step(Real dt) {
 
 maths::BlockSparseMatrix<3> IpcIntegrator::spdProjectHessian(Real h) const
 {
+  ensureFiniteValue("Hessian scale h", h);
   int nBlocks = system().x.numBlocks();
   maths::BlockSparseMatrix<3> H(nBlocks, nBlocks);
   H.setSymmetric(true);
 
   // Elastic Hessian
   system().spdProjectHessian(H);
+  ensureFiniteAllMatrixEntries("elastic Hessian assembly", H);
 
   // Barrier Hessian (elastic-elastic)
   Real kappa = config.contactStiffness;
-  for (const auto &c : constraintSet.vtConstraints)
-    c.assembleBarrierHessian(barrier, H, kappa);
-  for (const auto &c : constraintSet.eeConstraints)
-    c.assembleMollifiedBarrierHessian(barrier, H, kappa);
+  ensureFiniteValue("contact stiffness", kappa);
+  for (std::size_t i = 0; i < constraintSet.vtConstraints.size(); ++i) {
+    const auto& c = constraintSet.vtConstraints[i];
+    const auto label = describeVTConstraint(i, c);
+    const int prevEntries = H.numEntries();
+    try {
+      c.assembleBarrierHessian(barrier_, H, kappa);
+    } catch (const std::exception& e) {
+      throw std::runtime_error(std::format(
+          "[IPC] Hessian assembly failed for {}: {}", label, e.what()));
+    }
+    ensureFiniteNewMatrixEntries(std::format("Hessian assembly for {}", label), H, prevEntries);
+  }
+  for (std::size_t i = 0; i < constraintSet.eeConstraints.size(); ++i) {
+    const auto& c = constraintSet.eeConstraints[i];
+    const auto label = describeEEConstraint(i, c);
+    const int prevEntries = H.numEntries();
+    try {
+      c.assembleBarrierHessian(barrier_, H, kappa);
+    } catch (const std::exception& e) {
+      throw std::runtime_error(std::format(
+          "[IPC] Hessian assembly failed for {}: {}", label, e.what()));
+    }
+    ensureFiniteNewMatrixEntries(std::format("Hessian assembly for {}", label), H, prevEntries);
+  }
 
   // Barrier Hessian (elastic-kinematic)
-  for (const auto &c : constraintSet.kinematicVTConstraints)
-    c.assembleBarrierHessian(barrier, H, kappa);
+  for (std::size_t i = 0; i < constraintSet.kinematicVTConstraints.size(); ++i) {
+    const auto& c = constraintSet.kinematicVTConstraints[i];
+    const auto label = describeKinematicVTConstraint(i, c);
+    const int prevEntries = H.numEntries();
+    try {
+      c.assembleBarrierHessian(barrier_, H, kappa);
+    } catch (const std::exception& e) {
+      throw std::runtime_error(std::format(
+          "[IPC] Hessian assembly failed for {}: {}", label, e.what()));
+    }
+    ensureFiniteNewMatrixEntries(std::format("Hessian assembly for {}", label), H, prevEntries);
+  }
 
   // H_total = h² * H_elastic_barrier + M
   H.scale(h * h);
   H.addFrom(system().blockMass());
+  ensureFiniteAllMatrixEntries("final Newton Hessian", H);
 
   return H;
 }
 
-void IpcIntegrator::updateConstraintStatus() {
-  for (auto &c : constraintSet.vtConstraints)
-    c.updateDistanceType();
-  for (auto &c : constraintSet.eeConstraints)
-    c.updateDistanceType();
+void IpcIntegrator::refreshActiveConstraintPairs() {
+  // 更新所有 collision pair 的距离状态
+  for (auto &c : collisionPairs.vtPairs)
+    c.updateDistanceState();
+  for (auto &c : collisionPairs.eePairs)
+    c.updateDistanceState();
+  for (auto &c : collisionPairs.colliderVTPairs)
+    c.updateDistanceState();
+  
+  // 统计各类型 active constraint 的数量，用于分配存储空间
+  int ppCount = 0, peCount = 0, ptCount = 0, eeCount = 0;
+  int colliderPpCount = 0, colliderPeCount = 0, colliderPtCount = 0;
+  
+  Real dHatSqr = barrier_.dHatSqr();
+  
+  for (const auto& cp : collisionPairs.vtPairs) {
+    if (cp.isActive(dHatSqr)) {
+      switch (cp.type) {
+        case ipc::PointTriangleDistanceType::P_A:
+        case ipc::PointTriangleDistanceType::P_B:
+        case ipc::PointTriangleDistanceType::P_C:
+          ppCount++; break;
+        case ipc::PointTriangleDistanceType::P_AB:
+        case ipc::PointTriangleDistanceType::P_BC:
+        case ipc::PointTriangleDistanceType::P_CA:
+          peCount++; break;
+        case ipc::PointTriangleDistanceType::P_ABC:
+          ptCount++; break;
+        default: break;
+      }
+    }
+  }
+  
+  for (const auto& cp : collisionPairs.eePairs) {
+    if (cp.isActive(dHatSqr)) {
+      switch (cp.type) {
+        case ipc::EdgeEdgeDistanceType::A_C:
+        case ipc::EdgeEdgeDistanceType::A_D:
+        case ipc::EdgeEdgeDistanceType::B_C:
+        case ipc::EdgeEdgeDistanceType::B_D:
+          ppCount++; break;
+        case ipc::EdgeEdgeDistanceType::AB_C:
+        case ipc::EdgeEdgeDistanceType::AB_D:
+        case ipc::EdgeEdgeDistanceType::A_CD:
+        case ipc::EdgeEdgeDistanceType::B_CD:
+          peCount++; break;
+        case ipc::EdgeEdgeDistanceType::AB_CD:
+          eeCount++; break;
+        default: break;
+      }
+    }
+  }
+  
+  for (const auto& cp : collisionPairs.colliderVTPairs) {
+    if (cp.isActive(dHatSqr)) {
+      switch (cp.type) {
+        case ipc::PointTriangleDistanceType::P_A:
+        case ipc::PointTriangleDistanceType::P_B:
+        case ipc::PointTriangleDistanceType::P_C:
+          colliderPpCount++; break;
+        case ipc::PointTriangleDistanceType::P_AB:
+        case ipc::PointTriangleDistanceType::P_BC:
+        case ipc::PointTriangleDistanceType::P_CA:
+          colliderPeCount++; break;
+        case ipc::PointTriangleDistanceType::P_ABC:
+          colliderPtCount++; break;
+        default: break;
+      }
+    }
+  }
+  
+  int totalCount = ppCount + peCount + ptCount + eeCount;
+  int totalColliderCount = colliderPpCount + colliderPeCount + colliderPtCount;
+  
+  // 检查并分配存储空间
+  if (constraintPairs.pairs.size() < totalCount)
+    constraintPairs.pairs.resize(totalCount);
+  if (constraintPairs.colliderPairs.size() < totalColliderCount)
+    constraintPairs.colliderPairs.resize(totalColliderCount);
+  
+  // 同时清空并准备旧的 constraintSet（用于 barrier 计算）
+  constraintSet.clear();
+  
+  // 第二遍：填充 active constraint pair 和旧约束集
+  int ppIdx = 0, peIdx = ppCount, ptIdx = ppCount + peCount, eeIdx = ppCount + peCount + ptCount;
+  int colliderPpIdx = 0, colliderPeIdx = colliderPpCount, colliderPtIdx = colliderPpCount + colliderPeCount;
+  
+  for (const auto& cp : collisionPairs.vtPairs) {
+    if (!cp.isActive(dHatSqr)) continue;
+    
+    // 调用规范化的 appendConstraintPair 方法
+    // 它会按照规范填充索引
+    ipc::ConstraintPair c;
+    switch (cp.type) {
+      case ipc::PointTriangleDistanceType::P_A:
+        c.type = ipc::ConstraintKind::PP;
+        c.indices[0] = cp.globalVertex;
+        c.indices[1] = cp.globalTriVerts[0];
+        constraintPairs.pairs[ppIdx++] = c;
+        break;
+      case ipc::PointTriangleDistanceType::P_B:
+        c.type = ipc::ConstraintKind::PP;
+        c.indices[0] = cp.globalVertex;
+        c.indices[1] = cp.globalTriVerts[1];
+        constraintPairs.pairs[ppIdx++] = c;
+        break;
+      case ipc::PointTriangleDistanceType::P_C:
+        c.type = ipc::ConstraintKind::PP;
+        c.indices[0] = cp.globalVertex;
+        c.indices[1] = cp.globalTriVerts[2];
+        constraintPairs.pairs[ppIdx++] = c;
+        break;
+      case ipc::PointTriangleDistanceType::P_AB:
+        c.type = ipc::ConstraintKind::PE;
+        c.indices[0] = cp.globalVertex;
+        c.indices[1] = cp.globalTriVerts[0];
+        c.indices[2] = cp.globalTriVerts[1];
+        constraintPairs.pairs[peIdx++] = c;
+        break;
+      case ipc::PointTriangleDistanceType::P_BC:
+        c.type = ipc::ConstraintKind::PE;
+        c.indices[0] = cp.globalVertex;
+        c.indices[1] = cp.globalTriVerts[1];
+        c.indices[2] = cp.globalTriVerts[2];
+        constraintPairs.pairs[peIdx++] = c;
+        break;
+      case ipc::PointTriangleDistanceType::P_CA:
+        c.type = ipc::ConstraintKind::PE;
+        c.indices[0] = cp.globalVertex;
+        c.indices[1] = cp.globalTriVerts[2];
+        c.indices[2] = cp.globalTriVerts[0];
+        constraintPairs.pairs[peIdx++] = c;
+        break;
+      case ipc::PointTriangleDistanceType::P_ABC:
+        c.type = ipc::ConstraintKind::PT;
+        c.indices[0] = cp.globalVertex;
+        c.indices[1] = cp.globalTriVerts[0];
+        c.indices[2] = cp.globalTriVerts[1];
+        c.indices[3] = cp.globalTriVerts[2];
+        constraintPairs.pairs[ptIdx++] = c;
+        break;
+      default: break;
+    }
+    
+    // 同时添加到旧的约束集（用于 barrier 计算，后续 Phase 3 移除）
+    constraintSet.vtConstraints.push_back({
+        .x = system().x,
+        .globalVertex = cp.globalVertex,
+        .globalTriVerts = cp.globalTriVerts,
+        .type = cp.type,
+    });
+  }
+  
+  for (const auto& cp : collisionPairs.eePairs) {
+    if (!cp.isActive(dHatSqr)) continue;
+    
+    // 添加到新的统一 constraint pair 容器（按规范填充索引）
+    ipc::ConstraintPair c;
+    switch (cp.type) {
+      case ipc::EdgeEdgeDistanceType::A_C:
+        c.type = ipc::ConstraintKind::PP;
+        c.indices[0] = cp.globalEdgeA[0];
+        c.indices[1] = cp.globalEdgeB[0];
+        constraintPairs.pairs[ppIdx++] = c;
+        break;
+      case ipc::EdgeEdgeDistanceType::A_D:
+        c.type = ipc::ConstraintKind::PP;
+        c.indices[0] = cp.globalEdgeA[0];
+        c.indices[1] = cp.globalEdgeB[1];
+        constraintPairs.pairs[ppIdx++] = c;
+        break;
+      case ipc::EdgeEdgeDistanceType::B_C:
+        c.type = ipc::ConstraintKind::PP;
+        c.indices[0] = cp.globalEdgeA[1];
+        c.indices[1] = cp.globalEdgeB[0];
+        constraintPairs.pairs[ppIdx++] = c;
+        break;
+      case ipc::EdgeEdgeDistanceType::B_D:
+        c.type = ipc::ConstraintKind::PP;
+        c.indices[0] = cp.globalEdgeA[1];
+        c.indices[1] = cp.globalEdgeB[1];
+        constraintPairs.pairs[ppIdx++] = c;
+        break;
+      case ipc::EdgeEdgeDistanceType::AB_C:
+        c.type = ipc::ConstraintKind::PE;
+        c.indices[0] = cp.globalEdgeB[0];
+        c.indices[1] = cp.globalEdgeA[0];
+        c.indices[2] = cp.globalEdgeA[1];
+        constraintPairs.pairs[peIdx++] = c;
+        break;
+      case ipc::EdgeEdgeDistanceType::AB_D:
+        c.type = ipc::ConstraintKind::PE;
+        c.indices[0] = cp.globalEdgeB[1];
+        c.indices[1] = cp.globalEdgeA[0];
+        c.indices[2] = cp.globalEdgeA[1];
+        constraintPairs.pairs[peIdx++] = c;
+        break;
+      case ipc::EdgeEdgeDistanceType::A_CD:
+        c.type = ipc::ConstraintKind::PE;
+        c.indices[0] = cp.globalEdgeA[0];
+        c.indices[1] = cp.globalEdgeB[0];
+        c.indices[2] = cp.globalEdgeB[1];
+        constraintPairs.pairs[peIdx++] = c;
+        break;
+      case ipc::EdgeEdgeDistanceType::B_CD:
+        c.type = ipc::ConstraintKind::PE;
+        c.indices[0] = cp.globalEdgeA[1];
+        c.indices[1] = cp.globalEdgeB[0];
+        c.indices[2] = cp.globalEdgeB[1];
+        constraintPairs.pairs[peIdx++] = c;
+        break;
+      case ipc::EdgeEdgeDistanceType::AB_CD:
+        c.type = ipc::ConstraintKind::EE;
+        c.indices[0] = cp.globalEdgeA[0];
+        c.indices[1] = cp.globalEdgeA[1];
+        c.indices[2] = cp.globalEdgeB[0];
+        c.indices[3] = cp.globalEdgeB[1];
+        constraintPairs.pairs[eeIdx++] = c;
+        break;
+      default: break;
+    }
+    
+    // 同时添加到旧的约束集（用于 barrier 计算）
+    constraintSet.eeConstraints.push_back({
+        .x = system().x,
+        .X = system().X,
+        .globalEdgeA = cp.globalEdgeA,
+        .globalEdgeB = cp.globalEdgeB,
+        .type = cp.type,
+    });
+  }
+  
+  for (const auto& cp : collisionPairs.colliderVTPairs) {
+    if (!cp.isActive(dHatSqr)) continue;
+    
+    // 添加到新的统一 constraint pair 容器
+    ipc::ColliderConstraintPair c;
+    c.writableIndices[0] = cp.deformableVertex;
+    
+    switch (cp.type) {
+      case ipc::PointTriangleDistanceType::P_A:
+        c.type = ipc::ConstraintKind::PP;
+        c.colliderIndices[0] = 0;
+        c.colliderIndices[1] = -1;
+        c.colliderIndices[2] = -1;
+        constraintPairs.colliderPairs[colliderPpIdx++] = c;
+        break;
+      case ipc::PointTriangleDistanceType::P_B:
+        c.type = ipc::ConstraintKind::PP;
+        c.colliderIndices[0] = 1;
+        c.colliderIndices[1] = -1;
+        c.colliderIndices[2] = -1;
+        constraintPairs.colliderPairs[colliderPpIdx++] = c;
+        break;
+      case ipc::PointTriangleDistanceType::P_C:
+        c.type = ipc::ConstraintKind::PP;
+        c.colliderIndices[0] = 2;
+        c.colliderIndices[1] = -1;
+        c.colliderIndices[2] = -1;
+        constraintPairs.colliderPairs[colliderPpIdx++] = c;
+        break;
+      case ipc::PointTriangleDistanceType::P_AB:
+        c.type = ipc::ConstraintKind::PE;
+        c.colliderIndices[0] = 0;
+        c.colliderIndices[1] = 1;
+        c.colliderIndices[2] = -1;
+        constraintPairs.colliderPairs[colliderPeIdx++] = c;
+        break;
+      case ipc::PointTriangleDistanceType::P_BC:
+        c.type = ipc::ConstraintKind::PE;
+        c.colliderIndices[0] = 1;
+        c.colliderIndices[1] = 2;
+        c.colliderIndices[2] = -1;
+        constraintPairs.colliderPairs[colliderPeIdx++] = c;
+        break;
+      case ipc::PointTriangleDistanceType::P_CA:
+        c.type = ipc::ConstraintKind::PE;
+        c.colliderIndices[0] = 2;
+        c.colliderIndices[1] = 0;
+        c.colliderIndices[2] = -1;
+        constraintPairs.colliderPairs[colliderPeIdx++] = c;
+        break;
+      case ipc::PointTriangleDistanceType::P_ABC:
+        c.type = ipc::ConstraintKind::PT;
+        c.colliderIndices[0] = 0;
+        c.colliderIndices[1] = 1;
+        c.colliderIndices[2] = 2;
+        constraintPairs.colliderPairs[colliderPtIdx++] = c;
+        break;
+      default: break;
+    }
+    
+    // 同时添加到旧的约束集（用于 barrier 计算）
+    constraintSet.kinematicVTConstraints.push_back({
+        .x = system().x,
+        .deformableVertex = cp.deformableVertex,
+        .ka = cp.ka,
+        .kb = cp.kb,
+        .kc = cp.kc,
+        .type = cp.type,
+    });
+  }
+  
+  // 更新 type offsets
+  constraintPairs.typeOffsets = {0, ppCount, ppCount + peCount, ppCount + peCount + ptCount, totalCount};
+  constraintPairs.colliderTypeOffsets = {0, colliderPpCount, colliderPpCount + colliderPeCount, totalColliderCount};
+  
+  // 截断 vectors 到实际使用的大小
+  constraintPairs.pairs.resize(totalCount);
+  constraintPairs.colliderPairs.resize(totalColliderCount);
 }
 
-void IpcIntegrator::precomputeConstraintSet(
-    const ConstraintSetPrecomputeRequest &config) {
-  constraintSet.vtConstraints.clear();
-  constraintSet.eeConstraints.clear();
-  constraintSet.kinematicVTConstraints.clear();
+void IpcIntegrator::precomputeCollisionPairs(const maths::BlockVector<3>& p, Real alpha) {
+  collisionPairs.clear();
   
-  collisionDetector->updateBVHs(config.descentDir, config.toi);
-  computeVertexTriangleConstraints(config);
-  computeEdgeEdgeConstraints(config);
+  collisionDetector->updateBVHs(p, alpha);
+  computeVertexTriangleCollisionPairs(p, alpha);
+  computeEdgeEdgeCollisionPairs(p, alpha);
   
-  // 检测运动学体约束
   if (!system().kinematicBodies().empty()) {
-    computeKinematicVTConstraints(config);
+    computeColliderVTCollisionPairs(p, alpha);
   }
 }
 
-void IpcIntegrator::computeKinematicVTConstraints(
-    const ConstraintSetPrecomputeRequest &config) {
-  const auto &[p, toi, dHat] = config;
+void IpcIntegrator::computeColliderVTCollisionPairs(const maths::BlockVector<3>& p, Real alpha) {
+  Real dHat = config.dHat;
   
-  // 遍历所有运动学体
   for (size_t bodyIdx = 0; bodyIdx < system().kinematicBodies().size(); bodyIdx++) {
     const auto& body = system().kinematicBodies()[bodyIdx];
     auto* mg = std::get_if<KinematicBody::MeshGeometry>(&body.geometry);
-    if (!mg) continue;  // SDF 碰撞在 barrier 层单独处理
+    if (!mg) continue;
     
     const auto& triangles = mg->mesh->triangles;
     
     for (int vertexIdx = 0; vertexIdx < system().numVertices(); vertexIdx++) {
-      // 弹性体顶点轨迹 bbox
       auto startPos = system().x[vertexIdx];
-      auto endPos = startPos + p[vertexIdx] * toi;
+      auto endPos = startPos + p[vertexIdx] * alpha;
       BBox<Real, 3> vertexBBox;
       vertexBBox.expand({startPos.x, startPos.y, startPos.z});
       vertexBBox.expand({endPos.x, endPos.y, endPos.z});
       
-      // 遍历运动学体的三角形
       for (size_t triIdx = 0; triIdx < triangles.size(); triIdx++) {
         const auto& tri = triangles[triIdx];
-        
-        // 计算运动学三角形在当前时刻的位置
         glm::dvec3 ka = body.currentVertices[tri.x];
         glm::dvec3 kb = body.currentVertices[tri.y];
         glm::dvec3 kc = body.currentVertices[tri.z];
         
-        // 简单距离检测：如果弹性体顶点接近运动学三角形，添加约束
         Real distSqr = ipc::distanceSqrPointTriangle(startPos, ka, kb, kc);
         
         if (distSqr < dHat * dHat) {
-          constraintSet.kinematicVTConstraints.push_back({
+          collisionPairs.colliderVTPairs.push_back({
               .x = system().x,
               .deformableVertex = vertexIdx,
               .ka = ka,
@@ -203,24 +697,23 @@ void IpcIntegrator::computeKinematicVTConstraints(
               .kc = kc,
               .type = ipc::PointTriangleDistanceType::Unknown,
           });
-          constraintSet.kinematicVTConstraints.back().updateDistanceType();
+          collisionPairs.colliderVTPairs.back().updateDistanceState();
         }
       }
     }
   }
 }
 
-void IpcIntegrator::computeVertexTriangleConstraints(
-    const ConstraintSetPrecomputeRequest &config) {
-  const auto &[p, toi, dHat] = config;
+void IpcIntegrator::computeVertexTriangleCollisionPairs(const maths::BlockVector<3>& p, Real alpha) {
+  Real dHat = config.dHat;
   const int nVerts = system().numVertices();
 
-  tbb::enumerable_thread_specific<std::vector<ipc::VertexTriangleConstraint>> threadLocalVT;
+  tbb::enumerable_thread_specific<std::vector<ipc::VertexTriangleCollisionPair>> threadLocalVT;
 
   tbb::parallel_for(0, nVerts, [&](int vertexIdx) {
     auto vertexTrajectoryBBox =
         system().geometryManager()
-            .getTrajectoryAccessor(system().x, p, toi)
+            .getTrajectoryAccessor(system().x, p, alpha)
             .vertexBBox(vertexIdx);
     vertexTrajectoryBBox = vertexTrajectoryBBox.dilate(dHat);
 
@@ -237,7 +730,7 @@ void IpcIntegrator::computeVertexTriangleConstraints(
               .globalTriVerts = {globalTri.x, globalTri.y, globalTri.z},
               .type = ipc::PointTriangleDistanceType::Unknown,
           });
-          local.back().updateDistanceType();
+          local.back().updateDistanceState();
           return true;
         },
         [&](const BBox<Real, 3> &bbox) -> bool {
@@ -245,23 +738,21 @@ void IpcIntegrator::computeVertexTriangleConstraints(
         });
   });
 
-  // Sequential merge
   for (auto &local : threadLocalVT)
     for (auto &c : local)
-      constraintSet.vtConstraints.push_back(c);
+      collisionPairs.vtPairs.push_back(c);
 }
 
-void IpcIntegrator::computeEdgeEdgeConstraints(
-    const ConstraintSetPrecomputeRequest &config) {
-  const auto &[p, toi, dHat] = config;
+void IpcIntegrator::computeEdgeEdgeCollisionPairs(const maths::BlockVector<3>& p, Real alpha) {
+  Real dHat = config.dHat;
   const int nEdges = system().numEdges();
 
-  tbb::enumerable_thread_specific<std::vector<ipc::EdgeEdgeConstraint>> threadLocalEE;
+  tbb::enumerable_thread_specific<std::vector<ipc::EdgeEdgeCollisionPair>> threadLocalEE;
 
   tbb::parallel_for(0, nEdges, [&](int edgeIdx) {
     auto edgeTrajectoryBBox =
         system().geometryManager()
-            .getTrajectoryAccessor(system().x, p, toi)
+            .getTrajectoryAccessor(system().x, p, alpha)
             .edgeBBox(edgeIdx);
     edgeTrajectoryBBox = edgeTrajectoryBBox.dilate(dHat);
 
@@ -281,7 +772,7 @@ void IpcIntegrator::computeEdgeEdgeConstraints(
               .globalEdgeB = {globalEb.x, globalEb.y},
               .type = ipc::EdgeEdgeDistanceType::Unknown,
           });
-          local.back().updateDistanceType();
+          local.back().updateDistanceState();
           return true;
         },
         [&](const BBox<Real, 3> &bbox) -> bool {
@@ -289,22 +780,57 @@ void IpcIntegrator::computeEdgeEdgeConstraints(
         });
   });
 
-  // Sequential merge
   for (auto &local : threadLocalEE)
     for (auto &c : local)
-      constraintSet.eeConstraints.push_back(c);
+      collisionPairs.eePairs.push_back(c);
 }
 
 maths::BlockVector<3> IpcIntegrator::barrierEnergyGradient() const {
   maths::BlockVector<3> gradient(system().x.numBlocks());
   gradient.setZero();
   Real kappa = config.contactStiffness;
-  for (const auto &c : constraintSet.vtConstraints)
-    c.assembleBarrierGradient(barrier, gradient, kappa);
-  for (const auto &c : constraintSet.eeConstraints)
-    c.assembleMollifiedBarrierGradient(barrier, gradient, kappa);
-  for (const auto &c : constraintSet.kinematicVTConstraints)
-    c.assembleBarrierGradient(barrier, gradient, kappa);
+  ensureFiniteValue("contact stiffness", kappa);
+
+  for (std::size_t i = 0; i < constraintSet.vtConstraints.size(); ++i) {
+    const auto& c = constraintSet.vtConstraints[i];
+    const auto label = describeVTConstraint(i, c);
+    const std::array<int, 4> touched = {
+        c.globalVertex,
+        c.globalTriVerts[0],
+        c.globalTriVerts[1],
+        c.globalTriVerts[2]};
+    c.assembleBarrierGradient(barrier_, gradient, kappa);
+    ensureFiniteTouchedBlocks(std::format("Gradient assembly for {}", label), gradient, touched);
+  }
+
+  for (std::size_t i = 0; i < constraintSet.eeConstraints.size(); ++i) {
+    const auto& c = constraintSet.eeConstraints[i];
+    const auto label = describeEEConstraint(i, c);
+    const std::array<int, 4> touched = {
+        c.globalEdgeA[0], c.globalEdgeA[1], c.globalEdgeB[0], c.globalEdgeB[1]};
+    try {
+      c.assembleBarrierGradient(barrier_, gradient, kappa);
+    } catch (const std::exception& e) {
+      throw std::runtime_error(std::format(
+          "[IPC] Gradient assembly failed for {}: {}", label, e.what()));
+    }
+    ensureFiniteTouchedBlocks(std::format("Gradient assembly for {}", label), gradient, touched);
+  }
+
+  for (std::size_t i = 0; i < constraintSet.kinematicVTConstraints.size(); ++i) {
+    const auto& c = constraintSet.kinematicVTConstraints[i];
+    const auto label = describeKinematicVTConstraint(i, c);
+    const std::array<int, 1> touched = {c.deformableVertex};
+    try {
+      c.assembleBarrierGradient(barrier_, gradient, kappa);
+    } catch (const std::exception& e) {
+      throw std::runtime_error(std::format(
+          "[IPC] Gradient assembly failed for {}: {}", label, e.what()));
+    }
+    ensureFiniteTouchedBlocks(std::format("Gradient assembly for {}", label), gradient, touched);
+  }
+
+  ensureFiniteAllBlocks("full barrier gradient", gradient);
   return gradient;
 }
 
@@ -343,15 +869,55 @@ std::unique_ptr<Integrator> IpcIntegrator::create(System &system,
 }
 
 Real IpcIntegrator::barrierEnergy() const {
-  Real barrierEnergy = 0.0;
+  Real energy = 0.0;
   Real kappa = config.contactStiffness;
-  for (const auto &c : constraintSet.vtConstraints)
-    barrierEnergy += barrier(c.distanceSqr());
-  for (const auto &c : constraintSet.eeConstraints)
-    barrierEnergy += c.mollifier() * barrier(c.distanceSqr());
-  // 运动学约束
-  for (const auto &c : constraintSet.kinematicVTConstraints)
-    barrierEnergy += barrier(c.distanceSqr());
-  return kappa * barrierEnergy;
+  ensureFiniteValue("contact stiffness", kappa);
+
+  for (std::size_t i = 0; i < constraintSet.vtConstraints.size(); ++i) {
+    const auto& c = constraintSet.vtConstraints[i];
+    const auto label = describeVTConstraint(i, c);
+    Real localEnergy;
+    try {
+      localEnergy = c.barrierEnergy(barrier_, kappa);
+    } catch (const std::exception& e) {
+      throw std::runtime_error(std::format(
+          "[IPC] Barrier energy failed for {}: {}", label, e.what()));
+    }
+    ensureFiniteValue(std::format("barrier energy for {}", label), localEnergy);
+    energy += localEnergy;
+    ensureFiniteValue("accumulated barrier energy", energy);
+  }
+
+  for (std::size_t i = 0; i < constraintSet.eeConstraints.size(); ++i) {
+    const auto& c = constraintSet.eeConstraints[i];
+    const auto label = describeEEConstraint(i, c);
+    Real localEnergy;
+    try {
+      localEnergy = c.barrierEnergy(barrier_, kappa);
+    } catch (const std::exception& e) {
+      throw std::runtime_error(std::format(
+          "[IPC] Barrier energy failed for {}: {}", label, e.what()));
+    }
+    ensureFiniteValue(std::format("barrier energy for {}", label), localEnergy);
+    energy += localEnergy;
+    ensureFiniteValue("accumulated barrier energy", energy);
+  }
+
+  for (std::size_t i = 0; i < constraintSet.kinematicVTConstraints.size(); ++i) {
+    const auto& c = constraintSet.kinematicVTConstraints[i];
+    const auto label = describeKinematicVTConstraint(i, c);
+    Real localEnergy;
+    try {
+      localEnergy = c.barrierEnergy(barrier_, kappa);
+    } catch (const std::exception& e) {
+      throw std::runtime_error(std::format(
+          "[IPC] Barrier energy failed for {}: {}", label, e.what()));
+    }
+    ensureFiniteValue(std::format("barrier energy for {}", label), localEnergy);
+    energy += localEnergy;
+    ensureFiniteValue("accumulated barrier energy", energy);
+  }
+
+  return energy;
 }
 } // namespace sim::fem

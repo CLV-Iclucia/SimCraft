@@ -11,14 +11,11 @@ namespace sim::maths {
 
 using Real = double;
 
-/// 局部梯度：N 个顶点，每顶点一个 dvec3
-/// 声明为命名 struct 而非 using alias，令 ADL 能在 sim::maths 中查找算符重载
 template<int N>
 struct LocalGrad {
   std::array<glm::dvec3, N> v{};
 
   LocalGrad() = default;
-  // 从裸数组隐式构造，兼容仍返回 std::array 的旧接口
   LocalGrad(const std::array<glm::dvec3, N>& arr) : v(arr) {}
   LocalGrad(std::array<glm::dvec3, N>&& arr)       : v(std::move(arr)) {}
 
@@ -32,7 +29,6 @@ struct LocalGrad {
   static constexpr std::size_t size() noexcept { return N; }
 };
 
-/// 局部 Hessian：N×N 个 3×3 block，BlockH[i][j] = ∂²E/∂xᵢ∂xⱼ
 template<int N>
 struct LocalHessian {
   std::array<std::array<glm::dmat3, N>, N> v{};
