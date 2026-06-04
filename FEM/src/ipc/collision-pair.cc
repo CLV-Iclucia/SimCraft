@@ -178,7 +178,7 @@ bool EdgeEdgeCollisionPair::usesMollifier() const {
   auto eb0 = x[globalEdgeB[0]], eb1 = x[globalEdgeB[1]];
   auto rest_ea0 = X[globalEdgeA[0]], rest_ea1 = X[globalEdgeA[1]];
   auto rest_eb0 = X[globalEdgeB[0]], rest_eb1 = X[globalEdgeB[1]];
-  return needsMollifier(ea0, ea1, eb0, eb1, rest_ea0, rest_ea1, rest_eb0, rest_eb1);
+  return gipc::needsMollifier(ea0, ea1, eb0, eb1, rest_ea0, rest_ea1, rest_eb0, rest_eb1);
 }
 
 void EdgeEdgeCollisionPair::appendConstraintPair(ConstraintPairSet& out, Real dHatSqr) const {

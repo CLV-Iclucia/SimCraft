@@ -6,6 +6,7 @@
 //
 
 #pragma once
+#include <fem/simplex.h>
 #include <fem/ipc/distances.h>
 #include <Maths/block-types.h>
 

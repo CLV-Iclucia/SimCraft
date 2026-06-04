@@ -1386,7 +1386,7 @@ void colliderConstraintPairBarrierHessian(
   auto pfpx = computePFPx_PP(p, closest, dHat);
   if (!pfpx.valid || pfpx.I5 >= 1.0) return;
   Real lam = kappa * barrier.clampedLambda0(pfpx.I5);
-  auto localH = maths::sandwichRank1<2, 3>(pfpx.PFPx, pfpx.q0, lam);
+  auto localH = sandwichRank1<2, 3>(pfpx.PFPx, pfpx.q0, lam);
   globalHessian.addBlock(deformVertex, deformVertex, localH[0][0]);
 }
 
