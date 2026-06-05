@@ -102,7 +102,9 @@ struct ConstraintPair {
 struct ColliderConstraintPair {
   ConstraintKind type = ConstraintKind::PP;
   std::array<int, 1> writableIndices = {-1};      // 可写顶点 block 索引
-  std::array<int, 3> colliderIndices = {-1, -1, -1}; // collider 约束点位置存储
+  std::array<int, 3> colliderIndices = {-1, -1, -1}; // collider 三角形内的局部索引选择
+  std::array<glm::dvec3, 3> colliderVertices = {};   // 可选：直接内嵌 collider 三角形当前几何
+  bool hasEmbeddedColliderTriangle = false;
 };
 
 // =========================================================================

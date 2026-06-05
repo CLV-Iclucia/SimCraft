@@ -54,11 +54,11 @@ struct VertexTriangleCollisionPair {
 // =========================================================================
 
 struct EdgeEdgeCollisionPair {
-  const maths::BlockVector<3>& x;   // 全局当前配置
-  const maths::BlockVector<3>& X;   // 全局参考配置 (mollifier 用)
-  int globalEdgeA[2];               // edge A 两端点全局 block 索引
-  int globalEdgeB[2];               // edge B 两端点全局 block 索引
-  EdgeEdgeDistanceType type{};      // 当前构型下的距离类型
+  const maths::BlockVector<3>& x;
+  const maths::BlockVector<3>& X;
+  int globalEdgeA[2];
+  int globalEdgeB[2];
+  EdgeEdgeDistanceType type{};
 
   void updateDistanceState();
   [[nodiscard]] Real distanceSqr() const;
@@ -67,12 +67,9 @@ struct EdgeEdgeCollisionPair {
     return distanceSqr() < dHatSqr;
   }
   
-  /// 根据当前距离类型和距离，生成激活的 Constraint Pair
-  /// 如未激活，不生成任何东西
   void appendConstraintPair(class ConstraintPairSet& out, Real dHatSqr) const;
 
 private:
-  /// 是否走 mollifier 分支 (近平行 EE)
   [[nodiscard]] bool usesMollifier() const;
 };
 
@@ -99,8 +96,6 @@ struct ColliderVTCollisionPair {
     return distanceSqr() < dHatSqr;
   }
 
-  /// 根据当前距离类型和距离，生成激活的 Constraint Pair
-  /// 如未激活，不生成任何东西
   void appendConstraintPair(class ConstraintPairSet& out, Real dHatSqr) const;
 };
 

@@ -1,5 +1,7 @@
 #include <fem/geometry-manager.h>
 
+#include "fem/colliders.h"
+
 namespace sim::fem {
 
 void GeometryManager::collectGeometryReferences(

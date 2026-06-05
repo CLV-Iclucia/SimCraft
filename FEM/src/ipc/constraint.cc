@@ -1163,7 +1163,7 @@ void constraintPairBarrierGradient(
       auto pfpx = computePFPx_PE(pt, p0, p1, dHat);
       if (!pfpx.valid || pfpx.I5 >= 1.0) return;
       Real sqrtI5 = std::sqrt(pfpx.I5);
-      Eigen::Matrix<Real, 3, 1> pk1 = pfpx.q0 * (barrier.gradCoeff(pfpx.I5) * sqrtI5);
+      Eigen::Matrix<Real, 6, 1> pk1 = pfpx.q0 * (barrier.gradCoeff(pfpx.I5) * sqrtI5);
       Eigen::Matrix<Real, 9, 1> grad = kappa * pfpx.PFPx.transpose() * pk1;
       auto lg = eigenToLocalGrad<3>(grad);
       std::array<int, 3> idx = {pair.indices[0], pair.indices[1], pair.indices[2]};
@@ -1177,7 +1177,7 @@ void constraintPairBarrierGradient(
       auto pfpx = computePFPx_PT(pt, p0, p1, p2, dHat);
       if (!pfpx.valid || pfpx.I5 >= 1.0) return;
       Real sqrtI5 = std::sqrt(pfpx.I5);
-      Eigen::Matrix<Real, 3, 1> pk1 = pfpx.q0 * (barrier.gradCoeff(pfpx.I5) * sqrtI5);
+      Eigen::Matrix<Real, 9, 1> pk1 = pfpx.q0 * (barrier.gradCoeff(pfpx.I5) * sqrtI5);
       Eigen::Matrix<Real, 12, 1> grad = kappa * pfpx.PFPx.transpose() * pk1;
       auto lg = eigenToLocalGrad<4>(grad);
       std::array<int, 4> idx = {pair.indices[0], pair.indices[1], pair.indices[2], pair.indices[3]};
@@ -1191,7 +1191,7 @@ void constraintPairBarrierGradient(
       auto pfpx = computePFPx_EE(a0, a1, b0, b1, dHat);
       if (!pfpx.valid || pfpx.I5 >= 1.0) return;
       Real sqrtI5 = std::sqrt(pfpx.I5);
-      Eigen::Matrix<Real, 3, 1> pk1 = pfpx.q0 * (barrier.gradCoeff(pfpx.I5) * sqrtI5);
+      Eigen::Matrix<Real, 9, 1> pk1 = pfpx.q0 * (barrier.gradCoeff(pfpx.I5) * sqrtI5);
       Eigen::Matrix<Real, 12, 1> grad = kappa * pfpx.PFPx.transpose() * pk1;
       auto lg = eigenToLocalGrad<4>(grad);
       std::array<int, 4> idx = {pair.indices[0], pair.indices[1], pair.indices[2], pair.indices[3]};
@@ -1231,7 +1231,7 @@ void constraintPairBarrierHessian(
       auto pfpx = computePFPx_PE(pt, p0, p1, dHat);
       if (!pfpx.valid || pfpx.I5 >= 1.0) return;
       Real lam = kappa * barrier.clampedLambda0(pfpx.I5);
-      auto localH = sandwichRank1<3, 3>(pfpx.PFPx, pfpx.q0, lam);
+      auto localH = sandwichRank1<3, 6>(pfpx.PFPx, pfpx.q0, lam);
       std::array<int, 3> idx = {pair.indices[0], pair.indices[1], pair.indices[2]};
       assembleLocalHessian<3>(globalHessian, idx, localH);
       break;
@@ -1243,7 +1243,7 @@ void constraintPairBarrierHessian(
       auto pfpx = computePFPx_PT(pt, p0, p1, p2, dHat);
       if (!pfpx.valid || pfpx.I5 >= 1.0) return;
       Real lam = kappa * barrier.clampedLambda0(pfpx.I5);
-      auto localH = sandwichRank1<4, 3>(pfpx.PFPx, pfpx.q0, lam);
+      auto localH = sandwichRank1<4, 9>(pfpx.PFPx, pfpx.q0, lam);
       std::array<int, 4> idx = {pair.indices[0], pair.indices[1], pair.indices[2], pair.indices[3]};
       assembleLocalHessian<4>(globalHessian, idx, localH);
       break;
@@ -1255,7 +1255,7 @@ void constraintPairBarrierHessian(
       auto pfpx = computePFPx_EE(a0, a1, b0, b1, dHat);
       if (!pfpx.valid || pfpx.I5 >= 1.0) return;
       Real lam = kappa * barrier.clampedLambda0(pfpx.I5);
-      auto localH = sandwichRank1<4, 3>(pfpx.PFPx, pfpx.q0, lam);
+      auto localH = sandwichRank1<4, 9>(pfpx.PFPx, pfpx.q0, lam);
       std::array<int, 4> idx = {pair.indices[0], pair.indices[1], pair.indices[2], pair.indices[3]};
       assembleLocalHessian<4>(globalHessian, idx, localH);
       break;
@@ -1263,6 +1263,28 @@ void constraintPairBarrierHessian(
     default: break;
   }
 }
+
+namespace {
+
+void resolveColliderTriangleVertices(
+    const ColliderConstraintPair& pair,
+    const std::vector<glm::dvec3>& colliderTriangleVertices,
+    glm::dvec3& ka,
+    glm::dvec3& kb,
+    glm::dvec3& kc) {
+  if (pair.hasEmbeddedColliderTriangle) {
+    ka = pair.colliderVertices[0];
+    kb = pair.colliderVertices[1];
+    kc = pair.colliderVertices[2];
+    return;
+  }
+
+  if (pair.colliderIndices[0] >= 0) ka = colliderTriangleVertices[pair.colliderIndices[0]];
+  if (pair.colliderIndices[1] >= 0) kb = colliderTriangleVertices[pair.colliderIndices[1]];
+  if (pair.colliderIndices[2] >= 0) kc = colliderTriangleVertices[pair.colliderIndices[2]];
+}
+
+} // namespace
 
 Real colliderConstraintPairBarrierEnergy(
     const ColliderConstraintPair& pair,
@@ -1273,10 +1295,8 @@ Real colliderConstraintPairBarrierEnergy(
   int deformVertex = pair.writableIndices[0];
   auto p = x[deformVertex];
   glm::dvec3 ka, kb, kc;
-  if (pair.colliderIndices[0] >= 0) ka = colliderTriangleVertices[pair.colliderIndices[0]];
-  if (pair.colliderIndices[1] >= 0) kb = colliderTriangleVertices[pair.colliderIndices[1]];
-  if (pair.colliderIndices[2] >= 0) kc = colliderTriangleVertices[pair.colliderIndices[2]];
-  
+  resolveColliderTriangleVertices(pair, colliderTriangleVertices, ka, kb, kc);
+
   Real dSqr = 0.0;
   switch (pair.type) {
     case ConstraintKind::PP: dSqr = distanceSqrPointPoint(p, ka); break;
@@ -1298,15 +1318,13 @@ void colliderConstraintPairBarrierGradient(
   int deformVertex = pair.writableIndices[0];
   auto p = x[deformVertex];
   Real dHat = barrier.dHat();
-  
+
   glm::dvec3 ka, kb, kc;
-  if (pair.colliderIndices[0] >= 0) ka = colliderTriangleVertices[pair.colliderIndices[0]];
-  if (pair.colliderIndices[1] >= 0) kb = colliderTriangleVertices[pair.colliderIndices[1]];
-  if (pair.colliderIndices[2] >= 0) kc = colliderTriangleVertices[pair.colliderIndices[2]];
-  
+  resolveColliderTriangleVertices(pair, colliderTriangleVertices, ka, kb, kc);
+
   glm::dvec3 closest;
   Real dSqr = 0.0;
-  
+
   switch (pair.type) {
     case ConstraintKind::PP: {
       dSqr = distanceSqrPointPoint(p, ka);
@@ -1329,7 +1347,7 @@ void colliderConstraintPairBarrierGradient(
     }
     default: return;
   }
-  
+
   if (dSqr >= barrier.dHatSqr()) return;
   auto pfpx = computePFPx_PP(p, closest, dHat);
   if (!pfpx.valid || pfpx.I5 >= 1.0) return;
@@ -1350,15 +1368,13 @@ void colliderConstraintPairBarrierHessian(
   int deformVertex = pair.writableIndices[0];
   auto p = x[deformVertex];
   Real dHat = barrier.dHat();
-  
+
   glm::dvec3 ka, kb, kc;
-  if (pair.colliderIndices[0] >= 0) ka = colliderTriangleVertices[pair.colliderIndices[0]];
-  if (pair.colliderIndices[1] >= 0) kb = colliderTriangleVertices[pair.colliderIndices[1]];
-  if (pair.colliderIndices[2] >= 0) kc = colliderTriangleVertices[pair.colliderIndices[2]];
-  
+  resolveColliderTriangleVertices(pair, colliderTriangleVertices, ka, kb, kc);
+
   glm::dvec3 closest;
   Real dSqr = 0.0;
-  
+
   switch (pair.type) {
     case ConstraintKind::PP: {
       dSqr = distanceSqrPointPoint(p, ka);
@@ -1381,7 +1397,7 @@ void colliderConstraintPairBarrierHessian(
     }
     default: return;
   }
-  
+
   if (dSqr >= barrier.dHatSqr()) return;
   auto pfpx = computePFPx_PP(p, closest, dHat);
   if (!pfpx.valid || pfpx.I5 >= 1.0) return;
@@ -1389,6 +1405,7 @@ void colliderConstraintPairBarrierHessian(
   auto localH = sandwichRank1<2, 3>(pfpx.PFPx, pfpx.q0, lam);
   globalHessian.addBlock(deformVertex, deformVertex, localH[0][0]);
 }
+
 
 } // namespace sim::fem::ipc
 

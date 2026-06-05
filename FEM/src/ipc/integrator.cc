@@ -128,39 +128,70 @@ std::string toString(ipc::EdgeEdgeDistanceType type) {
   return "Unknown";
 }
 
-std::string describeVTConstraint(std::size_t idx,
-                                 const ipc::VertexTriangleConstraint& c) {
-  return std::format(
-      "vt[{}] v={} tri=({}, {}, {}) type={}",
-      idx,
-      c.globalVertex,
-      c.globalTriVerts[0],
-      c.globalTriVerts[1],
-      c.globalTriVerts[2],
-      toString(c.type));
+std::string toString(ipc::ConstraintKind kind) {
+  switch (kind) {
+    case ipc::ConstraintKind::PP: return "PP";
+    case ipc::ConstraintKind::PE: return "PE";
+    case ipc::ConstraintKind::PT: return "PT";
+    case ipc::ConstraintKind::EE: return "EE";
+  }
+  return "Unknown";
 }
 
-std::string describeEEConstraint(std::size_t idx,
-                                 const ipc::EdgeEdgeConstraint& c) {
-  return std::format(
-      "ee[{}] edgeA=({}, {}) edgeB=({}, {}) type={}",
-      idx,
-      c.globalEdgeA[0],
-      c.globalEdgeA[1],
-      c.globalEdgeB[0],
-      c.globalEdgeB[1],
-      toString(c.type));
+std::string describeConstraintPair(std::size_t idx,
+                                   const ipc::ConstraintPair& c) {
+  switch (c.type) {
+    case ipc::ConstraintKind::PP:
+      return std::format("pair[{}] type={} indices=({}, {})",
+                         idx,
+                         toString(c.type),
+                         c.indices[0],
+                         c.indices[1]);
+    case ipc::ConstraintKind::PE:
+      return std::format("pair[{}] type={} indices=({}, {}, {})",
+                         idx,
+                         toString(c.type),
+                         c.indices[0],
+                         c.indices[1],
+                         c.indices[2]);
+    case ipc::ConstraintKind::PT:
+    case ipc::ConstraintKind::EE:
+      return std::format("pair[{}] type={} indices=({}, {}, {}, {})",
+                         idx,
+                         toString(c.type),
+                         c.indices[0],
+                         c.indices[1],
+                         c.indices[2],
+                         c.indices[3]);
+  }
+  return std::format("pair[{}] type=Unknown", idx);
 }
 
-std::string describeKinematicVTConstraint(
-    std::size_t idx,
-    const ipc::DeformableKinematicVTConstraint& c) {
-  return std::format(
-      "kinematic-vt[{}] v={} type={}",
-      idx,
-      c.deformableVertex,
-      toString(c.type));
+void ensureFiniteConstraintPairGradient(std::string_view label,
+                                        const maths::BlockVector<3>& value,
+                                        const ipc::ConstraintPair& pair) {
+  switch (pair.type) {
+    case ipc::ConstraintKind::PP: {
+      const std::array<int, 2> touched = {pair.indices[0], pair.indices[1]};
+      ensureFiniteTouchedBlocks(label, value, touched);
+      return;
+    }
+    case ipc::ConstraintKind::PE: {
+      const std::array<int, 3> touched = {pair.indices[0], pair.indices[1], pair.indices[2]};
+      ensureFiniteTouchedBlocks(label, value, touched);
+      return;
+    }
+    case ipc::ConstraintKind::PT:
+    case ipc::ConstraintKind::EE: {
+      const std::array<int, 4> touched = {
+          pair.indices[0], pair.indices[1], pair.indices[2], pair.indices[3]};
+      ensureFiniteTouchedBlocks(label, value, touched);
+      return;
+    }
+  }
 }
+
+
 
 } // namespace
 
@@ -177,15 +208,24 @@ void IpcIntegrator::step(Real dt) {
   Real t_next = system().currentTime() + dt;
   system().advanceKinematicBodies(t_next);
 
-  collisionDetector->setKinematicBodies(&system().kinematicBodies());
+  collisionDetector->setKinematicBodies(&system().colliders());
 
   system().constraints().enforcePosition(system(), t_next);
   maths::BlockVector<3> x_t = system().x;
   ensureFiniteAllBlocks("initial configuration x_t", x_t);
   x_prev = system().x;
 
+  if (!hasInitializedActiveConstraints) {
+    maths::BlockVector<3> zeroDirection(x_t.numBlocks());
+    zeroDirection.setZero();
+    precomputeCollisionPairs(zeroDirection, 0.0);
+    refreshActiveConstraintPairs();
+    hasInitializedActiveConstraints = true;
+  }
+
   Real h = dt;
   spdlog::info("[IPC] computing initial energy...");
+
   Real E_prev = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
   ensureFiniteValue("initial barrier augmented energy", E_prev);
   spdlog::info("[IPC] E_prev = {}", E_prev);
@@ -202,16 +242,18 @@ void IpcIntegrator::step(Real dt) {
 
     // Compute Hessian directly as BlockSparseMatrix<3>
     spdlog::info("[IPC] iter {}: computing Hessian...", iter);
-    auto H_block = spdProjectHessian(h);
-    ensureFiniteAllMatrixEntries(std::format("Newton Hessian before solve at iter {}", iter), H_block);
+    auto H = spdProjectHessian(h);
+    ensureFiniteAllMatrixEntries(std::format("Newton Hessian before solve at iter {}", iter), H);
 
     spdlog::info("[IPC] iter {}: solving linear system...", iter);
     p.setZero();
-    spdlog::info("[IPC] nnz: {}", H_block.blocks().size());
-    auto result = solver->solve(H_block, negG, p);
+    spdlog::info("[IPC] nnz: {}", H.blocks().size());
+    auto result = solver->solve(H, negG, p);
     ensureFiniteValue(std::format("BlockPCG residual at iter {}", iter), result.residualNorm);
     if (!result.converged)
       spdlog::warn("BlockPCG: {} iters, residual={}", result.iterations, result.residualNorm);
+    else
+      spdlog::info("BlockPCG: {} iters, residual={}", result.iterations, result.residualNorm);
 
     system().constraints().projectToFreeSpace(p);
     ensureFiniteAllBlocks(std::format("projected Newton direction at iter {}", iter), p);
@@ -225,9 +267,8 @@ void IpcIntegrator::step(Real dt) {
     Real alphaElastic = computeStepSizeUpperBound(p);
     ensureFiniteValue(std::format("alphaElastic at iter {}", iter), alphaElastic);
     Real alphaKinematic = 1.0;
-    if (!system().kinematicBodies().empty()) {
-      auto toiKin = collisionDetector->detectDeformableVsKinematic(p, dt);
-      if (toiKin) alphaKinematic = *toiKin;
+    if (!system().colliders().empty()) {
+      if (auto toiColliders = collisionDetector->detectDeformableVsKinematic(p, dt)) alphaKinematic = *toiColliders;
     }
     ensureFiniteValue(std::format("alphaKinematic at iter {}", iter), alphaKinematic);
     Real alpha = config.stepSizeScale * std::min({1.0, alphaElastic, alphaKinematic});
@@ -251,9 +292,7 @@ void IpcIntegrator::step(Real dt) {
       ensureFiniteValue(std::format("line-search energy at iter {}", iter), E);
     } while (E > E_prev);
 
-    if (onNewtonIter) onNewtonIter(iter);
-
-
+    iter++;
   }
   velocityUpdate(x_t, h);
 
@@ -289,27 +328,15 @@ maths::BlockSparseMatrix<3> IpcIntegrator::spdProjectHessian(Real h) const
   system().spdProjectHessian(H);
   ensureFiniteAllMatrixEntries("elastic Hessian assembly", H);
 
-  // Barrier Hessian (elastic-elastic)
   Real kappa = config.contactStiffness;
   ensureFiniteValue("contact stiffness", kappa);
-  for (std::size_t i = 0; i < constraintSet.vtConstraints.size(); ++i) {
-    const auto& c = constraintSet.vtConstraints[i];
-    const auto label = describeVTConstraint(i, c);
+  const int activeConstraintPairCount = constraintPairs.typeOffsets.back();
+  for (int i = 0; i < activeConstraintPairCount; ++i) {
+    const auto& pair = constraintPairs.pairs[i];
+    const auto label = describeConstraintPair(i, pair);
     const int prevEntries = H.numEntries();
     try {
-      c.assembleBarrierHessian(barrier_, H, kappa);
-    } catch (const std::exception& e) {
-      throw std::runtime_error(std::format(
-          "[IPC] Hessian assembly failed for {}: {}", label, e.what()));
-    }
-    ensureFiniteNewMatrixEntries(std::format("Hessian assembly for {}", label), H, prevEntries);
-  }
-  for (std::size_t i = 0; i < constraintSet.eeConstraints.size(); ++i) {
-    const auto& c = constraintSet.eeConstraints[i];
-    const auto label = describeEEConstraint(i, c);
-    const int prevEntries = H.numEntries();
-    try {
-      c.assembleBarrierHessian(barrier_, H, kappa);
+      ipc::constraintPairBarrierHessian(pair, system().x, system().X, H, barrier_, kappa);
     } catch (const std::exception& e) {
       throw std::runtime_error(std::format(
           "[IPC] Hessian assembly failed for {}: {}", label, e.what()));
@@ -317,19 +344,7 @@ maths::BlockSparseMatrix<3> IpcIntegrator::spdProjectHessian(Real h) const
     ensureFiniteNewMatrixEntries(std::format("Hessian assembly for {}", label), H, prevEntries);
   }
 
-  // Barrier Hessian (elastic-kinematic)
-  for (std::size_t i = 0; i < constraintSet.kinematicVTConstraints.size(); ++i) {
-    const auto& c = constraintSet.kinematicVTConstraints[i];
-    const auto label = describeKinematicVTConstraint(i, c);
-    const int prevEntries = H.numEntries();
-    try {
-      c.assembleBarrierHessian(barrier_, H, kappa);
-    } catch (const std::exception& e) {
-      throw std::runtime_error(std::format(
-          "[IPC] Hessian assembly failed for {}: {}", label, e.what()));
-    }
-    ensureFiniteNewMatrixEntries(std::format("Hessian assembly for {}", label), H, prevEntries);
-  }
+
 
   // H_total = h² * H_elastic_barrier + M
   H.scale(h * h);
@@ -340,7 +355,6 @@ maths::BlockSparseMatrix<3> IpcIntegrator::spdProjectHessian(Real h) const
 }
 
 void IpcIntegrator::refreshActiveConstraintPairs() {
-  // 更新所有 collision pair 的距离状态
   for (auto &c : collisionPairs.vtPairs)
     c.updateDistanceState();
   for (auto &c : collisionPairs.eePairs)
@@ -348,7 +362,6 @@ void IpcIntegrator::refreshActiveConstraintPairs() {
   for (auto &c : collisionPairs.colliderVTPairs)
     c.updateDistanceState();
   
-  // 统计各类型 active constraint 的数量，用于分配存储空间
   int ppCount = 0, peCount = 0, ptCount = 0, eeCount = 0;
   int colliderPpCount = 0, colliderPeCount = 0, colliderPtCount = 0;
   
@@ -413,24 +426,17 @@ void IpcIntegrator::refreshActiveConstraintPairs() {
   int totalCount = ppCount + peCount + ptCount + eeCount;
   int totalColliderCount = colliderPpCount + colliderPeCount + colliderPtCount;
   
-  // 检查并分配存储空间
   if (constraintPairs.pairs.size() < totalCount)
     constraintPairs.pairs.resize(totalCount);
   if (constraintPairs.colliderPairs.size() < totalColliderCount)
     constraintPairs.colliderPairs.resize(totalColliderCount);
   
-  // 同时清空并准备旧的 constraintSet（用于 barrier 计算）
-  constraintSet.clear();
-  
-  // 第二遍：填充 active constraint pair 和旧约束集
   int ppIdx = 0, peIdx = ppCount, ptIdx = ppCount + peCount, eeIdx = ppCount + peCount + ptCount;
   int colliderPpIdx = 0, colliderPeIdx = colliderPpCount, colliderPtIdx = colliderPpCount + colliderPeCount;
   
   for (const auto& cp : collisionPairs.vtPairs) {
     if (!cp.isActive(dHatSqr)) continue;
     
-    // 调用规范化的 appendConstraintPair 方法
-    // 它会按照规范填充索引
     ipc::ConstraintPair c;
     switch (cp.type) {
       case ipc::PointTriangleDistanceType::P_A:
@@ -482,20 +488,11 @@ void IpcIntegrator::refreshActiveConstraintPairs() {
         break;
       default: break;
     }
-    
-    // 同时添加到旧的约束集（用于 barrier 计算，后续 Phase 3 移除）
-    constraintSet.vtConstraints.push_back({
-        .x = system().x,
-        .globalVertex = cp.globalVertex,
-        .globalTriVerts = cp.globalTriVerts,
-        .type = cp.type,
-    });
   }
   
   for (const auto& cp : collisionPairs.eePairs) {
     if (!cp.isActive(dHatSqr)) continue;
     
-    // 添加到新的统一 constraint pair 容器（按规范填充索引）
     ipc::ConstraintPair c;
     switch (cp.type) {
       case ipc::EdgeEdgeDistanceType::A_C:
@@ -562,19 +559,19 @@ void IpcIntegrator::refreshActiveConstraintPairs() {
     }
     
     // 同时添加到旧的约束集（用于 barrier 计算）
-    constraintSet.eeConstraints.push_back({
-        .x = system().x,
-        .X = system().X,
-        .globalEdgeA = cp.globalEdgeA,
-        .globalEdgeB = cp.globalEdgeB,
-        .type = cp.type,
-    });
+    // TODO Phase 3: Remove old constraint set completely
+    // constraintSet.eeConstraints.push_back({
+    //     .x = system().x,
+    //     .X = system().X,
+    //     .globalEdgeA = cp.globalEdgeA,
+    //     .globalEdgeB = cp.globalEdgeB,
+    //     .type = cp.type,
+    // });
   }
   
   for (const auto& cp : collisionPairs.colliderVTPairs) {
     if (!cp.isActive(dHatSqr)) continue;
     
-    // 添加到新的统一 constraint pair 容器
     ipc::ColliderConstraintPair c;
     c.writableIndices[0] = cp.deformableVertex;
     
@@ -631,24 +628,14 @@ void IpcIntegrator::refreshActiveConstraintPairs() {
       default: break;
     }
     
-    // 同时添加到旧的约束集（用于 barrier 计算）
-    constraintSet.kinematicVTConstraints.push_back({
-        .x = system().x,
-        .deformableVertex = cp.deformableVertex,
-        .ka = cp.ka,
-        .kb = cp.kb,
-        .kc = cp.kc,
-        .type = cp.type,
-    });
   }
   
   // 更新 type offsets
   constraintPairs.typeOffsets = {0, ppCount, ppCount + peCount, ppCount + peCount + ptCount, totalCount};
   constraintPairs.colliderTypeOffsets = {0, colliderPpCount, colliderPpCount + colliderPeCount, totalColliderCount};
   
-  // 截断 vectors 到实际使用的大小
-  constraintPairs.pairs.resize(totalCount);
-  constraintPairs.colliderPairs.resize(totalColliderCount);
+ // constraintPairs.pairs.resize(totalCount);
+ // constraintPairs.colliderPairs.resize(totalColliderCount);
 }
 
 void IpcIntegrator::precomputeCollisionPairs(const maths::BlockVector<3>& p, Real alpha) {
@@ -658,50 +645,6 @@ void IpcIntegrator::precomputeCollisionPairs(const maths::BlockVector<3>& p, Rea
   computeVertexTriangleCollisionPairs(p, alpha);
   computeEdgeEdgeCollisionPairs(p, alpha);
   
-  if (!system().kinematicBodies().empty()) {
-    computeColliderVTCollisionPairs(p, alpha);
-  }
-}
-
-void IpcIntegrator::computeColliderVTCollisionPairs(const maths::BlockVector<3>& p, Real alpha) {
-  Real dHat = config.dHat;
-  
-  for (size_t bodyIdx = 0; bodyIdx < system().kinematicBodies().size(); bodyIdx++) {
-    const auto& body = system().kinematicBodies()[bodyIdx];
-    auto* mg = std::get_if<KinematicBody::MeshGeometry>(&body.geometry);
-    if (!mg) continue;
-    
-    const auto& triangles = mg->mesh->triangles;
-    
-    for (int vertexIdx = 0; vertexIdx < system().numVertices(); vertexIdx++) {
-      auto startPos = system().x[vertexIdx];
-      auto endPos = startPos + p[vertexIdx] * alpha;
-      BBox<Real, 3> vertexBBox;
-      vertexBBox.expand({startPos.x, startPos.y, startPos.z});
-      vertexBBox.expand({endPos.x, endPos.y, endPos.z});
-      
-      for (size_t triIdx = 0; triIdx < triangles.size(); triIdx++) {
-        const auto& tri = triangles[triIdx];
-        glm::dvec3 ka = body.currentVertices[tri.x];
-        glm::dvec3 kb = body.currentVertices[tri.y];
-        glm::dvec3 kc = body.currentVertices[tri.z];
-        
-        Real distSqr = ipc::distanceSqrPointTriangle(startPos, ka, kb, kc);
-        
-        if (distSqr < dHat * dHat) {
-          collisionPairs.colliderVTPairs.push_back({
-              .x = system().x,
-              .deformableVertex = vertexIdx,
-              .ka = ka,
-              .kb = kb,
-              .kc = kc,
-              .type = ipc::PointTriangleDistanceType::Unknown,
-          });
-          collisionPairs.colliderVTPairs.back().updateDistanceState();
-        }
-      }
-    }
-  }
 }
 
 void IpcIntegrator::computeVertexTriangleCollisionPairs(const maths::BlockVector<3>& p, Real alpha) {
@@ -791,48 +734,23 @@ maths::BlockVector<3> IpcIntegrator::barrierEnergyGradient() const {
   Real kappa = config.contactStiffness;
   ensureFiniteValue("contact stiffness", kappa);
 
-  for (std::size_t i = 0; i < constraintSet.vtConstraints.size(); ++i) {
-    const auto& c = constraintSet.vtConstraints[i];
-    const auto label = describeVTConstraint(i, c);
-    const std::array<int, 4> touched = {
-        c.globalVertex,
-        c.globalTriVerts[0],
-        c.globalTriVerts[1],
-        c.globalTriVerts[2]};
-    c.assembleBarrierGradient(barrier_, gradient, kappa);
-    ensureFiniteTouchedBlocks(std::format("Gradient assembly for {}", label), gradient, touched);
-  }
-
-  for (std::size_t i = 0; i < constraintSet.eeConstraints.size(); ++i) {
-    const auto& c = constraintSet.eeConstraints[i];
-    const auto label = describeEEConstraint(i, c);
-    const std::array<int, 4> touched = {
-        c.globalEdgeA[0], c.globalEdgeA[1], c.globalEdgeB[0], c.globalEdgeB[1]};
+  const int activeConstraintPairCount = constraintPairs.typeOffsets.back();
+  for (int i = 0; i < activeConstraintPairCount; ++i) {
+    const auto& pair = constraintPairs.pairs[i];
+    const auto label = describeConstraintPair(i, pair);
     try {
-      c.assembleBarrierGradient(barrier_, gradient, kappa);
+      ipc::constraintPairBarrierGradient(pair, system().x, system().X, gradient, barrier_, kappa);
     } catch (const std::exception& e) {
       throw std::runtime_error(std::format(
           "[IPC] Gradient assembly failed for {}: {}", label, e.what()));
     }
-    ensureFiniteTouchedBlocks(std::format("Gradient assembly for {}", label), gradient, touched);
-  }
-
-  for (std::size_t i = 0; i < constraintSet.kinematicVTConstraints.size(); ++i) {
-    const auto& c = constraintSet.kinematicVTConstraints[i];
-    const auto label = describeKinematicVTConstraint(i, c);
-    const std::array<int, 1> touched = {c.deformableVertex};
-    try {
-      c.assembleBarrierGradient(barrier_, gradient, kappa);
-    } catch (const std::exception& e) {
-      throw std::runtime_error(std::format(
-          "[IPC] Gradient assembly failed for {}: {}", label, e.what()));
-    }
-    ensureFiniteTouchedBlocks(std::format("Gradient assembly for {}", label), gradient, touched);
+    ensureFiniteConstraintPairGradient(std::format("Gradient assembly for {}", label), gradient, pair);
   }
 
   ensureFiniteAllBlocks("full barrier gradient", gradient);
   return gradient;
 }
+
 
 std::unique_ptr<Integrator> IpcIntegrator::create(System &system,
                                                   const core::JsonNode &json) {
@@ -873,42 +791,13 @@ Real IpcIntegrator::barrierEnergy() const {
   Real kappa = config.contactStiffness;
   ensureFiniteValue("contact stiffness", kappa);
 
-  for (std::size_t i = 0; i < constraintSet.vtConstraints.size(); ++i) {
-    const auto& c = constraintSet.vtConstraints[i];
-    const auto label = describeVTConstraint(i, c);
+  const int activeConstraintPairCount = constraintPairs.typeOffsets.back();
+  for (int i = 0; i < activeConstraintPairCount; ++i) {
+    const auto& pair = constraintPairs.pairs[i];
+    const auto label = describeConstraintPair(i, pair);
     Real localEnergy;
     try {
-      localEnergy = c.barrierEnergy(barrier_, kappa);
-    } catch (const std::exception& e) {
-      throw std::runtime_error(std::format(
-          "[IPC] Barrier energy failed for {}: {}", label, e.what()));
-    }
-    ensureFiniteValue(std::format("barrier energy for {}", label), localEnergy);
-    energy += localEnergy;
-    ensureFiniteValue("accumulated barrier energy", energy);
-  }
-
-  for (std::size_t i = 0; i < constraintSet.eeConstraints.size(); ++i) {
-    const auto& c = constraintSet.eeConstraints[i];
-    const auto label = describeEEConstraint(i, c);
-    Real localEnergy;
-    try {
-      localEnergy = c.barrierEnergy(barrier_, kappa);
-    } catch (const std::exception& e) {
-      throw std::runtime_error(std::format(
-          "[IPC] Barrier energy failed for {}: {}", label, e.what()));
-    }
-    ensureFiniteValue(std::format("barrier energy for {}", label), localEnergy);
-    energy += localEnergy;
-    ensureFiniteValue("accumulated barrier energy", energy);
-  }
-
-  for (std::size_t i = 0; i < constraintSet.kinematicVTConstraints.size(); ++i) {
-    const auto& c = constraintSet.kinematicVTConstraints[i];
-    const auto label = describeKinematicVTConstraint(i, c);
-    Real localEnergy;
-    try {
-      localEnergy = c.barrierEnergy(barrier_, kappa);
+      localEnergy = ipc::constraintPairBarrierEnergy(pair, system().x, system().X, barrier_, kappa);
     } catch (const std::exception& e) {
       throw std::runtime_error(std::format(
           "[IPC] Barrier energy failed for {}: {}", label, e.what()));
@@ -920,4 +809,5 @@ Real IpcIntegrator::barrierEnergy() const {
 
   return energy;
 }
+
 } // namespace sim::fem

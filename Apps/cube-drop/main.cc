@@ -18,7 +18,7 @@
 #include <fem/primitives/elastic-tet-mesh.h>
 #include <fem/primitive.h>
 #include <fem/system.h>
-#include <fem/kinematic-body.h>
+#include <fem/colliders.h>
 #include <fem/ipc/implicit-euler.h>
 #include <Maths/block-solvers/block-pcg.h>
 #include <Deform/strain-energy-density.h>
@@ -144,11 +144,11 @@ int main(int argc, char** argv) {
   // ─── 4. Ground Plane ────────────────────────────────────────────────────────
   // y = -1 平面 (法线朝上, offset = -1)
   {
-    KinematicBody ground;
+    Collider ground;
     glm::dvec3 normal(0.0, 1.0, 0.0);
     double offset = -1.0;
 
-    KinematicBody::SDFGeometry sdf;
+    Collider::SDFGeometry sdf;
     sdf.signedDistance = [normal, offset](const glm::dvec3& p) -> Real {
       return glm::dot(normal, p) - offset;
     };
@@ -158,7 +158,7 @@ int main(int argc, char** argv) {
 
     ground.geometry = std::move(sdf);
     ground.motion = staticMotion();
-    system.kinematicBodies().push_back(std::move(ground));
+    system.colliders().push_back(std::move(ground));
   }
 
   // 初始化系统（分配 DOF、构建质量矩阵等）

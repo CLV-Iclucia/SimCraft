@@ -11,7 +11,7 @@
 #include <fem/primitives/tet-mesh.h>
 #include <fem/primitives/elastic-tet-mesh.h>
 #include <fem/constraints.h>
-#include <fem/kinematic-body.h>
+#include <fem/colliders.h>
 #include <fem/ipc/integrator.h>
 #include <fem/ipc/implicit-euler.h>
 #include <fem/fem-simulation.h>
@@ -56,7 +56,7 @@ struct PyIntegratorConfig {
 
 /// Phase 6: KinematicBody wrapper
 struct PyKinematicBody {
-  KinematicBody body;
+  Collider body;
   std::string motion_type{"static"};
 };
 
@@ -103,7 +103,7 @@ struct PySystem : std::enable_shared_from_this<PySystem> {
     check_locked();
     if (!kb)
       throw py::type_error("kinematic_body must be a valid KinematicBody object");
-    system.kinematicBodies().push_back(std::move(kb->body));
+    system.colliders().push_back(std::move(kb->body));
   }
 
   void set_gravity(py::array_t<double> g) {

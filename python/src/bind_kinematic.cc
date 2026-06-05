@@ -23,7 +23,7 @@ void bind_kinematic(py::module_& m)
 
       auto kb = std::make_shared<PyKinematicBody>();
 
-      KinematicBody::SDFGeometry sdf;
+      Collider::SDFGeometry sdf;
       sdf.signedDistance = [n, offset](const glm::dvec3& p) -> Real {
         return glm::dot(n, p) - offset;
       };

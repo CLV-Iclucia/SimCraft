@@ -9,7 +9,7 @@
 #include <Maths/inclusion-root-finder.h>
 #include <Spatify/lbvh.h>
 #include <fem/system.h>
-#include <fem/kinematic-body.h>
+#include <fem/colliders.h>
 #include <fem/trajectories.h>
 #include <memory>
 #include <span>
@@ -153,7 +153,7 @@ struct CollisionDetector {
   void updateBVHs(const maths::BlockVector<3> &p, Real toi);
 
   // ─── 运动学体碰撞检测 ───
-  void setKinematicBodies(const std::vector<KinematicBody>* bodies) { m_kinBodies = bodies; }
+  void setKinematicBodies(const std::vector<Collider>* bodies) { m_kinBodies = bodies; }
   [[nodiscard]] std::optional<Real> detectDeformableVsKinematic(
       const maths::BlockVector<3>& p, Real dt);
 
@@ -174,7 +174,7 @@ private:
   spatify::LBVH<Real> edges_bvh{};
 
   // 运动学体相关
-  const std::vector<KinematicBody>* m_kinBodies = nullptr;
+  const std::vector<Collider>* m_kinBodies = nullptr;
   struct KinematicBVH {
     spatify::LBVH<Real> bvh;
   };

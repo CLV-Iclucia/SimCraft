@@ -135,7 +135,7 @@ System &System::init() {
 }
 
 void System::initGeometryManager() {
-  m_geometryManager.collectGeometryReferences(prs, colliders);
+  m_geometryManager.collectGeometryReferences(prs, m_colliders);
   nTriangles = m_geometryManager.triangleCount();
   nEdges = m_geometryManager.edgeCount();
   nVertices = m_geometryManager.vertexCount();
@@ -146,7 +146,7 @@ void System::logSystemInfo() const {
   // system
   spdlog::info("System Info:");
   spdlog::info("Number of primitives: {}", prs.size());
-  spdlog::info("Number of colliders: {}", colliders.size());
+  spdlog::info("Number of colliders: {}", m_colliders.size());
   spdlog::info("Number of triangles: {}", nTriangles);
   spdlog::info("Number of edges: {}", nEdges);
   spdlog::info("Number of vertices: {}", nVertices);
@@ -180,7 +180,7 @@ System SystemBuilder::build(const core::JsonNode &json) {
 
   System system;
   system.prs = std::move(cfg.primitives);
-  system.colliders = std::move(cfg.colliders);
+  system.m_colliders = std::move(cfg.colliders);
 
   // 解析重力配置
   if (dict.contains("gravity")) {

@@ -11,8 +11,12 @@
 //     via dxc/WinAdapter.h on Linux/macOS). All compiler arguments are ASCII
 //     in practice (entry points, target profiles, define names, paths) so a
 //     byte-by-byte widen() is sufficient. Non-ASCII paths are not yet supported.
-//   • Caching: an in-memory map keyed by hash(source, options). Two identical
-//     compileHlsl() calls return the same bytecode without invoking DXC twice.
+//   • Instance-scoped target backend: bind it once at create() time for the
+//     common "compiler shadows runtime backend" case, or leave it unset and
+//     choose per call for standalone tooling.
+//   • Caching: an in-memory map keyed by hash(source, options, resolved backend).
+//     Two identical compileHlsl() calls return the same bytecode without
+//     invoking DXC twice.
 //   • Cross-platform RAII: dxcapi.h doesn't ship a ComPtr; we use a tiny local
 //     `DxcPtr<T>` that calls Release() on destruction.
 //   • SPIR-V disassembly (R6+): DXC's Disassemble only handles DXIL. SPIR-V
@@ -129,11 +133,13 @@ inline size_t hashCombine(size_t a, size_t b) {
   return a ^ (b + 0x9e3779b97f4a7c15ULL + (a << 6) + (a >> 2));
 }
 
-size_t computeCacheKey(std::string_view source, const ShaderCompileOptions& o) {
+size_t computeCacheKey(std::string_view source,
+                       const ShaderCompileOptions& o,
+                       Backend targetBackend) {
   size_t h = std::hash<std::string_view>{}(source);
   h = hashCombine(h, std::hash<std::string>{}(o.entryPoint));
   h = hashCombine(h, std::hash<int>{}(static_cast<int>(o.stage)));
-  h = hashCombine(h, std::hash<int>{}(static_cast<int>(o.targetBackend)));
+  h = hashCombine(h, std::hash<int>{}(static_cast<int>(targetBackend)));
   h = hashCombine(h, std::hash<bool>{}(o.generateDisassembly));
   h = hashCombine(h, std::hash<bool>{}(o.enableDebugInfo));
   for (const auto& [name, value] : o.defines) {
@@ -150,6 +156,9 @@ size_t computeCacheKey(std::string_view source, const ShaderCompileOptions& o) {
 
 class DxcShaderCompiler final : public ShaderCompiler {
  public:
+  explicit DxcShaderCompiler(std::optional<Backend> defaultBackend)
+      : m_defaultBackend(defaultBackend) {}
+
   // Two-phase init so create() can return nullptr on dxcompiler load failure
   // (e.g. DLL missing) without throwing from the ctor.
   bool initialize() {
@@ -192,13 +201,31 @@ class DxcShaderCompiler final : public ShaderCompiler {
   }
 
  private:
+  std::optional<Backend> resolveTargetBackend(
+      const ShaderCompileOptions& options,
+      std::string_view sourceName) const {
+    if (options.targetBackend.has_value()) return options.targetBackend;
+    if (m_defaultBackend.has_value()) return m_defaultBackend;
+
+    spdlog::error(
+        "[ShaderCompiler] {} has no target backend. Bind one via "
+        "ShaderCompiler::create(Backend) or set "
+        "ShaderCompileOptions::targetBackend.",
+        sourceName);
+    return std::nullopt;
+  }
+
   std::optional<CompiledShader> compileImpl(
       std::string_view source,
       const ShaderCompileOptions& options,
       std::string_view sourceName,
       const std::filesystem::path& extraIncludeDir) {
+    const auto resolvedBackend = resolveTargetBackend(options, sourceName);
+    if (!resolvedBackend.has_value()) return std::nullopt;
+    const Backend targetBackend = *resolvedBackend;
+
     // ---- Cache lookup -----------------------------------------------------
-    const size_t key = computeCacheKey(source, options);
+    const size_t key = computeCacheKey(source, options, targetBackend);
     {
       std::scoped_lock lock(m_cacheMu);
       auto it = m_cache.find(key);
@@ -223,7 +250,7 @@ class DxcShaderCompiler final : public ShaderCompiler {
     addArgL(targetProfileFor(options.stage));
 
     // Backend codegen switches.
-    if (options.targetBackend == Backend::Vulkan) {
+    if (targetBackend == Backend::Vulkan) {
       addArgL(L"-spirv");
       addArgL(L"-fspv-target-env=vulkan1.3");
     }
@@ -331,7 +358,7 @@ class DxcShaderCompiler final : public ShaderCompiler {
     // spirv-reflect). For now, we populate disassembly only for DX12 output;
     // for Vulkan output we log an info note and leave the field empty.
     if (options.generateDisassembly) {
-      if (options.targetBackend == Backend::Dx12) {
+      if (targetBackend == Backend::Dx12) {
         DxcBuffer obj{};
         obj.Ptr = out.bytecode.data();
         obj.Size = out.bytecode.size();
@@ -371,6 +398,7 @@ class DxcShaderCompiler final : public ShaderCompiler {
     return out;
   }
 
+  std::optional<Backend> m_defaultBackend;
   DxcPtr<IDxcUtils> m_utils;
   DxcPtr<IDxcCompiler3> m_compiler;
   std::mutex m_cacheMu;
@@ -380,7 +408,13 @@ class DxcShaderCompiler final : public ShaderCompiler {
 }  // namespace
 
 std::unique_ptr<ShaderCompiler> ShaderCompiler::create() {
-  auto c = std::make_unique<DxcShaderCompiler>();
+  auto c = std::make_unique<DxcShaderCompiler>(std::nullopt);
+  if (!c->initialize()) return nullptr;
+  return c;
+}
+
+std::unique_ptr<ShaderCompiler> ShaderCompiler::create(Backend defaultBackend) {
+  auto c = std::make_unique<DxcShaderCompiler>(defaultBackend);
   if (!c->initialize()) return nullptr;
   return c;
 }

@@ -14,19 +14,6 @@
 
 namespace sim::fem {
 
-// 临时的旧约束集，用于 barrier energy/gradient/hessian 计算
-// 后续 Phase 3 迁移到统一的 ConstraintPairSet
-struct ConstraintSet {
-  void clear() {
-    vtConstraints.clear();
-    eeConstraints.clear();
-    kinematicVTConstraints.clear();
-  }
-  std::vector<ipc::VertexTriangleConstraint> vtConstraints{};
-  std::vector<ipc::EdgeEdgeConstraint> eeConstraints{};
-  std::vector<ipc::DeformableKinematicVTConstraint> kinematicVTConstraints{};
-};
-
 class IpcIntegrator : public Integrator {
   public:
     struct Config {
@@ -103,11 +90,12 @@ class IpcIntegrator : public Integrator {
     
     void computeVertexTriangleCollisionPairs(const maths::BlockVector<3>& p, Real alpha);
     void computeEdgeEdgeCollisionPairs(const maths::BlockVector<3>& p, Real alpha);
-    void computeColliderVTCollisionPairs(const maths::BlockVector<3>& p, Real alpha);
+
 
     ipc::CollisionPairSet collisionPairs;    // broad phase 候选层
     ipc::ConstraintPairSet constraintPairs;  // active 约束层
-    ConstraintSet constraintSet;              // 临时的旧约束集，用于 barrier 计算
+    bool hasInitializedActiveConstraints = false;
+
     
     std::unique_ptr<ipc::CollisionDetector> collisionDetector{};
     ipc::gipc::Barrier barrier_;

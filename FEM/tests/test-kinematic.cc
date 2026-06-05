@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include <fem/kinematic-body.h>
+#include <fem/colliders.h>
 #include <fem/constraints.h>
 #include <Maths/block-vector.h>
 #include <glm/glm.hpp>
@@ -55,11 +55,11 @@ static TriangleMesh createSphere(Real radius = 1.0, int segments = 8) {
 // ─── 测试 1: 静止运动学体 ───
 
 TEST(KinematicBody, StaticBody) {
-  KinematicBody body;
+  Collider body;
   
   // 设置网格
   auto mesh = std::make_shared<TriangleMesh>(createGroundPlane());
-  body.geometry = KinematicBody::MeshGeometry{mesh};
+  body.geometry = Collider::MeshGeometry{mesh};
   
   // 静止运动
   body.motion = staticMotion();
@@ -81,11 +81,11 @@ TEST(KinematicBody, StaticBody) {
 // ─── 测试 2: 匀速运动学体 ───
 
 TEST(KinematicBody, ConstantVelocity) {
-  KinematicBody body;
+  Collider body;
   
   // 设置网格 (地面在 y=0)
   auto mesh = std::make_shared<TriangleMesh>(createGroundPlane());
-  body.geometry = KinematicBody::MeshGeometry{mesh};
+  body.geometry = Collider::MeshGeometry{mesh};
   
   // 以速度 (0, -1, 0) 向下移动
   body.motion = constantVelocity(glm::dvec3(0.0, -1.0, 0.0));
@@ -106,7 +106,7 @@ TEST(KinematicBody, ConstantVelocity) {
 // ─── 测试 3: 旋转运动学体 ───
 
 TEST(KinematicBody, Rotation) {
-  KinematicBody body;
+  Collider body;
   
   // 创建一个在原点附近的网格
   TriangleMesh mesh;
@@ -117,7 +117,7 @@ TEST(KinematicBody, Rotation) {
   };
   mesh.triangles = {glm::ivec3(0, 1, 2)};
   
-  body.geometry = KinematicBody::MeshGeometry{std::make_shared<TriangleMesh>(std::move(mesh))};
+  body.geometry = Collider::MeshGeometry{std::make_shared<TriangleMesh>(std::move(mesh))};
   
   // 绕 z 轴旋转，角速度 = pi/2 rad/s
   body.motion = constantRotation(
@@ -139,10 +139,10 @@ TEST(KinematicBody, Rotation) {
 // ─── 测试 4: 正弦振动运动学体 ───
 
 TEST(KinematicBody, SinusoidalMotion) {
-  KinematicBody body;
+  Collider body;
   
   auto mesh = std::make_shared<TriangleMesh>(createGroundPlane());
-  body.geometry = KinematicBody::MeshGeometry{mesh};
+  body.geometry = Collider::MeshGeometry{mesh};
   
   // 沿 y 轴正弦振动，振幅 0.5，频率 1Hz
   body.motion = sinusoidalMotion(
@@ -170,10 +170,10 @@ TEST(KinematicBody, SinusoidalMotion) {
 // ─── 测试 5: SDF 碰撞体 ───
 
 TEST(KinematicBody, SDFGeometry) {
-  KinematicBody body;
+  Collider body;
   
   // 创建 SDF 几何：无限平面 y=0
-  KinematicBody::SDFGeometry sdf;
+  Collider::SDFGeometry sdf;
   sdf.signedDistance = [](const glm::dvec3& p) {
     return p.y;  // 平面 y=0，上方为正
   };
@@ -198,9 +198,9 @@ TEST(KinematicBody, IntegrationWithConstraints) {
   ConstraintManager mgr;
   
   // 创建一个沿 y 轴运动的运动学体
-  KinematicBody body;
+  Collider body;
   auto mesh = std::make_shared<TriangleMesh>(createGroundPlane());
-  body.geometry = KinematicBody::MeshGeometry{mesh};
+  body.geometry = Collider::MeshGeometry{mesh};
   body.motion = constantVelocity(glm::dvec3(0.0, -1.0, 0.0));
   
   // 推进到 t=0.5
@@ -225,16 +225,16 @@ TEST(KinematicBody, IntegrationWithConstraints) {
 // ─── 测试 7: 多个运动学体 ───
 
 TEST(KinematicBody, MultipleBodies) {
-  std::vector<KinematicBody> bodies(2);
+  std::vector<Collider> bodies(2);
   
   // 物体 0: 静止地面
   auto mesh0 = std::make_shared<TriangleMesh>(createGroundPlane(0.0));
-  bodies[0].geometry = KinematicBody::MeshGeometry{mesh0};
+  bodies[0].geometry = Collider::MeshGeometry{mesh0};
   bodies[0].motion = staticMotion();
   
   // 物体 1: 向下移动的平面
   auto mesh1 = std::make_shared<TriangleMesh>(createGroundPlane(2.0));
-  bodies[1].geometry = KinematicBody::MeshGeometry{mesh1};
+  bodies[1].geometry = Collider::MeshGeometry{mesh1};
   bodies[1].motion = constantVelocity(glm::dvec3(0.0, -1.0, 0.0));
   
   // 推进时间
@@ -249,9 +249,9 @@ TEST(KinematicBody, MultipleBodies) {
 // ─── 测试 8: 运动学体速度查询 ───
 
 TEST(KinematicBody, VelocityQuery) {
-  KinematicBody body;
+  Collider body;
   auto mesh = std::make_shared<TriangleMesh>(createGroundPlane());
-  body.geometry = KinematicBody::MeshGeometry{mesh};
+  body.geometry = Collider::MeshGeometry{mesh};
   
   // 匀速运动
   body.motion = constantVelocity(glm::dvec3(0.0, -2.0, 0.0));

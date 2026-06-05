@@ -9,7 +9,14 @@
 //   • Tests can feed mock bytecode straight into Device::createShader (R4) and
 //     skip DXC entirely.
 //
-// Backend selection drives codegen:
+// Backend selection still drives codegen, but the choice is instance-scoped
+// rather than tied to any particular runtime object:
+//   • Bind a default once via ShaderCompiler::create(Backend) when the compiler
+//     shadows a known runtime backend.
+//   • Leave the compiler unbound via ShaderCompiler::create() when it is used
+//     standalone, then set ShaderCompileOptions::targetBackend per call.
+//   • If neither path provides a backend, compilation fails fast instead of
+//     silently producing the wrong bytecode format.
 //   • Backend::Vulkan → SPIR-V via `-spirv -fspv-target-env=vulkan1.3`.
 //   • Backend::Dx12   → DXIL (best-effort on non-Windows; signing requires
 //                       dxil.dll which is Windows-only).
@@ -35,7 +42,11 @@ namespace sim::rhi {
 struct ShaderCompileOptions {
   std::string entryPoint = "main";
   ShaderStage stage = ShaderStage::Compute;
-  Backend targetBackend = Backend::Vulkan;
+
+  // Optional per-call override. When unset, ShaderCompiler::create(Backend)
+  // provides the default codegen target for the compiler instance. Leaving both
+  // unset is an error.
+  std::optional<Backend> targetBackend;
 
   // Preprocessor defines: each pair is (name, value). Empty value emits `-D NAME`.
   std::vector<std::pair<std::string, std::string>> defines;
@@ -69,12 +80,17 @@ class ShaderCompiler : public sim::core::NonCopyable {
   // path, or DxcCreateInstance fails).
   static std::unique_ptr<ShaderCompiler> create();
 
+  // Same as create(), but binds a default codegen backend to the compiler
+  // instance so most call sites don't need to repeat it.
+  static std::unique_ptr<ShaderCompiler> create(Backend defaultBackend);
+
   virtual ~ShaderCompiler() = default;
 
   // Compile HLSL source. On failure returns std::nullopt and logs the DXC
   // diagnostics via spdlog at error level. On success the result is also
   // memoised on (source, options) so a second call returns the same bytecode
-  // without recompiling.
+  // without recompiling. If options.targetBackend is unset, the compiler's
+  // instance default is used instead.
   virtual std::optional<CompiledShader> compileHlsl(
       std::string_view source,
       const ShaderCompileOptions& options) = 0;

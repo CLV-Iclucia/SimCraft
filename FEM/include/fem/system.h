@@ -12,7 +12,6 @@
 #include <Spatify/lbvh.h>
 #include <fem/colliders.h>
 #include <fem/constraints.h>
-#include <fem/kinematic-body.h>
 #include <fem/primitive.h>
 
 namespace sim {
@@ -126,10 +125,10 @@ struct System {
   Real currentTime() const { return m_currentTime; }
 
   // 运动学体管理
-  [[nodiscard]] std::vector<KinematicBody>& kinematicBodies() { return m_kinematicBodies; }
-  [[nodiscard]] const std::vector<KinematicBody>& kinematicBodies() const { return m_kinematicBodies; }
+  [[nodiscard]] std::vector<Collider>& colliders() { return m_colliders; }
+  [[nodiscard]] const std::vector<Collider>& colliders() const { return m_colliders; }
   void advanceKinematicBodies(Real t) {
-    for (auto& body : m_kinematicBodies)
+    for (auto& body : m_colliders)
       body.advanceTo(t);
   }
 
@@ -167,7 +166,6 @@ private:
   bool use_parallel_dispatch{false};
 
   std::vector<Primitive> prs;
-  std::vector<Collider> colliders;
   std::vector<ExternalForce> externalForces;
   std::vector<int> dofStarts;
   GeometryManager m_geometryManager;
@@ -179,14 +177,12 @@ private:
   maths::BlockSparseMatrix<3> m_blockMass;
   Real m_meshLengthScale{std::numeric_limits<Real>::infinity()};
 
-  // 约束和外力系统
   ConstraintManager m_constraints;
   glm::dvec3 m_gravity{0.0, -9.81, 0.0};
   std::vector<Real> m_lumpedMass;      // 每顶点质量 (trace(M_ii)/3)
   Real m_currentTime{0.0};
 
-  // 运动学碰撞体
-  std::vector<KinematicBody> m_kinematicBodies;
+  std::vector<Collider> m_colliders;
 
   void updateDeformationGradient();
   void buildBlockMassMatrix();

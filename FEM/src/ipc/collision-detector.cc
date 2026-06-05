@@ -427,7 +427,7 @@ void CollisionDetector::updateKinematicBVHs() {
   
   for (size_t bodyIdx = 0; bodyIdx < m_kinBodies->size(); bodyIdx++) {
     const auto& body = (*m_kinBodies)[bodyIdx];
-    auto* mg = std::get_if<KinematicBody::MeshGeometry>(&body.geometry);
+    auto* mg = std::get_if<Collider::MeshGeometry>(&body.geometry);
     if (!mg) continue;  // SDF 碰撞体不需要 BVH
     
     const auto& triangles = mg->mesh->triangles;
@@ -471,7 +471,7 @@ std::optional<Real> CollisionDetector::detectDeformableVsKinematic(
     const auto& body = (*m_kinBodies)[bodyIdx];
     
     // 仅处理 MeshGeometry (SDF 碰撞在 barrier 层单独处理)
-    auto* mg = std::get_if<KinematicBody::MeshGeometry>(&body.geometry);
+    auto* mg = std::get_if<Collider::MeshGeometry>(&body.geometry);
     if (!mg) continue;
     
     const auto& triangles = mg->mesh->triangles;
