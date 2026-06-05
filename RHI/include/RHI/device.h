@@ -88,19 +88,28 @@ class Device : public sim::core::NonCopyable {
   // True once the device is bound to a swapchain (Tier 1 path active).
   // Always false in R0–R6 since we use explicit sync model.
   virtual bool frameLoopActive() const = 0;
-    ShaderRef createVertexShader(std::span<const std::byte> bytecode, std::string_view entryPoint = "main")
-    {
-        return createShader(bytecode, ShaderStage::Vertex, entryPoint);
-    }
 
-    ShaderRef createFragmentShader(std::span<const std::byte> bytecode, std::string_view entryPoint = "main")
-    {
-        return createShader(bytecode, ShaderStage::Fragment, entryPoint);
-    }
-    ShaderRef createComputeShader(std::span<const std::byte> bytecode, std::string_view entryPoint = "main")
-    {
-        return createShader(bytecode, ShaderStage::Compute, entryPoint);
-    }
+  // ---- Shader compilation (R3) -------------------------------------------
+  // Convenience: creates a ShaderCompiler pre-bound to this device's backend.
+  // The returned compiler will default to this device's backend for all
+  // subsequent compileHlsl/compileHlslFile calls, so call sites don't need to
+  // repeat targetBackend in ShaderCompileOptions.
+  std::unique_ptr<ShaderCompiler> createShaderCompiler() const;
+
+  // ---- Convenience shader creation shortcuts (R4) --------------------------
+  ShaderRef createVertexShader(std::span<const std::byte> bytecode, std::string_view entryPoint = "main")
+  {
+      return createShader(bytecode, ShaderStage::Vertex, entryPoint);
+  }
+
+  ShaderRef createFragmentShader(std::span<const std::byte> bytecode, std::string_view entryPoint = "main")
+  {
+      return createShader(bytecode, ShaderStage::Fragment, entryPoint);
+  }
+  ShaderRef createComputeShader(std::span<const std::byte> bytecode, std::string_view entryPoint = "main")
+  {
+      return createShader(bytecode, ShaderStage::Compute, entryPoint);
+  }
 
 };
 

@@ -11,8 +11,11 @@
 //
 // Backend selection still drives codegen, but the choice is instance-scoped
 // rather than tied to any particular runtime object:
+//   • When used with a Device, prefer Device::createShaderCompiler() which
+//     automatically binds the device's backend. This is the recommended path
+//     for R4+ code that has a Device context.
 //   • Bind a default once via ShaderCompiler::create(Backend) when the compiler
-//     shadows a known runtime backend.
+//     shadows a known runtime backend but no Device object is available.
 //   • Leave the compiler unbound via ShaderCompiler::create() when it is used
 //     standalone, then set ShaderCompileOptions::targetBackend per call.
 //   • If neither path provides a backend, compilation fails fast instead of

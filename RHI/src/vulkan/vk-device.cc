@@ -40,6 +40,11 @@ std::unique_ptr<Device> Device::create(const DeviceDesc& desc) {
   }
 }
 
+// ---- Device::createShaderCompiler -------------------------------------------
+std::unique_ptr<ShaderCompiler> Device::createShaderCompiler() const {
+  return ShaderCompiler::create(backend());
+}
+
 }  // namespace sim::rhi
 
 namespace sim::rhi::vulkan {
