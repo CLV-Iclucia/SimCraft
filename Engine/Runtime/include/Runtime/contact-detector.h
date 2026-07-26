@@ -5,7 +5,7 @@
 
 namespace ksk::runtime {
 
-struct CcdStepBoundResult {
+struct CCDStepBoundResult {
   ContactCandidates sweptCandidates;
   Real stepSizeUpperBound = 1.0;
 };
@@ -16,7 +16,7 @@ class ContactDetector {
   void rebuildActiveContacts(SimulationContext& simulation) const;
 
   // Use swept CCD only to bound the step length along a proposed direction.
-  [[nodiscard]] CcdStepBoundResult computeCcdStepBound(
+  [[nodiscard]] CCDStepBoundResult computeCCDStepBound(
       SimulationContext& simulation,
       const DofBuffer& direction) const;
 
@@ -29,7 +29,7 @@ class ContactDetector {
       const RuntimeScene& scene);
 
   static void applyRoutedContacts(SimulationContext& simulation,
-                                  GlobalContactRouter routedContacts);
+                                  const GlobalContactRouter& routedContacts);
 };
 
 }  // namespace ksk::runtime

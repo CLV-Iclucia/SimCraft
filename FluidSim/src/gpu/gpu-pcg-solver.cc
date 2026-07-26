@@ -48,7 +48,7 @@ namespace fluid::gpu
     // ============================================================================
     void GpuPCGSolver::solve(CommandList& cmd, const PressureSystem& system)
     {
-        SIM_PROFILE_FUNCTION();
+        KSK_PROFILE_FUNCTION();
 
         if (!spmv_.valid() || !jacobiPrecond_.valid()) return;
 
@@ -58,7 +58,7 @@ namespace fluid::gpu
         uint32_t reduceGroups = cellGroups;
 
         int maxIters = std::min(std::max(maxIters_, 1), 500);
-        SIM_PROFILE_VALUE("GPUPCG/MaxIterations", maxIters);
+        KSK_PROFILE_VALUE("GPUPCG/MaxIterations", maxIters);
 
         using B = BarrierDesc;
         auto computeBarrier = [&]() { cmd.memoryBarrier(B::StageComputeShader, B::StageComputeShader); };
@@ -173,7 +173,7 @@ namespace fluid::gpu
         // ---- Main PCG loop ----
         for (int iter = 0; iter < maxIters; ++iter)
         {
-            SIM_PROFILE_SCOPE("GPUPCG/Iteration");
+            KSK_PROFILE_SCOPE("GPUPCG/Iteration");
             doSpMV(cgS_, cgZ_); // z = A*s
             computeBarrier();
             doDot(cgS_, cgZ_, dotSZScalar_); // dotSZ = dot(s,z)

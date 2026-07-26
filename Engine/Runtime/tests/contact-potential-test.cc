@@ -9,9 +9,9 @@ TEST(ContactPotential, EvaluatesPointPointGIPCEnergy)
 {
   GlobalGeometryManager geometry;
   const PointIdx p0 =
-      geometry.addPoint(SubsystemId{0}, 0, glm::dvec3(0.0, 0.0, 0.0));
+      geometry.addPoint(SubsystemIdx{0}, 0, glm::dvec3(0.0, 0.0, 0.0));
   const PointIdx p1 =
-      geometry.addPoint(SubsystemId{1}, 0, glm::dvec3(0.5, 0.0, 0.0));
+      geometry.addPoint(SubsystemIdx{1}, 0, glm::dvec3(0.5, 0.0, 0.0));
 
   ContactStencils contacts;
   contacts.push_back(ContactStencil{
@@ -28,9 +28,9 @@ TEST(ContactPotential, EvaluatesPointPointGIPCGradient)
 {
   GlobalGeometryManager geometry;
   const PointIdx p0 =
-      geometry.addPoint(SubsystemId{0}, 0, glm::dvec3(0.0, 0.0, 0.0));
+      geometry.addPoint(SubsystemIdx{0}, 0, glm::dvec3(0.0, 0.0, 0.0));
   const PointIdx p1 =
-      geometry.addPoint(SubsystemId{1}, 0, glm::dvec3(0.5, 0.0, 0.0));
+      geometry.addPoint(SubsystemIdx{1}, 0, glm::dvec3(0.5, 0.0, 0.0));
 
   ContactStencils contacts;
   contacts.push_back(ContactStencil{
@@ -59,9 +59,9 @@ TEST(ContactPotential, IgnoresInactivePointPointStencil)
 {
   GlobalGeometryManager geometry;
   const PointIdx p0 =
-      geometry.addPoint(SubsystemId{0}, 0, glm::dvec3(0.0, 0.0, 0.0));
+      geometry.addPoint(SubsystemIdx{0}, 0, glm::dvec3(0.0, 0.0, 0.0));
   const PointIdx p1 =
-      geometry.addPoint(SubsystemId{1}, 0, glm::dvec3(2.0, 0.0, 0.0));
+      geometry.addPoint(SubsystemIdx{1}, 0, glm::dvec3(2.0, 0.0, 0.0));
 
   ContactStencils contacts;
   contacts.push_back(ContactStencil{
@@ -81,13 +81,13 @@ TEST(ContactPotential, EvaluatesPointEdgeAndPointTriangleGIPCGradient)
 {
   GlobalGeometryManager geometry;
   const PointIdx p =
-      geometry.addPoint(SubsystemId{0}, 0, glm::dvec3(0.25, 0.25, 0.25));
+      geometry.addPoint(SubsystemIdx{0}, 0, glm::dvec3(0.25, 0.25, 0.25));
   const PointIdx a =
-      geometry.addPoint(SubsystemId{1}, 0, glm::dvec3(0.0, 0.0, 0.0));
+      geometry.addPoint(SubsystemIdx{1}, 0, glm::dvec3(0.0, 0.0, 0.0));
   const PointIdx b =
-      geometry.addPoint(SubsystemId{1}, 1, glm::dvec3(1.0, 0.0, 0.0));
+      geometry.addPoint(SubsystemIdx{1}, 1, glm::dvec3(1.0, 0.0, 0.0));
   const PointIdx c =
-      geometry.addPoint(SubsystemId{1}, 2, glm::dvec3(0.0, 1.0, 0.0));
+      geometry.addPoint(SubsystemIdx{1}, 2, glm::dvec3(0.0, 1.0, 0.0));
 
   ContactStencils contacts;
   contacts.push_back(ContactStencil{
@@ -113,9 +113,9 @@ TEST(ContactPotential, EvaluatesAnalyticHessianProduct)
 {
   GlobalGeometryManager geometry;
   const PointIdx p0 =
-      geometry.addPoint(SubsystemId{0}, 0, glm::dvec3(0.0, 0.0, 0.0));
+      geometry.addPoint(SubsystemIdx{0}, 0, glm::dvec3(0.0, 0.0, 0.0));
   const PointIdx p1 =
-      geometry.addPoint(SubsystemId{1}, 0, glm::dvec3(0.5, 0.0, 0.0));
+      geometry.addPoint(SubsystemIdx{1}, 0, glm::dvec3(0.5, 0.0, 0.0));
 
   ContactStencils contacts;
   contacts.push_back(ContactStencil{
@@ -141,44 +141,44 @@ TEST(ContactPotential, EdgeEdgeMollifierUsesRestScale)
 {
   GlobalGeometryManager small_rest_geometry;
   const PointIdx s0 = small_rest_geometry.addPoint(
-      SubsystemId{0},
+      SubsystemIdx{0},
       0,
       glm::dvec3(0.0, 0.0, 0.0),
       glm::dvec3(0.0, 0.0, 0.0));
   const PointIdx s1 = small_rest_geometry.addPoint(
-      SubsystemId{0},
+      SubsystemIdx{0},
       1,
       glm::dvec3(1.0, 0.0, 0.0),
       glm::dvec3(0.001, 0.0, 0.0));
   const PointIdx s2 = small_rest_geometry.addPoint(
-      SubsystemId{1},
+      SubsystemIdx{1},
       0,
       glm::dvec3(0.0, 0.1, 0.05),
       glm::dvec3(0.0, 0.0, 0.0));
   const PointIdx s3 = small_rest_geometry.addPoint(
-      SubsystemId{1},
+      SubsystemIdx{1},
       1,
       glm::dvec3(1.0, 0.1001, 0.05),
       glm::dvec3(0.0, 0.001, 0.0));
 
   GlobalGeometryManager large_rest_geometry;
   const PointIdx l0 = large_rest_geometry.addPoint(
-      SubsystemId{0},
+      SubsystemIdx{0},
       0,
       glm::dvec3(0.0, 0.0, 0.0),
       glm::dvec3(0.0, 0.0, 0.0));
   const PointIdx l1 = large_rest_geometry.addPoint(
-      SubsystemId{0},
+      SubsystemIdx{0},
       1,
       glm::dvec3(1.0, 0.0, 0.0),
       glm::dvec3(1.0, 0.0, 0.0));
   const PointIdx l2 = large_rest_geometry.addPoint(
-      SubsystemId{1},
+      SubsystemIdx{1},
       0,
       glm::dvec3(0.0, 0.1, 0.05),
       glm::dvec3(0.0, 0.0, 0.0));
   const PointIdx l3 = large_rest_geometry.addPoint(
-      SubsystemId{1},
+      SubsystemIdx{1},
       1,
       glm::dvec3(1.0, 0.1001, 0.05),
       glm::dvec3(0.0, 1.0, 0.0));

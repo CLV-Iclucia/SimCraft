@@ -15,6 +15,7 @@ struct RuntimeStepResult {
   double finalGradientNorm = 0.0;
   double finalStepNorm = 0.0;
   bool converged = false;
+  std::string terminationReason;
 };
 
 class GlobalSolverStatsCollector {
@@ -81,8 +82,13 @@ class GlobalGaussNewtonSolver {
   [[nodiscard]] static bool solveNewtonDirection(SimulationContext& simulation,
                                                  const DofBuffer& gradient,
                                                  DofBuffer& direction,
-                                                 GlobalSolverStatsCollector* stats);
+                                                 GlobalSolverStatsCollector* stats,
+                                                 std::string* failureReason = nullptr);
   [[nodiscard]] static bool solveSingleSubsystemDirection(
+      SimulationContext& simulation,
+      const DofBuffer& gradient,
+      DofBuffer& direction);
+  [[nodiscard]] static bool solveBlockDiagonalSubsystemDirection(
       SimulationContext& simulation,
       const DofBuffer& gradient,
       DofBuffer& direction);

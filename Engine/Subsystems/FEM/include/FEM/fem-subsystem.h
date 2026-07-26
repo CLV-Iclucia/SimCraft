@@ -63,19 +63,19 @@ using FEMPrimitive = std::variant<FEMTetMeshPrimitive, FEMClothPrimitive>;
 
 class FEMSubsystem final : public runtime::Subsystem {
  public:
-  FEMSubsystem(runtime::SubsystemId id,
+  FEMSubsystem(runtime::SubsystemIdx id,
                std::vector<TetMeshDesc> meshes,
                std::vector<FEMConstraintBinding> constraints = {},
                int scalarOffset = 0,
                glm::dvec3 gravity = glm::dvec3(0.0));
-  FEMSubsystem(runtime::SubsystemId id,
+  FEMSubsystem(runtime::SubsystemIdx id,
                std::vector<FEMPrimitive> primitives,
                std::vector<FEMConstraintBinding> constraints,
                int scalarOffset,
                glm::dvec3 gravity);
   ~FEMSubsystem() override;
 
-  [[nodiscard]] runtime::SubsystemId id() const noexcept override;
+  [[nodiscard]] runtime::SubsystemIdx id() const noexcept override;
   [[nodiscard]] runtime::DofRange dofRange() const noexcept override;
 
   void declareGeometry(runtime::GlobalGeometryManager& geometry) override;
@@ -171,7 +171,7 @@ class FEMSubsystem final : public runtime::Subsystem {
       std::vector<Eigen::Triplet<double>>& triplets) const;
   [[nodiscard]] int constraintLocalOffset(
       const FEMConstraintBinding& binding) const;
-  runtime::SubsystemId id_;
+  runtime::SubsystemIdx id_;
   runtime::DofRange range_;
   glm::dvec3 gravity_;
   std::vector<FEMPrimitive> primitives_;

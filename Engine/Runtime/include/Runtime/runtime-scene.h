@@ -160,7 +160,7 @@ class SubsystemBuildContext {
                                  const RuntimeSceneDesc* scene = nullptr);
   ~SubsystemBuildContext();
 
-  [[nodiscard]] SubsystemId nextSubsystemId() const noexcept;
+  [[nodiscard]] SubsystemIdx nextSubsystemId() const noexcept;
   [[nodiscard]] int nextScalarOffset() const noexcept;
   [[nodiscard]] const glm::dvec3& gravity() const noexcept;
   [[nodiscard]] const RuntimeSceneDesc& sceneDesc() const;

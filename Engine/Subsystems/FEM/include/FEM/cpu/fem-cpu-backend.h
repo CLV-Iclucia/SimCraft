@@ -4,6 +4,7 @@
 #include <Runtime/contact-table.h>
 
 #include <Eigen/Core>
+#include <Eigen/SparseCholesky>
 #include <Eigen/SparseCore>
 
 #include <span>
@@ -60,6 +61,8 @@ class FEMCPUBackend {
   Eigen::VectorXd inertial_target_;
   Eigen::VectorXd mass_diagonal_;
   Eigen::SparseMatrix<double> local_matrix_;
+  Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> local_solver_;
+  bool local_solver_ready_ = false;
   double step_dt_ = 0.0;
 };
 

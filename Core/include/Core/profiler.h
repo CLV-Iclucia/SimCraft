@@ -7,8 +7,6 @@
 //   SIM_PROFILE_FRAME_MARK()        — 标记帧边界（用于 step 结束处）
 //   SIM_PROFILE_VALUE("name", val)  — 追踪标量数值（如能量、迭代次数）
 //
-// 编译时通过 CMake 选项 KISEKI_PROFILE=ON 启用（自动定义 TRACY_ENABLE）。
-// 关闭时所有宏展开为空语句，零开销。
 //
 
 #pragma once
@@ -17,10 +15,10 @@
 
 #include <tracy/Tracy.hpp>
 
-#define SIM_PROFILE_FUNCTION()      ZoneScoped
-#define SIM_PROFILE_SCOPE(name)     ZoneScopedN(name)
-#define SIM_PROFILE_FRAME_MARK()    FrameMark
-#define SIM_PROFILE_VALUE(name, val) \
+#define KSK_PROFILE_FUNCTION()      ZoneScoped
+#define KSK_PROFILE_SCOPE(name)     ZoneScopedN(name)
+#define KSK_PROFILE_FRAME_MARK()    FrameMark
+#define KSK_PROFILE_VALUE(name, val) \
     do { TracyPlot(name, static_cast<double>(val)); } while(0)
 
 #define SIM_PROFILE_SCOPE_COLOR(name, color) ZoneScopedNC(name, color)

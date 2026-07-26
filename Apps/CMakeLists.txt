@@ -36,7 +36,8 @@ add_executable(der-hair der-hair/main.cc)
 
 # Coupled DER/FEM contact demo scene
 add_executable(coupled-contact-flow coupled-contact-flow/main.cc)
-target_link_libraries(coupled-contact-flow PUBLIC Kiseki::DER Kiseki::EngineFEM cxxopts Kiseki::Renderer)
+target_link_libraries(coupled-contact-flow PUBLIC
+    Kiseki::DER Kiseki::EngineFEM Kiseki::EngineABD cxxopts Kiseki::Renderer)
 target_compile_features(coupled-contact-flow PUBLIC cxx_std_20)
 
 # Fluid Dam Break simulation

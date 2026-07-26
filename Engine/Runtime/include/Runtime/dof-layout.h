@@ -8,7 +8,7 @@
 namespace ksk::runtime {
 
 struct DofRange {
-  SubsystemId subsystem = -1;
+  SubsystemIdx subsystem = -1;
   int scalarOffset = 0;
   int scalarCount = 0;
   int blockSize = 0;
@@ -18,10 +18,10 @@ struct DofLayout {
   int totalScalars = 0;
   std::vector<DofRange> ranges;
 
-  [[nodiscard]] DofRange appendRange(SubsystemId subsystem,
+  [[nodiscard]] DofRange appendRange(SubsystemIdx subsystem,
                                      int scalarCount,
                                      int blockSize = 0);
-  [[nodiscard]] std::optional<DofRange> findRange(SubsystemId subsystem) const;
+  [[nodiscard]] std::optional<DofRange> findRange(SubsystemIdx subsystem) const;
 };
 
 }  // namespace ksk::runtime

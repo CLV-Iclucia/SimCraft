@@ -38,14 +38,14 @@ static GPUGridState makeGridView(GPUFluidContext& ctx) {
 }
 
 void GPUAdvectorP2GSolver::solve(GPUFluidContext& ctx, Real dt) {
-    SIM_PROFILE_FUNCTION();
+    KSK_PROFILE_FUNCTION();
 
     GPUGridState grid = makeGridView(ctx);
     impl_->scatterP2G(ctx.cmd(), grid, dt);
 }
 
 void GPUAdvectorG2PSolver::solve(GPUFluidContext& ctx, Real dt) {
-    SIM_PROFILE_FUNCTION();
+    KSK_PROFILE_FUNCTION();
 
     GPUGridState grid = makeGridView(ctx);
     impl_->gatherAndAdvect(ctx.cmd(), grid, dt);

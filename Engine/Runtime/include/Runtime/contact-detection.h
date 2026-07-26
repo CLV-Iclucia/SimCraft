@@ -14,13 +14,13 @@
 namespace ksk::runtime {
 
 struct SubsystemContactData {
-  SubsystemId subsystem = -1;
+  SubsystemIdx subsystem = -1;
   ContactStencils contacts;
 };
 
 struct GlobalContactRouter {
   ContactStencils globalContacts;
-  std::map<SubsystemId, SubsystemContactData> subsystemInternalContacts;
+  std::map<SubsystemIdx, SubsystemContactData> subsystemInternalContacts;
 };
 
 enum class EContactCandidate : std::uint16_t {
@@ -31,7 +31,7 @@ enum class EContactCandidate : std::uint16_t {
 };
 
 struct ContactCandidate {
-  EContactCandidate kind = EContactCandidate::PointPoint;
+  EContactCandidate type = EContactCandidate::PointPoint;
   std::array<int, 4> geometryIds{-1, -1, -1, -1};
   Real detectionDistance = 0.0;
   Real dHat = 0.0;
@@ -42,12 +42,31 @@ struct ContactCandidate {
 using ContactCandidates = std::vector<ContactCandidate>;
 
 struct ContactWorkList {
-  std::vector<std::array<int, 2>> deformablePointTriangles;
-  std::vector<std::array<int, 2>> deformableEdgeEdges;
+  struct GeometryBodyBounds {
+    GeometryBodyIdx body = -1;
+    GeometryBounds bounds;
+  };
+
+  enum class EContactPairPolicy {
+    DeformableGlobal,
+    BodyPairIAABB,
+  };
+
+  struct BodyPairWork {
+    GeometryBodyIdx first = -1;
+    GeometryBodyIdx second = -1;
+    GeometryBounds iAABB;
+    EContactPairPolicy policy = EContactPairPolicy::BodyPairIAABB;
+  };
+
+  std::vector<GeometryBodyBounds> bodies;
+  std::vector<BodyPairWork> bodyPairs;
+  std::vector<std::array<int, 2>> pointTriangles;
+  std::vector<std::array<int, 2>> edgeEdges;
 
   [[nodiscard]] bool empty() const noexcept
   {
-    return deformablePointTriangles.empty() && deformableEdgeEdges.empty();
+    return bodyPairs.empty() && pointTriangles.empty() && edgeEdges.empty();
   }
 };
 
@@ -58,7 +77,7 @@ struct DeviceContactTable {
 };
 
 struct SubsystemDeviceContactTable {
-  SubsystemId subsystem = -1;
+  SubsystemIdx subsystem = -1;
   DeviceContactTable contacts;
 };
 
@@ -83,7 +102,6 @@ enum class ContactDetectionStorage {
 
 struct ContactDetectionConfig {
   ContactDetectionStorage storage = ContactDetectionStorage::Auto;
-  Real detectionDistance = 1.0e-3;
   Real dHat = 1.0e-3;
   Real stiffness = 1.0e5;
   Real toi = 1.0;

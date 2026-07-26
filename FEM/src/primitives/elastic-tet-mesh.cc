@@ -72,7 +72,7 @@ Real ElasticTetMesh::deformationEnergy() const {
 // New BlockSparseMatrix interface (Phase 2B) — Parallelized (Phase A-1)
 void ElasticTetMesh::assembleEnergyHessian(
     maths::BlockSparseMatrix<3> &globalH, int blockStart) const {
-  SIM_PROFILE_SCOPE("assembleElasticHessian");
+  KSK_PROFILE_SCOPE("assembleElasticHessian");
   const int nTets = static_cast<int>(numTets());
 
   // For small meshes, stay serial to avoid TBB overhead

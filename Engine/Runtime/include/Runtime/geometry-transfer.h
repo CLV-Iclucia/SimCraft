@@ -24,7 +24,7 @@ struct GeometryTransferMap {
 
 struct GeometryTransferInput {
   ObjectId sourceObject = -1;
-  SubsystemId subsystem = -1;
+  SubsystemIdx subsystem = -1;
   int localInstanceId = -1;
   int localSampleOffset = 0;
   std::span<const glm::dvec3> vertices;

@@ -1,27 +1,21 @@
 #include <Runtime/contact-detector.h>
 
 #include <algorithm>
-#include <cmath>
+#include <glm/geometric.hpp>
 #include <iostream>
 #include <span>
 #include <utility>
 #include <vector>
 
-#include <glm/geometric.hpp>
-
 namespace ksk::runtime {
 namespace {
-
 GeometryBuffer createGeometryDirectionBuffer(const DofBuffer& direction,
-                                             int point_count)
-{
-  if (direction.isCPU())
-    return GeometryBuffer::CPU(point_count);
+                                             int point_count) {
+  if (direction.isCPU()) return GeometryBuffer::CPU(point_count);
   return GeometryBuffer::GPU(*direction.device(), point_count);
 }
 
-int candidatePointCount(EContactCandidate kind)
-{
+int candidatePointCount(EContactCandidate kind) {
   switch (kind) {
     case EContactCandidate::PointPoint:
       return 2;
@@ -34,11 +28,9 @@ int candidatePointCount(EContactCandidate kind)
   return 0;
 }
 
-double boundsDiagonal(const GeometryBounds& bounds)
-{
+double boundsDiagonal(const GeometryBounds& bounds) {
   const auto extent = bounds.extent();
-  return std::sqrt(extent.x * extent.x +
-                   extent.y * extent.y +
+  return std::sqrt(extent.x * extent.x + extent.y * extent.y +
                    extent.z * extent.z);
 }
 
@@ -61,8 +53,7 @@ struct ContactCandidateSanityStats {
 ContactCandidateSanityStats computeContactCandidateSanityStats(
     const GlobalGeometryManager& geometry,
     const GeometryBuffer& geometryDirection,
-    const ContactCandidates& candidates)
-{
+    const ContactCandidates& candidates) {
   ContactCandidateSanityStats stats;
   const auto& directions = geometryDirection.cpu();
   for (int point = 0; point < geometry.pointCount(); ++point) {
@@ -74,8 +65,9 @@ ContactCandidateSanityStats computeContactCandidateSanityStats(
                  boundsDiagonal(geometry.trajectoryPointBounds(
                      PointIdx{point}, directions, 1.0)));
   }
+
   if (geometry.pointCount() > 0) {
-    stats.directionAvg /= static_cast<double>(geometry.pointCount());
+    stats.directionAvg /= geometry.pointCount();
   }
 
   for (int edge = 0; edge < geometry.edgeCount(); ++edge) {
@@ -83,18 +75,18 @@ ContactCandidateSanityStats computeContactCandidateSanityStats(
         std::max(stats.edgeSweptDiagonalMax,
                  boundsDiagonal(geometry.trajectoryEdgeBounds(
                      edge, directions, 1.0,
-                     geometry.edges[static_cast<size_t>(edge)].radius)));
+                     geometry.edges[edge].radius)));
   }
   for (int triangle = 0; triangle < geometry.triangleCount(); ++triangle) {
-    stats.triangleSweptDiagonalMax =
-        std::max(stats.triangleSweptDiagonalMax,
-                 boundsDiagonal(geometry.trajectoryTriangleBounds(
-                     triangle, directions, 1.0,
-                     geometry.triangles[static_cast<size_t>(triangle)].thickness)));
+    stats.triangleSweptDiagonalMax = std::max(
+        stats.triangleSweptDiagonalMax,
+        boundsDiagonal(geometry.trajectoryTriangleBounds(
+            triangle, directions, 1.0,
+            geometry.triangles[triangle].thickness)));
   }
 
   for (const ContactCandidate& candidate : candidates) {
-    switch (candidate.kind) {
+    switch (candidate.type) {
       case EContactCandidate::PointPoint:
         ++stats.pointPointCandidates;
         break;
@@ -109,30 +101,32 @@ ContactCandidateSanityStats computeContactCandidateSanityStats(
         break;
     }
 
-    const int point_count = candidatePointCount(candidate.kind);
+    const int point_count = candidatePointCount(candidate.type);
     const GeometryStencilInfo info =
         geometry.classify(std::span(candidate.geometryIds.data(), point_count));
+
     if (!info.valid) {
       ++stats.invalidCandidates;
     }
+
     if (info.hasCollider) {
       ++stats.colliderCandidates;
     }
+
     if (info.crossesSubsystems) {
       ++stats.crossSubsystemCandidates;
     } else if (!info.hasCollider && info.subsystemCount == 1) {
       ++stats.selfCandidates;
     }
+
   }
   return stats;
 }
-
+#ifndef NDEBUG
 void warnIfContactCandidatesLookSuspicious(
-    const RuntimeScene& scene,
-    const GeometryBuffer& geometryDirection,
+    const RuntimeScene& scene, const GeometryBuffer& geometryDirection,
     const ContactDetectionConfig& currentConfig,
-    const ContactCandidateDetectionResult& detected)
-{
+    const ContactCandidateDetectionResult& detected) {
   const GlobalGeometryManager& geometry = scene.geometry;
   const int primitive_count =
       geometry.pointCount() + geometry.edgeCount() + geometry.triangleCount();
@@ -143,16 +137,13 @@ void warnIfContactCandidatesLookSuspicious(
     return;
   }
 
-  const ContactCandidateSanityStats stats =
-      computeContactCandidateSanityStats(
-          geometry, geometryDirection, detected.candidates);
+  const ContactCandidateSanityStats stats = computeContactCandidateSanityStats(
+      geometry, geometryDirection, detected.candidates);
 
   GeometryBuffer zero_direction = GeometryBuffer::CPU(geometry.pointCount());
   const ContactCandidates zero_candidates =
-      detectContactCandidatesAlongDirection(
-          geometry,
-          zero_direction,
-          currentConfig);
+      detectContactCandidatesAlongDirection(geometry, zero_direction,
+                                            currentConfig);
 
   std::cerr << "[contact-sanity] warning: unusually many CCD candidates: "
             << candidate_count << " primitives=" << primitive_count
@@ -173,21 +164,15 @@ void warnIfContactCandidatesLookSuspicious(
             << " edge=" << stats.edgeSweptDiagonalMax
             << " triangle=" << stats.triangleSweptDiagonalMax << '\n';
 }
-
+#endif
 }  // namespace
 
 ContactDetectionConfig ContactDetector::createDetectionConfig(
-    const RuntimeScene& scene,
-    Real toi)
-{
+    const RuntimeScene& scene, Real toi) {
   const GlobalSolverConfig& solver_config = scene.solverConfig;
-  const Real barrier_distance =
-      solver_config.contactBarrierDistance > 0.0
-          ? solver_config.contactBarrierDistance
-          : solver_config.contactDetectionDistance;
+  const Real barrier_distance = solver_config.contactBarrierDistance;
   return ContactDetectionConfig{
       .storage = solver_config.contactDetectionStorage,
-      .detectionDistance = solver_config.contactDetectionDistance,
       .dHat = barrier_distance,
       .stiffness = solver_config.contactStiffness,
       .toi = toi,
@@ -195,17 +180,13 @@ ContactDetectionConfig ContactDetector::createDetectionConfig(
 }
 
 ContactDetectionConfig ContactDetector::createCurrentBarrierConfig(
-    const RuntimeScene& scene)
-{
+    const RuntimeScene& scene) {
   ContactDetectionConfig config = createDetectionConfig(scene, 0.0);
-  config.detectionDistance = config.dHat;
   return config;
 }
 
-void ContactDetector::applyRoutedContacts(
-    SimulationContext& simulation,
-    GlobalContactRouter routedContacts)
-{
+void ContactDetector::applyRoutedContacts(SimulationContext& simulation,
+                                          const GlobalContactRouter& routedContacts) {
   RuntimeScene& scene = simulation.scene();
   scene.contacts = std::move(routedContacts.globalContacts);
 
@@ -213,52 +194,47 @@ void ContactDetector::applyRoutedContacts(
     ContactStencils contacts;
     const auto found =
         routedContacts.subsystemInternalContacts.find(subsystem->id());
-    if (found != routedContacts.subsystemInternalContacts.end()) {
+
+    if (found != routedContacts.subsystemInternalContacts.end())
       contacts = std::move(found->second.contacts);
-    }
+
     subsystem->applyInternalContacts(std::move(contacts));
   }
 }
 
 void ContactDetector::rebuildActiveContacts(
-    SimulationContext& simulation) const
-{
+    SimulationContext& simulation) const {
   GeometryBuffer zero_direction =
       GeometryBuffer::CPU(simulation.scene().geometry.pointCount());
   GlobalContactRouter routed_contacts =
-      runCCD(simulation.scene().geometry,
-             zero_direction,
+      runCCD(simulation.scene().geometry, zero_direction,
              createCurrentBarrierConfig(simulation.scene()));
   applyRoutedContacts(simulation, std::move(routed_contacts));
 }
 
-CcdStepBoundResult ContactDetector::computeCcdStepBound(
-    SimulationContext& simulation,
-    const DofBuffer& direction) const
-{
+CCDStepBoundResult ContactDetector::computeCCDStepBound(
+    SimulationContext& simulation, const DofBuffer& direction) const {
   RuntimeScene& scene = simulation.scene();
   GeometryBuffer geometry_direction =
       createGeometryDirectionBuffer(direction, scene.geometry.pointCount());
 
-  for (const auto& subsystem : simulation.subsystems()) {
+  for (const auto& subsystem : simulation.subsystems())
     subsystem->mapLocalDirectionToGeometry(
         direction.slice(subsystem->dofRange()), geometry_direction.view());
-  }
 
   const ContactDetectionConfig ccd_config = createDetectionConfig(scene, 1.0);
   const ContactDetectionConfig current_config =
       createCurrentBarrierConfig(scene);
   ContactCandidateDetectionResult detected =
       detectContactCandidatesAndStepSizeAlongDirection(
-          scene.geometry,
-          geometry_direction,
-          ccd_config);
-  warnIfContactCandidatesLookSuspicious(
-      scene, geometry_direction, current_config, detected);
-  return CcdStepBoundResult{
+          scene.geometry, geometry_direction, ccd_config);
+#ifndef NDEBUG
+  warnIfContactCandidatesLookSuspicious(scene, geometry_direction,
+                                        current_config, detected);
+#endif
+  return CCDStepBoundResult{
       .sweptCandidates = std::move(detected.candidates),
       .stepSizeUpperBound = detected.stepSizeUpperBound,
   };
 }
-
 }  // namespace ksk::runtime

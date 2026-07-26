@@ -6,6 +6,7 @@
 #include <Runtime/global-geometry-manager.h>
 
 #include <Eigen/Core>
+#include <Eigen/SparseCholesky>
 #include <Eigen/SparseCore>
 
 #include <span>
@@ -72,6 +73,8 @@ class DERCPUBackend {
   Eigen::VectorXd mass_diagonal_;
   double step_dt_ = 0.0;
   Eigen::SparseMatrix<double> local_matrix_;
+  Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> local_solver_;
+  bool local_solver_ready_ = false;
 };
 
 }  // namespace ksk::der

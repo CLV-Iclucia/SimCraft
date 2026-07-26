@@ -37,7 +37,7 @@ static GPUGridState makeGridView(GPUFluidContext& ctx) {
 }
 
 void GPUReconstructorSolver::solve(GPUFluidContext& ctx, Real dt) {
-    SIM_PROFILE_FUNCTION();
+    KSK_PROFILE_FUNCTION();
 
     (void)dt;
     GPUGridState grid = makeGridView(ctx);

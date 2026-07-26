@@ -170,7 +170,13 @@ void bind_der(py::module_& m)
       .def_readwrite("ccd_step_size_scale",
                      &runtime::GlobalSolverConfig::ccdStepSizeScale)
       .def_readwrite("pcg_tolerance",
-                     &runtime::GlobalSolverConfig::pcgTolerance);
+                     &runtime::GlobalSolverConfig::pcgTolerance)
+      .def_readwrite("enable_contact",
+                     &runtime::GlobalSolverConfig::enableContact)
+      .def_readwrite("contact_barrier_distance",
+                     &runtime::GlobalSolverConfig::contactBarrierDistance)
+      .def_readwrite("contact_stiffness",
+                     &runtime::GlobalSolverConfig::contactStiffness);
 
   py::class_<runtime::RuntimeStepResult>(m, "RuntimeStepResult")
       .def_readonly("iterations", &runtime::RuntimeStepResult::iterations)

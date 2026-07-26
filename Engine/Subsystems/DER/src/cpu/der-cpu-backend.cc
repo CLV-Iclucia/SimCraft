@@ -4,6 +4,7 @@
 
 #include <Contact/contact-barrier.h>
 
+#include <Eigen/Eigenvalues>
 #include <Eigen/SparseCholesky>
 
 #include <algorithm>
@@ -12,6 +13,7 @@
 #include <fstream>
 #include <iomanip>
 #include <optional>
+#include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -59,6 +61,220 @@ namespace ksk::der
                 throw std::invalid_argument(std::string(operation) +
                     " received a DOF view that is too small");
             }
+        }
+
+        double vectorInfNorm(const Eigen::VectorXd& vector)
+        {
+            return vector.size() == 0 ? 0.0 : vector.cwiseAbs().maxCoeff();
+        }
+
+        int maxAbsIndex(const Eigen::VectorXd& vector)
+        {
+            if (vector.size() == 0)
+            {
+                return -1;
+            }
+            Eigen::Index index = 0;
+            vector.cwiseAbs().maxCoeff(&index);
+            return static_cast<int>(index);
+        }
+
+        struct ScalarLocation
+        {
+            int rod = -1;
+            int vertex = -1;
+            int lane = -1;
+        };
+
+        ScalarLocation locateScalar(const DERSubsystem& subsystem,
+                                    int local_scalar)
+        {
+            const auto& offsets = subsystem.rodOffsets();
+            const auto& rods = subsystem.rods();
+            for (int rod_index = 0; rod_index < static_cast<int>(rods.size());
+                 ++rod_index)
+            {
+                const int base = offsets[static_cast<size_t>(rod_index)].q;
+                const int scalar_count =
+                    static_cast<int>(rods[static_cast<size_t>(rod_index)]
+                                         .state()
+                                         .size()) *
+                    4;
+                if (local_scalar >= base && local_scalar < base + scalar_count)
+                {
+                    const int relative = local_scalar - base;
+                    return ScalarLocation{
+                        .rod = rod_index,
+                        .vertex = relative / 4,
+                        .lane = relative % 4,
+                    };
+                }
+            }
+            return {};
+        }
+
+        void dumpDenseVector(const Eigen::VectorXd& vector,
+                             const char* path)
+        {
+            std::ofstream out(path);
+            if (!out)
+            {
+                return;
+            }
+
+            out << "# DER CPU backend vector\n";
+            out << "size " << vector.size() << '\n';
+            out << std::scientific << std::setprecision(17);
+            for (int i = 0; i < vector.size(); ++i)
+            {
+                out << vector[i] << '\n';
+            }
+        }
+
+        void dumpDenseMatrix(const Eigen::SparseMatrix<double>& matrix,
+                             const char* path);
+
+        void diagnoseDenseAssemblyMatrix(const char* label,
+                                         const Eigen::MatrixXd& matrix,
+                                         int subsystem_id,
+                                         int rod_index,
+                                         bool require_spd)
+        {
+            if (matrix.rows() == 0)
+            {
+                return;
+            }
+            if (!matrix.allFinite())
+            {
+                spdlog::warn(
+                    "DER assembly matrix contains non-finite entries: "
+                    "label={} subsystem={} rod={} scalars={}",
+                    label,
+                    subsystem_id,
+                    rod_index,
+                    matrix.rows());
+                return;
+            }
+
+            const Eigen::MatrixXd skew = matrix - matrix.transpose();
+            const double asymmetry = skew.cwiseAbs().maxCoeff();
+            const Eigen::VectorXd diagonal = matrix.diagonal();
+            const double min_diag = diagonal.minCoeff();
+            const double max_diag = diagonal.maxCoeff();
+            const Eigen::MatrixXd symmetric = 0.5 * (matrix + matrix.transpose());
+            Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(symmetric);
+            if (eigensolver.info() != Eigen::Success)
+            {
+                spdlog::warn(
+                    "DER assembly matrix eigen analysis failed: label={} "
+                    "subsystem={} rod={} scalars={} asymmetry={} min_diag={} "
+                    "max_diag={}",
+                    label,
+                    subsystem_id,
+                    rod_index,
+                    matrix.rows(),
+                    asymmetry,
+                    min_diag,
+                    max_diag);
+                return;
+            }
+
+            const double min_eigen = eigensolver.eigenvalues().minCoeff();
+            const double max_abs_eigen =
+                eigensolver.eigenvalues().cwiseAbs().maxCoeff();
+            const double tolerance =
+                1.0e-10 * std::max(1.0, max_abs_eigen);
+            const bool valid = require_spd ? min_eigen > tolerance
+                                           : min_eigen >= -tolerance;
+            if (valid && asymmetry <= 1.0e-8)
+            {
+                return;
+            }
+
+            spdlog::warn(
+                "DER assembly matrix is not {}: label={} subsystem={} "
+                "rod={} scalars={} min_eigen={} max_abs_eigen={} "
+                "tolerance={} asymmetry={} min_diag={} max_diag={}",
+                require_spd ? "SPD" : "PSD",
+                label,
+                subsystem_id,
+                rod_index,
+                matrix.rows(),
+                min_eigen,
+                max_abs_eigen,
+                tolerance,
+                asymmetry,
+                min_diag,
+                max_diag);
+        }
+
+        void diagnoseLocalMatrixSPD(const Eigen::SparseMatrix<double>& matrix,
+                                    int subsystem_id,
+                                    int internal_contact_count)
+        {
+            if (matrix.rows() == 0)
+            {
+                return;
+            }
+
+            Eigen::MatrixXd dense = Eigen::MatrixXd(matrix);
+            if (!dense.allFinite())
+            {
+                spdlog::warn(
+                    "DER local operator contains non-finite entries: "
+                    "subsystem={} scalars={} internal_contacts={}",
+                    subsystem_id,
+                    matrix.rows(),
+                    internal_contact_count);
+                dumpDenseMatrix(matrix, "der-local-matrix-nonfinite.txt");
+                return;
+            }
+
+            const Eigen::MatrixXd skew = dense - dense.transpose();
+            const double asymmetry = skew.cwiseAbs().maxCoeff();
+            const Eigen::VectorXd diagonal = dense.diagonal();
+            const double min_diag = diagonal.minCoeff();
+            const double max_diag = diagonal.maxCoeff();
+            const Eigen::MatrixXd symmetric = 0.5 * (dense + dense.transpose());
+
+            Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(symmetric);
+            if (eigensolver.info() != Eigen::Success)
+            {
+                spdlog::warn(
+                    "DER local operator eigen analysis failed: subsystem={} "
+                    "scalars={} internal_contacts={} asymmetry={} "
+                    "min_diag={} max_diag={}",
+                    subsystem_id,
+                    matrix.rows(),
+                    internal_contact_count,
+                    asymmetry,
+                    min_diag,
+                    max_diag);
+                dumpDenseMatrix(matrix, "der-local-matrix-eigen-failure.txt");
+                return;
+            }
+
+            const double min_eigen = eigensolver.eigenvalues().minCoeff();
+            const double max_abs_eigen =
+                eigensolver.eigenvalues().cwiseAbs().maxCoeff();
+            if (min_eigen > 0.0 && asymmetry <= 1.0e-8 && min_diag > 0.0)
+            {
+                return;
+            }
+
+            spdlog::warn(
+                "DER local operator is not SPD: subsystem={} scalars={} "
+                "min_eigen={} max_abs_eigen={} asymmetry={} min_diag={} "
+                "max_diag={} internal_contacts={}",
+                subsystem_id,
+                matrix.rows(),
+                min_eigen,
+                max_abs_eigen,
+                asymmetry,
+                min_diag,
+                max_diag,
+                internal_contact_count);
+            dumpDenseMatrix(matrix, "der-local-matrix-not-spd.txt");
         }
 
         int contactPointCount(runtime::ContactCase type)
@@ -523,6 +739,24 @@ namespace ksk::der
 
             const int base = offsets[rod_index].q;
             const Eigen::VectorXd mass = rod.massDiagonal();
+            Eigen::MatrixXd mass_matrix =
+                Eigen::MatrixXd::Zero(mass.size(), mass.size());
+            for (Eigen::Index i = 0; i < mass.size(); ++i)
+            {
+                mass_matrix(i, i) = mass[i] / (dt * dt);
+            }
+            const Eigen::MatrixXd rod_hessian =
+                Eigen::MatrixXd(evaluation.hessian);
+            diagnoseDenseAssemblyMatrix(
+                "rod_mass", mass_matrix, subsystem_.id(), rod_index, true);
+            diagnoseDenseAssemblyMatrix(
+                "rod_hessian", rod_hessian, subsystem_.id(), rod_index, false);
+            diagnoseDenseAssemblyMatrix(
+                "rod_mass_plus_hessian",
+                mass_matrix + rod_hessian,
+                subsystem_.id(),
+                rod_index,
+                true);
             for (Eigen::Index i = 0; i < mass.size(); ++i)
             {
                 triplets.emplace_back(base + static_cast<int>(i),
@@ -548,10 +782,22 @@ namespace ksk::der
             appendContactHessianTriplets(subsystem_, contact, triplets);
         }
 
+        local_solver_ready_ = false;
         local_matrix_.resize(subsystem_.localScalarCount(),
                              subsystem_.localScalarCount());
         local_matrix_.setFromTriplets(triplets.begin(), triplets.end());
         local_matrix_.makeCompressed();
+        diagnoseLocalMatrixSPD(
+            local_matrix_,
+            subsystem_.id(),
+            static_cast<int>(subsystem_.internal_contacts_.size()));
+        local_solver_.compute(local_matrix_);
+        if (local_solver_.info() != Eigen::Success)
+        {
+            dumpDenseMatrix(local_matrix_, "der-local-matrix-factor-failure.txt");
+            throw std::runtime_error("failed to factor DER CPU backend local matrix");
+        }
+        local_solver_ready_ = true;
     }
 
     void DERCPUBackend::assembleLocalGradient(runtime::DofView g) const
@@ -629,22 +875,86 @@ namespace ksk::der
         {
             throw std::runtime_error("DER CPU backend local matrix is not prepared");
         }
+        if (!local_solver_ready_)
+        {
+            throw std::runtime_error("DER CPU backend local solver is not prepared");
+        }
         requireCPU(b, "DERCpuBackend::solveLocalSystem");
         requireCPU(x, "DERCpuBackend::solveLocalSystem");
         requireDofCount(b, subsystem_.localScalarCount(), "DERCpuBackend::solveLocalSystem");
         requireDofCount(x, subsystem_.localScalarCount(), "DERCpuBackend::solveLocalSystem");
 
-        Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
-        solver.compute(local_matrix_);
-        if (solver.info() != Eigen::Success)
+        const Eigen::VectorXd local_b = gatherLocalVector(b);
+        if (!local_b.allFinite())
         {
-            dumpDenseMatrix(local_matrix_, "der-local-matrix-factor-failure.txt");
-            throw std::runtime_error("failed to factor DER CPU backend local matrix");
+            spdlog::warn(
+                "DER local solve received non-finite rhs: subsystem={} "
+                "scalars={} rhs_norm={} rhs_inf={} internal_contacts={}",
+                subsystem_.id(),
+                subsystem_.localScalarCount(),
+                local_b.norm(),
+                vectorInfNorm(local_b),
+                subsystem_.internal_contacts_.size());
+            dumpDenseVector(local_b, "der-local-solve-rhs-nonfinite.txt");
         }
-        const Eigen::VectorXd local_x = solver.solve(gatherLocalVector(b));
-        if (solver.info() != Eigen::Success)
+
+        const Eigen::VectorXd local_x = local_solver_.solve(local_b);
+        if (local_solver_.info() != Eigen::Success)
         {
+            dumpDenseMatrix(local_matrix_, "der-local-matrix-solve-failure.txt");
+            dumpDenseVector(local_b, "der-local-solve-rhs-failure.txt");
             throw std::runtime_error("failed to solve DER CPU backend local system");
+        }
+        const Eigen::VectorXd local_ax = local_matrix_ * local_x;
+        const Eigen::VectorXd solve_residual = local_ax - local_b;
+        const double preconditioner_dot = local_b.dot(local_x);
+        const double quadratic = local_x.dot(local_ax);
+        const double rhs_norm = local_b.norm();
+        const double solution_norm = local_x.norm();
+        const double relative_solve_residual =
+            solve_residual.norm() / std::max(1.0, rhs_norm);
+        if (!local_x.allFinite() ||
+            !std::isfinite(preconditioner_dot) ||
+            preconditioner_dot <= 0.0 ||
+            !std::isfinite(quadratic) ||
+            quadratic <= 0.0 ||
+            !std::isfinite(relative_solve_residual) ||
+            relative_solve_residual > 1.0e-6)
+        {
+            const int max_rhs_scalar = maxAbsIndex(local_b);
+            const int max_x_scalar = maxAbsIndex(local_x);
+            const ScalarLocation max_rhs_location =
+                locateScalar(subsystem_, max_rhs_scalar);
+            const ScalarLocation max_x_location =
+                locateScalar(subsystem_, max_x_scalar);
+            spdlog::warn(
+                "DER local solve diagnostic: subsystem={} scalars={} "
+                "b_dot_x={} xTAx={} rhs_norm={} x_norm={} rhs_inf={} "
+                "x_inf={} relative_residual={} internal_contacts={} "
+                "max_rhs_scalar={} max_rhs_rod={} max_rhs_vertex={} "
+                "max_rhs_lane={} max_x_scalar={} max_x_rod={} "
+                "max_x_vertex={} max_x_lane={}",
+                subsystem_.id(),
+                subsystem_.localScalarCount(),
+                preconditioner_dot,
+                quadratic,
+                rhs_norm,
+                solution_norm,
+                vectorInfNorm(local_b),
+                vectorInfNorm(local_x),
+                relative_solve_residual,
+                subsystem_.internal_contacts_.size(),
+                max_rhs_scalar,
+                max_rhs_location.rod,
+                max_rhs_location.vertex,
+                max_rhs_location.lane,
+                max_x_scalar,
+                max_x_location.rod,
+                max_x_location.vertex,
+                max_x_location.lane);
+            dumpDenseMatrix(local_matrix_, "der-local-matrix-invalid-solve.txt");
+            dumpDenseVector(local_b, "der-local-solve-rhs-invalid.txt");
+            dumpDenseVector(local_x, "der-local-solve-x-invalid.txt");
         }
 
         const int scalar_count = subsystem_.localScalarCount();

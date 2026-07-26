@@ -53,7 +53,7 @@ GPUReconstructor::GPUReconstructor(Device& device, const GPUGridState& grid)
 }
 
 void GPUReconstructor::execute(CommandList& cmd, GPUGridState& grid) {
-    SIM_PROFILE_FUNCTION();
+    KSK_PROFILE_FUNCTION();
 
     if (!grid.fluidSdfImg || !grid.particlePositions) return;
     if (!buildHash_.valid() || !buildRanges_.valid() ||
@@ -71,7 +71,7 @@ void GPUReconstructor::execute(CommandList& cmd, GPUGridState& grid) {
 
     // Step 1: Build sorted-grid spatial hash.
     {
-        SIM_PROFILE_SCOPE("GPUReconstructor/BuildParticleHash");
+        KSK_PROFILE_SCOPE("GPUReconstructor/BuildParticleHash");
         BuildParticleHashCS::Params params;
         params.particleCellKeys = particleCellKeys_;
         params.particleIndices = particleIndices_;
@@ -91,13 +91,13 @@ void GPUReconstructor::execute(CommandList& cmd, GPUGridState& grid) {
                       BarrierDesc::AccessShaderRead | BarrierDesc::AccessShaderWrite);
 
     {
-        SIM_PROFILE_SCOPE("GPUReconstructor/SortParticleHash");
+        KSK_PROFILE_SCOPE("GPUReconstructor/SortParticleHash");
         sorter_->pairs(cmd, particleCellKeys_, particleIndices_, grid.numParticles);
     }
 
     // Step 2: Build [start, end) ranges for each occupied grid cell.
     {
-        SIM_PROFILE_SCOPE("GPUReconstructor/BuildCellRanges");
+        KSK_PROFILE_SCOPE("GPUReconstructor/BuildCellRanges");
         cmd.fillBuffer(cellStart_, 0xffffffffu);
         cmd.fillBuffer(cellEnd_, 0u);
         cmd.memoryBarrier(BarrierDesc::StageTransfer, BarrierDesc::StageComputeShader,
@@ -117,7 +117,7 @@ void GPUReconstructor::execute(CommandList& cmd, GPUGridState& grid) {
 
     // Step 3: Reconstruct SDF from nearby particle buckets only.
     {
-        SIM_PROFILE_SCOPE("GPUReconstructor/ReconstructSDFHashed");
+        KSK_PROFILE_SCOPE("GPUReconstructor/ReconstructSDFHashed");
         ReconstructSdfHashedCS::Params params;
         params.fluidSdf = grid.fluidSdfImg;
         params.positions = grid.particlePositions;
@@ -140,11 +140,11 @@ void GPUReconstructor::execute(CommandList& cmd, GPUGridState& grid) {
 
     // Step 4: Smooth (3 iterations, ping-pong)
     if (smooth_.valid()) {
-        SIM_PROFILE_SCOPE("GPUReconstructor/SmoothSDF");
+        KSK_PROFILE_SCOPE("GPUReconstructor/SmoothSDF");
         ImageRef srcSdf = grid.fluidSdfImg;
         ImageRef dstSdf = sdfBuf_;
         for (int i = 0; i < 3; ++i) {
-            SIM_PROFILE_SCOPE("GPUReconstructor/SmoothIteration");
+            KSK_PROFILE_SCOPE("GPUReconstructor/SmoothIteration");
             SmoothSdfCS::Params params;
             params.srcSdf   = ImageBinding{srcSdf, grid.sdfSampler};
             params.dstSdf   = dstSdf;

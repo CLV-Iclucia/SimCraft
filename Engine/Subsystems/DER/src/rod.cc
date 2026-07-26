@@ -1,10 +1,12 @@
 #include <DER/rod.h>
 
 #include <Eigen/Core>
+#include <Eigen/Eigenvalues>
 #include <Eigen/Geometry>
 
 #include <cmath>
 #include <numbers>
+#include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <utility>
 
@@ -41,6 +43,57 @@ glm::dvec3 toGlm(const Vec3& value)
 Vec3 toEigen(const glm::dvec3& value)
 {
   return {value.x, value.y, value.z};
+}
+
+void diagnoseRodHessianComponent(const char* label,
+                                 const Eigen::MatrixXd& hessian,
+                                 size_t vertex_count)
+{
+  if (hessian.rows() == 0) {
+    return;
+  }
+  if (!hessian.allFinite()) {
+    spdlog::warn(
+        "DER rod Hessian component contains non-finite entries: "
+        "component={} vertices={} scalars={}",
+        label,
+        vertex_count,
+        hessian.rows());
+    return;
+  }
+
+  const Eigen::MatrixXd skew = hessian - hessian.transpose();
+  const double asymmetry = skew.cwiseAbs().maxCoeff();
+  const Eigen::MatrixXd symmetric = 0.5 * (hessian + hessian.transpose());
+  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(symmetric);
+  if (eigensolver.info() != Eigen::Success) {
+    spdlog::warn(
+        "DER rod Hessian component eigen analysis failed: component={} "
+        "vertices={} scalars={} asymmetry={}",
+        label,
+        vertex_count,
+        hessian.rows(),
+        asymmetry);
+    return;
+  }
+
+  const double min_eigen = eigensolver.eigenvalues().minCoeff();
+  const double max_abs_eigen = eigensolver.eigenvalues().cwiseAbs().maxCoeff();
+  const double tolerance = 1.0e-10 * std::max(1.0, max_abs_eigen);
+  if (min_eigen >= -tolerance && asymmetry <= 1.0e-8) {
+    return;
+  }
+
+  spdlog::warn(
+      "DER rod Hessian component is not PSD: component={} vertices={} "
+      "scalars={} min_eigen={} max_abs_eigen={} tolerance={} asymmetry={}",
+      label,
+      vertex_count,
+      hessian.rows(),
+      min_eigen,
+      max_abs_eigen,
+      tolerance,
+      asymmetry);
 }
 
 Mat3 crossMatrix(const Vec3& value)
@@ -675,17 +728,42 @@ RodEvaluation Rod::evaluate(const glm::dvec3& gravity,
   try {
     Eigen::VectorXd gradient = Eigen::VectorXd::Zero(dofs);
     Eigen::MatrixXd hessian = Eigen::MatrixXd::Zero(dofs, dofs);
+    Eigen::MatrixXd component_hessian = Eigen::MatrixXd::Zero(dofs, dofs);
 
+    component_hessian.setZero();
     accumulateStretching(state_, rest_, material_, result.energy, gradient,
-                         hessian);
+                         component_hessian);
+    diagnoseRodHessianComponent(
+        "stretching", component_hessian, state_.size());
+    hessian += component_hessian;
+    diagnoseRodHessianComponent(
+        "after_stretching", hessian, state_.size());
+
+    component_hessian.setZero();
     accumulateBending(state_, rest_, material_, result.energy, gradient,
-                      hessian);
+                      component_hessian);
+    diagnoseRodHessianComponent("bending", component_hessian, state_.size());
+    hessian += component_hessian;
+    diagnoseRodHessianComponent("after_bending", hessian, state_.size());
+
+    component_hessian.setZero();
     accumulateTwisting(state_, rest_, material_, referenceTwists, result.energy,
-                       gradient, hessian);
+                       gradient, component_hessian);
+    diagnoseRodHessianComponent("twisting", component_hessian, state_.size());
+    hessian += component_hessian;
+    diagnoseRodHessianComponent("after_twisting", hessian, state_.size());
+
     accumulateGravity(state_, massDiagonal(), gravity, result.energy, gradient);
+
     for (const RodConstraint& constraint : constraints_) {
+      component_hessian.setZero();
       accumulateConstraint(state_, constraint, result.energy, gradient,
-                           hessian);
+                           component_hessian);
+      diagnoseRodHessianComponent(
+          "constraint", component_hessian, state_.size());
+      hessian += component_hessian;
+      diagnoseRodHessianComponent(
+          "after_constraint", hessian, state_.size());
     }
 
     result.gradient = toBlocks(gradient);

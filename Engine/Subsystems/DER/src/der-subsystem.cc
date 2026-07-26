@@ -39,7 +39,7 @@ int rodScalarCount(const Rod& rod)
 
 }  // namespace
 
-DERSubsystem::DERSubsystem(runtime::SubsystemId id,
+DERSubsystem::DERSubsystem(runtime::SubsystemIdx id,
                            std::vector<Rod> rods,
                            std::vector<DERConstraintBinding> constraints,
                            int scalarOffset,
@@ -75,7 +75,7 @@ DERSubsystem::DERSubsystem(runtime::SubsystemId id,
 
 DERSubsystem::~DERSubsystem() = default;
 
-runtime::SubsystemId DERSubsystem::id() const noexcept
+runtime::SubsystemIdx DERSubsystem::id() const noexcept
 {
   return id_;
 }

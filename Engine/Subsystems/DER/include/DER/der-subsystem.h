@@ -33,14 +33,14 @@ struct DERConstraintBinding {
 
 class DERSubsystem final : public runtime::Subsystem {
  public:
-  DERSubsystem(runtime::SubsystemId id,
+  DERSubsystem(runtime::SubsystemIdx id,
                std::vector<Rod> rods,
                std::vector<DERConstraintBinding> constraints = {},
                int scalarOffset = 0,
                glm::dvec3 gravity = glm::dvec3(0.0));
   ~DERSubsystem() override;
 
-  [[nodiscard]] runtime::SubsystemId id() const noexcept override;
+  [[nodiscard]] runtime::SubsystemIdx id() const noexcept override;
   [[nodiscard]] runtime::DofRange dofRange() const noexcept override;
 
   void declareGeometry(runtime::GlobalGeometryManager& geometry) override;
@@ -105,7 +105,7 @@ class DERSubsystem final : public runtime::Subsystem {
   [[nodiscard]] bool usesGPU(runtime::ConstGeometryView view) const noexcept;
   [[nodiscard]] bool usesGPU(runtime::GeometryView view) const noexcept;
 
-  runtime::SubsystemId id_;
+  runtime::SubsystemIdx id_;
   runtime::DofRange range_;
   glm::dvec3 gravity_;
   std::vector<Rod> rods_;

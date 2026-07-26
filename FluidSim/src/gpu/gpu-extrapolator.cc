@@ -16,7 +16,7 @@ GPUExtrapolatorSolver::GPUExtrapolatorSolver(GPUFluidContext& ctx, int iters)
 {}
 
 void GPUExtrapolatorSolver::solve(GPUFluidContext& ctx, Real dt) {
-    SIM_PROFILE_FUNCTION();
+    KSK_PROFILE_FUNCTION();
 
     (void)dt;
     // Extrapolation passes for u, v, w

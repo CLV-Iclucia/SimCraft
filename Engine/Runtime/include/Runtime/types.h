@@ -6,7 +6,7 @@ namespace ksk::runtime {
 
 using Real = double;
 
-using SubsystemId = int;
+using SubsystemIdx = int;
 using PointIdx = int;
 
 using ObjectId = int;

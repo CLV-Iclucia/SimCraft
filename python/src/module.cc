@@ -20,4 +20,5 @@ PYBIND11_MODULE(kiseki, m)
   bind_simulation(m);
   bind_renderer(m);
   bind_der(m);
+  bind_abd(m);
 }

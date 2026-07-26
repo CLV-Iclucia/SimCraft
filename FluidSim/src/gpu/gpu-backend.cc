@@ -43,7 +43,7 @@ GPUFluidBackend::~GPUFluidBackend() = default;
 // FluidBackend interface
 // ============================================================================
 void GPUFluidBackend::initialize(const FluidScene& scene) {
-    SIM_PROFILE_FUNCTION();
+    KSK_PROFILE_FUNCTION();
 
     // 1. Cache config
     config_ = scene.solver;
@@ -145,7 +145,7 @@ void GPUFluidBackend::computeCFL() {
 }
 
 void GPUFluidBackend::step(Real dt) {
-    SIM_PROFILE_FUNCTION();
+    KSK_PROFILE_FUNCTION();
 
     // Compute dynamic CFL from particle velocities
     {
@@ -164,7 +164,7 @@ void GPUFluidBackend::step(Real dt) {
         Real subDt = std::min(cflDt, dt - t);
         substepCnt++;
         {
-            SIM_PROFILE_SCOPE("GPUFluid/Substep");
+            KSK_PROFILE_SCOPE("GPUFluid/Substep");
             substep(*cmd, subDt);
         }
         t += subDt;
@@ -174,27 +174,27 @@ void GPUFluidBackend::step(Real dt) {
 
     // Optional: surface reconstruction
     if (reconstructor_) {
-        SIM_PROFILE_SCOPE("GPUFluid/ReconstructSurface");
+        KSK_PROFILE_SCOPE("GPUFluid/ReconstructSurface");
         reconstructor_->execute(*cmd, grid_);
     }
     if (surfaceMesher_) {
-        SIM_PROFILE_SCOPE("GPUFluid/ExtractSurfaceMesh");
+        KSK_PROFILE_SCOPE("GPUFluid/ExtractSurfaceMesh");
         surfaceMesher_->execute(*cmd, grid_);
     }
 
     {
-        SIM_PROFILE_SCOPE("GPUFluid/SubmitStep");
+        KSK_PROFILE_SCOPE("GPUFluid/SubmitStep");
         cmd->end();
         device_.submitAndWait(*cmd, QueueType::Compute);
     }
-    SIM_PROFILE_VALUE("GPUFluid/Substeps", substepCnt);
-    SIM_PROFILE_VALUE("GPUFluid/CFLDt", cflDt);
-    SIM_PROFILE_VALUE("GPUFluid/MaxSpeed", cachedMaxSpeed_);
-    SIM_PROFILE_FRAME_MARK();
+    KSK_PROFILE_VALUE("GPUFluid/Substeps", substepCnt);
+    KSK_PROFILE_VALUE("GPUFluid/CFLDt", cflDt);
+    KSK_PROFILE_VALUE("GPUFluid/MaxSpeed", cachedMaxSpeed_);
+    KSK_PROFILE_FRAME_MARK();
 }
 
 void GPUFluidBackend::readbackParticles(FluidFrame& out) {
-    SIM_PROFILE_FUNCTION();
+    KSK_PROFILE_FUNCTION();
 
     // Copy GPU particle buffers to readback (SOA)
     size_t bufSize = particleBufferSize(grid_.numParticles);
@@ -227,7 +227,7 @@ bool GPUFluidBackend::readbackSurfaceMesh(FluidSurfaceMesh& out) {
 }
 
 void GPUFluidBackend::updateCollider(const Mesh& mesh) {
-    SIM_PROFILE_FUNCTION();
+    KSK_PROFILE_FUNCTION();
 
     uploadColliderToImage(mesh);
 }
@@ -243,7 +243,7 @@ void GPUFluidBackend::updateSolverConfig(const SolverConfig& config) {
 // Buffer creation
 // ============================================================================
 void GPUFluidBackend::createSharedBuffers(const FluidScene& scene) {
-    SIM_PROFILE_SCOPE("GPUFluid/CreateSharedBuffers");
+    KSK_PROFILE_SCOPE("GPUFluid/CreateSharedBuffers");
 
     int nx = grid_.gridSize.x, ny = grid_.gridSize.y, nz = grid_.gridSize.z;
     grid_.originX = static_cast<float>(scene.domain.origin.x);
@@ -326,7 +326,7 @@ void GPUFluidBackend::createSharedBuffers(const FluidScene& scene) {
 }
 
 void GPUFluidBackend::uploadParticles(const FluidScene& scene) {
-    SIM_PROFILE_SCOPE("GPUFluid/UploadParticles");
+    KSK_PROFILE_SCOPE("GPUFluid/UploadParticles");
 
     size_t bufSize = particleBufferSize(grid_.numParticles);
 
@@ -377,7 +377,7 @@ void GPUFluidBackend::uploadParticles(const FluidScene& scene) {
 }
 
 void GPUFluidBackend::uploadColliderToImage(const Mesh& mesh) {
-    SIM_PROFILE_SCOPE("GPUFluid/UploadColliderSDF");
+    KSK_PROFILE_SCOPE("GPUFluid/UploadColliderSDF");
 
     // Phase 1: stub — collider SDF upload will be implemented with CPU-side
     // mesh-to-SDF conversion, then upload to 3D image via staging buffer.
@@ -390,7 +390,7 @@ void GPUFluidBackend::uploadColliderToImage(const Mesh& mesh) {
 // ============================================================================
 
 void GPUFluidBackend::substep(CommandList& cmd, Real dt) {
-    SIM_PROFILE_FUNCTION();
+    KSK_PROFILE_FUNCTION();
 
     using B = BarrierDesc;
     auto barrier = [&]() { cmd.memoryBarrier(B::StageComputeShader, B::StageComputeShader); };
@@ -406,7 +406,7 @@ void GPUFluidBackend::substep(CommandList& cmd, Real dt) {
 
     // ---- 1. P2G scatter + normalize ----
     {
-        SIM_PROFILE_SCOPE("GPUFluid/P2G");
+        KSK_PROFILE_SCOPE("GPUFluid/P2G");
         advector_->scatterP2G(cmd, grid_, dt);
     }
     // barrier already done inside scatterP2G
@@ -416,7 +416,7 @@ void GPUFluidBackend::substep(CommandList& cmd, Real dt) {
 
     // ---- 2. Body force (gravity on V faces) ----
     if (bodyForce_.valid()) {
-        SIM_PROFILE_SCOPE("GPUFluid/BodyForce");
+        KSK_PROFILE_SCOPE("GPUFluid/BodyForce");
         BodyForceCS::Params p;
         p.vGrid      = grid_.vGrid;
         p.dt         = fdt;
@@ -428,7 +428,7 @@ void GPUFluidBackend::substep(CommandList& cmd, Real dt) {
 
     // ---- 3. Extrapolate velocities (in-place: write result back to grid) ----
     if (extrapolate_.valid()) {
-        SIM_PROFILE_SCOPE("GPUFluid/Extrapolate");
+        KSK_PROFILE_SCOPE("GPUFluid/Extrapolate");
         // Pass 1: extrapolate into gridBuf
         {
             ExtrapolateCS::Params p;
@@ -490,7 +490,7 @@ void GPUFluidBackend::substep(CommandList& cmd, Real dt) {
 
     // ---- 5. G2P gather + advect particles ----
     {
-        SIM_PROFILE_SCOPE("GPUFluid/G2PAdvect");
+        KSK_PROFILE_SCOPE("GPUFluid/G2PAdvect");
         advector_->gatherAndAdvect(cmd, grid_, dt);
     }
     // final barrier inside gatherAndAdvect

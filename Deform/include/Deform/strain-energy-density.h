@@ -64,7 +64,7 @@ struct StableNeoHookean final : StrainEnergyDensity<T> {
         + ((I(2) - 1.0) * lambda - mu) * hessianIiii<T>(dg);
   }
   Matrix<T, 9, 9> filteredEnergyHessian(const DeformationGradient<T, 3> &dg) const override {
-    SIM_PROFILE_SCOPE("filteredSNHessian");
+    KSK_PROFILE_SCOPE("filteredSNHessian");
     auto I = isotropicInvariants(dg);
     Vector<T, 9> vec_giii = maths::vectorize(gradientIiii<T>(dg));
     Matrix<T, 9, 9> H = lambda * vec_giii * vec_giii.transpose() + 0.5 * mu * hessianIii<T>()
@@ -73,7 +73,7 @@ struct StableNeoHookean final : StrainEnergyDensity<T> {
     Vector<T, 9> eigenvalues;
     Matrix<T, 9, 9> eigenvectors;
     {
-      SIM_PROFILE_SCOPE("SNH_EigenSolve");
+      KSK_PROFILE_SCOPE("SNH_EigenSolve");
       Eigen::SelfAdjointEigenSolver<Matrix<T, 9, 9>> es(H);
       eigenvalues = es.eigenvalues();
       eigenvectors = es.eigenvectors();
@@ -100,12 +100,12 @@ struct ARAP final : StrainEnergyDensity<T> {
     return hessianIii<T>() - 2 * hessianIi(dg);
   }
   Matrix<T, 9, 9> filteredEnergyHessian(const DeformationGradient<T, 3> &dg) const override {
-    SIM_PROFILE_SCOPE("filteredARAPHessian");
+    KSK_PROFILE_SCOPE("filteredARAPHessian");
     auto H = hessianIii<T>() - 2 * hessianIi(dg);
     Vector<T, 9> eigenvalues;
     Matrix<T, 9, 9> eigenvectors;
     {
-      SIM_PROFILE_SCOPE("ARAP_EigenSolve");
+      KSK_PROFILE_SCOPE("ARAP_EigenSolve");
       Eigen::SelfAdjointEigenSolver<Matrix<T, 9, 9>> es(H);
       eigenvalues = es.eigenvalues();
       eigenvectors = es.eigenvectors();

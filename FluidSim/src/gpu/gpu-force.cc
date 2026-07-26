@@ -16,7 +16,7 @@ GPUForceSolver::GPUForceSolver(GPUFluidContext& ctx, GPUForceConfig config)
 {}
 
 void GPUForceSolver::solve(GPUFluidContext& ctx, Real dt) {
-    SIM_PROFILE_FUNCTION();
+    KSK_PROFILE_FUNCTION();
 
     auto& cmd = ctx.cmd();
     int ny = ctx.gridSize.y;

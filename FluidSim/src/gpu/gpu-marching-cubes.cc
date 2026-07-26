@@ -73,7 +73,7 @@ GPUMarchingCubes::GPUMarchingCubes(Device& device, const GPUGridState& grid)
 }
 
 void GPUMarchingCubes::execute(CommandList& cmd, const GPUGridState& grid) {
-    SIM_PROFILE_FUNCTION();
+    KSK_PROFILE_FUNCTION();
 
     if (!marchingCubes_.valid() || !grid.fluidSdfImg || maxTriangles_ == 0) {
         return;
@@ -112,7 +112,7 @@ void GPUMarchingCubes::execute(CommandList& cmd, const GPUGridState& grid) {
 }
 
 bool GPUMarchingCubes::readback(Device& device, FluidSurfaceMesh& out) {
-    SIM_PROFILE_FUNCTION();
+    KSK_PROFILE_FUNCTION();
 
     out = {};
     if (maxTriangles_ == 0) {

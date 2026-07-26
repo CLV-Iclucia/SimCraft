@@ -139,6 +139,26 @@ def test_lock_initial_state():
     assert not intg.locked
 
 
+def test_abd_scene_add_body():
+    vertices = np.array([
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ], dtype=np.float64)
+    triangles = np.array([
+        [0, 2, 1],
+        [0, 1, 3],
+        [0, 3, 2],
+        [1, 2, 3],
+    ], dtype=np.int32)
+    body = kiseki.ABDRigidBody(vertices, triangles=triangles, density=6.0)
+    scene = kiseki.ABDScene()
+    scene.add_body(body, tag="tetra")
+    assert body.num_vertices == 4
+    assert body.num_triangles == 4
+
+
 if __name__ == "__main__":
     test_import_succeeds()
     test_version_string()
@@ -157,4 +177,5 @@ if __name__ == "__main__":
     test_integrator_modify()
     test_integrator_invalid()
     test_lock_initial_state()
+    test_abd_scene_add_body()
     print("All Phase 1-9 checks passed.")

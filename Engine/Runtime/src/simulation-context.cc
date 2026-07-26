@@ -30,7 +30,7 @@ SimulationContext::SimulationContext(
 void SimulationContext::rebuild()
 {
   scene_.dofs = {};
-  scene_.geometry = {};
+  scene_.geometry.clear();
   scene_.contacts = {};
   scene_.subsystemBatches.clear();
   scene_.gravity = gravity_;

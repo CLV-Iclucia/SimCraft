@@ -37,7 +37,7 @@ static GPUGridState makeGridView(GPUFluidContext& ctx) {
 }
 
 void GPUProjectorSolver::solve(GPUFluidContext& ctx, Real dt) {
-    SIM_PROFILE_FUNCTION();
+    KSK_PROFILE_FUNCTION();
 
     GPUGridState grid = makeGridView(ctx);
     impl_->solve(ctx.cmd(), grid, dt);

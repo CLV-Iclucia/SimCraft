@@ -9,8 +9,8 @@ TEST(RuntimeLayout, AppendsNonOverlappingDofRanges)
 {
   DofLayout layout;
 
-  const auto fem_range = layout.appendRange(SubsystemId{0}, 12, 3);
-  const auto hair_range = layout.appendRange(SubsystemId{1}, 7, 0);
+  const auto fem_range = layout.appendRange(SubsystemIdx{0}, 12, 3);
+  const auto hair_range = layout.appendRange(SubsystemIdx{1}, 7, 0);
 
   EXPECT_EQ(fem_range.scalarOffset, 0);
   EXPECT_EQ(fem_range.scalarCount, 12);
@@ -21,8 +21,8 @@ TEST(RuntimeLayout, AppendsNonOverlappingDofRanges)
 TEST(RuntimeLayout, RuntimeSceneRefreshesBufferLayout)
 {
   RuntimeScene scene;
-  scene.dofs.appendRange(SubsystemId{0}, 6, 3);
-  scene.geometry.addPoint(SubsystemId{0}, 0, glm::dvec3{1.0, 2.0, 3.0});
+  scene.dofs.appendRange(SubsystemIdx{0}, 6, 3);
+  scene.geometry.addPoint(SubsystemIdx{0}, 0, glm::dvec3{1.0, 2.0, 3.0});
 
   scene.refreshBufferLayout();
 

@@ -28,9 +28,9 @@ SubsystemBuildContext::SubsystemBuildContext(GlobalSolverConfig solver,
 
 SubsystemBuildContext::~SubsystemBuildContext() = default;
 
-SubsystemId SubsystemBuildContext::nextSubsystemId() const noexcept
+SubsystemIdx SubsystemBuildContext::nextSubsystemId() const noexcept
 {
-  return SubsystemId{static_cast<int>(subsystems_.size())};
+  return SubsystemIdx{static_cast<int>(subsystems_.size())};
 }
 
 int SubsystemBuildContext::nextScalarOffset() const noexcept

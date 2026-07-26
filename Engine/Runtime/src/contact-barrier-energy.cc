@@ -54,9 +54,9 @@ namespace ksk::runtime
 
             for (int i = 0; i < stencilPointCount(contact.type); ++i)
             {
-                const PointIdx point = contact.geometryIds[static_cast<size_t>(i)];
-                barrier.x[static_cast<size_t>(i)] = geometry.worldPosition(point);
-                barrier.restX[static_cast<size_t>(i)] = geometry.restPosition(point);
+                const PointIdx point = contact.geometryIds[i];
+                barrier.x[i] = geometry.worldPosition(point);
+                barrier.restX[i] = geometry.restPosition(point);
             }
             return barrier;
         }

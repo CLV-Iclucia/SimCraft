@@ -14,7 +14,7 @@ class Subsystem {
  public:
   virtual ~Subsystem() = default;
 
-  [[nodiscard]] virtual SubsystemId id() const noexcept = 0;
+  [[nodiscard]] virtual SubsystemIdx id() const noexcept = 0;
   [[nodiscard]] virtual DofRange dofRange() const noexcept = 0;
 
   virtual void declareGeometry(GlobalGeometryManager& geometry) = 0;

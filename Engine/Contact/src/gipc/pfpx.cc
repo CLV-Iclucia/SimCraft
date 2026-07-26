@@ -126,6 +126,9 @@ PFPxResult12 computePFPx_PT(
     for (int j = 0; j < 9; j++)
       result.PFPx(j, i) = raw.m[i][j];
 
+  if (!result.PFPx.allFinite()) {
+    result.valid = false;
+  }
   assert(result.PFPx.allFinite());
   result.q0.setZero();
   result.q0(8) = 1.0;

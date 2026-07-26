@@ -31,7 +31,7 @@ static int ipc_auto_reg = ([]() {
   }(), 0);
 
 void IpcIntegrator::step(Real dt) {
-  SIM_PROFILE_FUNCTION();
+  KSK_PROFILE_FUNCTION();
 
   Real t_next = system().currentTime() + dt;
   system().advanceKinematicBodies(t_next);
@@ -43,7 +43,7 @@ void IpcIntegrator::step(Real dt) {
   x_prev = system().x;
 
   if (!hasInitializedActiveConstraints) {
-    SIM_PROFILE_SCOPE("InitCollisionPairs");
+    KSK_PROFILE_SCOPE("InitCollisionPairs");
     maths::BlockVector<3> zeroDirection(x_t.numBlocks());
     zeroDirection.setZero();
     precomputeCollisionPairs(zeroDirection, 0.0);
@@ -62,7 +62,7 @@ void IpcIntegrator::step(Real dt) {
   maths::BlockVector<3> p(x_t.numBlocks());
   int iter = 0;
   while (true) {
-    SIM_PROFILE_SCOPE("NewtonIteration");
+    KSK_PROFILE_SCOPE("NewtonIteration");
 
     // Compute negative gradient directly as BlockVector<3>
     maths::BlockVector<3> negG;
@@ -139,7 +139,7 @@ void IpcIntegrator::step(Real dt) {
 
     x_prev = system().x;
     iter++;
-    SIM_PROFILE_VALUE("IPC/NewtonIter", iter);
+    KSK_PROFILE_VALUE("IPC/NewtonIter", iter);
 
     if (onNewtonIter)
       onNewtonIter(iter);
@@ -157,26 +157,26 @@ void IpcIntegrator::step(Real dt) {
   spdlog::info("[IPC] t={:.4f}  T={:.6e}  V_elastic={:.6e}  V_gravity={:.6e}  Total={:.6e}",
                system().currentTime(), T, V, Vg, total);
 
-  SIM_PROFILE_VALUE("IPC/TotalEnergy", total);
-  SIM_PROFILE_FRAME_MARK();
+  KSK_PROFILE_VALUE("IPC/TotalEnergy", total);
+  KSK_PROFILE_FRAME_MARK();
 }
 
 maths::BlockSparseMatrix<3> IpcIntegrator::spdProjectHessian(Real h) const
 {
-  SIM_PROFILE_SCOPE("spdProjectHessian");
+  KSK_PROFILE_SCOPE("spdProjectHessian");
   int nBlocks = system().x.numBlocks();
   maths::BlockSparseMatrix<3> H(nBlocks, nBlocks);
 
   // Elastic Hessian
   {
-    SIM_PROFILE_SCOPE("spdProjectHessian/Elastic");
+    KSK_PROFILE_SCOPE("spdProjectHessian/Elastic");
     system().spdProjectHessian(H);
   }
 
   Real kappa = config.contactStiffness;
   const int activeConstraintPairCount = constraintPairs.typeOffsets.back();
   {
-    SIM_PROFILE_SCOPE("spdProjectHessian/Barrier");
+    KSK_PROFILE_SCOPE("spdProjectHessian/Barrier");
     for (int i = 0; i < activeConstraintPairCount; ++i) {
       const auto& pair = constraintPairs.pairs[i];
       ipc::constraintPairBarrierHessian(pair, system().x, system().X, H, barrier_, kappa);
@@ -185,7 +185,7 @@ maths::BlockSparseMatrix<3> IpcIntegrator::spdProjectHessian(Real h) const
 
   // H_total = h² * H_elastic_barrier + M
   {
-    SIM_PROFILE_SCOPE("spdProjectHessian/PostProcess");
+    KSK_PROFILE_SCOPE("spdProjectHessian/PostProcess");
     H.scale(h * h);
     H.addFrom(system().blockMass());
 
@@ -471,7 +471,7 @@ void IpcIntegrator::refreshActiveConstraintPairs() {
 }
 
 void IpcIntegrator::precomputeCollisionPairs(const maths::BlockVector<3>& p, Real alpha) {
-  SIM_PROFILE_SCOPE("PrecomputeCollisionPairs");
+  KSK_PROFILE_SCOPE("PrecomputeCollisionPairs");
   collisionPairs.clear();
   
   collisionDetector->updateBVHs(p, alpha);
@@ -481,7 +481,7 @@ void IpcIntegrator::precomputeCollisionPairs(const maths::BlockVector<3>& p, Rea
 }
 
 void IpcIntegrator::computeVertexTriangleCollisionPairs(const maths::BlockVector<3>& p, Real alpha) {
-  SIM_PROFILE_SCOPE("VT-CollisionPairs");
+  KSK_PROFILE_SCOPE("VT-CollisionPairs");
   Real dHat = config.dHat;
   const int nVerts = system().numVertices();
 
@@ -521,7 +521,7 @@ void IpcIntegrator::computeVertexTriangleCollisionPairs(const maths::BlockVector
 }
 
 void IpcIntegrator::computeEdgeEdgeCollisionPairs(const maths::BlockVector<3>& p, Real alpha) {
-  SIM_PROFILE_SCOPE("EE-CollisionPairs");
+  KSK_PROFILE_SCOPE("EE-CollisionPairs");
   Real dHat = config.dHat;
   const int nEdges = system().numEdges();
 
