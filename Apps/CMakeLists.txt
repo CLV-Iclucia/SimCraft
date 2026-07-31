@@ -20,11 +20,6 @@ add_executable(prescribed-motion prescribed-motion/main.cc)
 target_link_libraries(prescribed-motion PUBLIC Kiseki::FEM cxxopts Kiseki::Renderer)
 target_compile_features(prescribed-motion PUBLIC cxx_std_20)
 
-# Energy Conservation Check (equivalent to python/examples/energy_conservation.py)
-add_executable(energy-check energy-check/main.cc)
-target_link_libraries(energy-check PUBLIC Kiseki::FEM cxxopts Kiseki::Renderer)
-target_compile_features(energy-check PUBLIC cxx_std_20)
-
 # FEM Showcase: comprehensive multi-body + mixed-collider test scene
 add_executable(fem-showcase fem-showcase/main.cc)
 target_link_libraries(fem-showcase PUBLIC Kiseki::FEM cxxopts Kiseki::Renderer)

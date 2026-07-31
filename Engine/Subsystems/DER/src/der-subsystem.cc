@@ -251,30 +251,20 @@ void DERSubsystem::scatterContactGradient(
 }
 
 void DERSubsystem::applyContactGeometryHessianProduct(
-    std::span<const runtime::PointIdx> gradientPoints,
-    runtime::ConstGeometryView pointGradient,
     std::span<const runtime::PointIdx> productPoints,
     runtime::ConstGeometryView pointHessianProduct,
-    runtime::ConstDofView localDq,
     runtime::DofView localY) const
 {
-  if (usesGPU(pointGradient) || usesGPU(pointHessianProduct) ||
-      usesGPU(localDq) || usesGPU(localY)) {
+  if (usesGPU(pointHessianProduct) || usesGPU(localY)) {
     gpu_backend_->applyContactGeometryHessianProduct(
-        gradientPoints,
-        pointGradient,
         productPoints,
         pointHessianProduct,
-        localDq,
         localY);
     return;
   }
   cpu_backend_->applyContactGeometryHessianProduct(
-      gradientPoints,
-      pointGradient,
       productPoints,
       pointHessianProduct,
-      localDq,
       localY);
 }
 

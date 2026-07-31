@@ -7,6 +7,8 @@ std::vector<runtime::PropertyDescriptor> ABDBodyObjectDesc::listProperties()
 {
   return {
       {"density", runtime::PropertyType::Scalar, 1, 1, "ABD body density"},
+      {"orthogonalStiffness", runtime::PropertyType::Scalar, 1, 1,
+       "ABD orthogonality stiffness"},
       {"contactThickness", runtime::PropertyType::Scalar, 1, 1,
        "ABD body contact thickness"},
       {"affine", runtime::PropertyType::Scalar, 12, 1,

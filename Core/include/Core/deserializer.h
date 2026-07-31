@@ -18,7 +18,8 @@ namespace ksk::core {
 template<typename T>
 struct custom_deserializer {
   static T do_deserialize(const JsonNode &node) {
-    throw std::runtime_error("Custom deserializer is not implemented for type " + std::string(typeid(T).name()));
+    throw std::runtime_error("Custom deserializer is not implemented for type " +
+                             std::string(TypeName<T>()));
   }
 };
 

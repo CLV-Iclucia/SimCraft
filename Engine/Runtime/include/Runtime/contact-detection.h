@@ -117,11 +117,6 @@ struct ContactDetectionConfig {
     const GeometryBuffer& geometryDirection,
     const ContactDetectionConfig& config = {});
 
-[[nodiscard]] ContactWorkList gatherCollisionWorkListAlongDirection(
-    const GlobalGeometryManager& geometry,
-    const GeometryBuffer& geometryDirection,
-    const ContactDetectionConfig& config = {});
-
 [[nodiscard]] ContactCandidateDetectionResult
 detectContactCandidatesAndStepSizeAlongDirection(
     const GlobalGeometryManager& geometry,

@@ -45,11 +45,8 @@ class DERCPUBackend {
       runtime::ConstGeometryView pointGradient,
       runtime::DofView g) const;
   void applyContactGeometryHessianProduct(
-      std::span<const runtime::PointIdx> gradientPoints,
-      runtime::ConstGeometryView pointGradient,
       std::span<const runtime::PointIdx> productPoints,
       runtime::ConstGeometryView pointHessianProduct,
-      runtime::ConstDofView localDq,
       runtime::DofView localY) const;
   void applyInternalContactHessian(runtime::ConstDofView localDq,
                                    runtime::DofView localY) const;

@@ -4,6 +4,11 @@
 
 namespace ksk::runtime {
 
+enum class GlobalSolveMode {
+  Decoupled,
+  Coupled,
+};
+
 struct GlobalSolverConfig {
   int maxNewtonIterations = 25;
   int maxPcgIterations = 200;
@@ -13,7 +18,10 @@ struct GlobalSolverConfig {
   double lineSearchArmijo = 1.0e-4;
   double ccdStepSizeScale = 0.9;
   double pcgTolerance = 1.0e-8;
+  bool enablePCGWarmStart = true;
   bool enableContact = true;
+  GlobalSolveMode solveMode = GlobalSolveMode::Decoupled;
+  double coupledDiagonalRegularization = 1.0e-12;
   ContactDetectionStorage contactDetectionStorage =
       ContactDetectionStorage::Host;
   double contactBarrierDistance = 0.0;

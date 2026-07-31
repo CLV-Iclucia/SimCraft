@@ -8,6 +8,7 @@
 
 #include <array>
 #include <cstddef>
+#include <vector>
 
 namespace ksk::abd {
 namespace {
@@ -83,7 +84,7 @@ TEST(ABDSubsystem, SceneGroupingBuildsOneSubsystemWithBodyBlocks)
   EXPECT_TRUE(second.isValid());
   ASSERT_EQ(context.subsystems().size(), 1);
   const auto* subsystem =
-      dynamic_cast<const ABDSubsystem*>(context.subsystems().front().get());
+      static_cast<const ABDSubsystem*>(context.subsystems().front().get());
   ASSERT_NE(subsystem, nullptr);
   EXPECT_EQ(subsystem->dofRange().scalarCount, 24);
   EXPECT_EQ(subsystem->dofRange().blockSize, 12);
@@ -227,6 +228,79 @@ TEST(ABDSubsystem, ClosedSurfaceMassUsesVolumeIntegral)
                   1.0),
               2.0,
               1.0e-12);
+}
+
+TEST(ABDSubsystem, OrthogonalPotentialIsZeroForIdentityLinearPart)
+{
+  ABDBodyDesc body = makeUnitTetraSurfaceBody();
+  body.orthogonalStiffness = 7.0;
+  ABDSubsystem subsystem(runtime::SubsystemIdx{0}, {body});
+
+  std::vector<double> q(static_cast<size_t>(subsystem.localScalarCount()));
+  std::vector<double> qdot(static_cast<size_t>(subsystem.localScalarCount()));
+  subsystem.writeState(
+      runtime::DofView::CPU(q.data(), static_cast<int>(q.size())),
+      runtime::DofView::CPU(qdot.data(), static_cast<int>(qdot.size())));
+  subsystem.beginStep(
+      runtime::ConstDofView::CPU(q.data(), static_cast<int>(q.size())),
+      runtime::ConstDofView::CPU(qdot.data(), static_cast<int>(qdot.size())),
+      1.0);
+
+  EXPECT_NEAR(subsystem.evaluateObjective(
+                  runtime::ConstDofView::CPU(q.data(), static_cast<int>(q.size())),
+                  runtime::ConstDofView::CPU(qdot.data(),
+                                             static_cast<int>(qdot.size())),
+                  1.0),
+              0.0,
+              1.0e-12);
+}
+
+TEST(ABDSubsystem, OrthogonalPotentialGradientMatchesFiniteDifference)
+{
+  ABDBodyDesc body = makeUnitTetraSurfaceBody();
+  body.orthogonalStiffness = 11.0;
+  body.initialTransform[0] = glm::dvec3{1.15, 0.05, -0.02};
+  body.initialTransform[1] = glm::dvec3{0.03, 0.92, 0.04};
+  body.initialTransform[2] = glm::dvec3{-0.01, 0.07, 1.08};
+  ABDSubsystem subsystem(runtime::SubsystemIdx{0}, {body});
+
+  std::vector<double> q(static_cast<size_t>(subsystem.localScalarCount()));
+  std::vector<double> qdot(static_cast<size_t>(subsystem.localScalarCount()));
+  std::vector<double> gradient(static_cast<size_t>(subsystem.localScalarCount()));
+  subsystem.writeState(
+      runtime::DofView::CPU(q.data(), static_cast<int>(q.size())),
+      runtime::DofView::CPU(qdot.data(), static_cast<int>(qdot.size())));
+  subsystem.beginStep(
+      runtime::ConstDofView::CPU(q.data(), static_cast<int>(q.size())),
+      runtime::ConstDofView::CPU(qdot.data(), static_cast<int>(qdot.size())),
+      1.0);
+  subsystem.readState(
+      runtime::ConstDofView::CPU(q.data(), static_cast<int>(q.size())),
+      runtime::ConstDofView::CPU(qdot.data(), static_cast<int>(qdot.size())));
+  subsystem.assembleLocalGradient(
+      runtime::DofView::CPU(gradient.data(), static_cast<int>(gradient.size())));
+
+  constexpr double eps = 1.0e-6;
+  for (int dof = 0; dof < 9; ++dof) {
+    std::vector<double> qp = q;
+    std::vector<double> qm = q;
+    qp[static_cast<size_t>(dof)] += eps;
+    qm[static_cast<size_t>(dof)] -= eps;
+    const double ep = subsystem.evaluateObjective(
+        runtime::ConstDofView::CPU(qp.data(), static_cast<int>(qp.size())),
+        runtime::ConstDofView::CPU(qdot.data(), static_cast<int>(qdot.size())),
+        1.0);
+    const double em = subsystem.evaluateObjective(
+        runtime::ConstDofView::CPU(qm.data(), static_cast<int>(qm.size())),
+        runtime::ConstDofView::CPU(qdot.data(), static_cast<int>(qdot.size())),
+        1.0);
+    EXPECT_NEAR(gradient[static_cast<size_t>(dof)],
+                (ep - em) / (2.0 * eps),
+                1.0e-6);
+  }
+  EXPECT_NEAR(gradient[9], 0.0, 1.0e-12);
+  EXPECT_NEAR(gradient[10], 0.0, 1.0e-12);
+  EXPECT_NEAR(gradient[11], 0.0, 1.0e-12);
 }
 
 }  // namespace

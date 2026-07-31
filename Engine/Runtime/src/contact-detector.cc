@@ -1,5 +1,7 @@
 #include <Runtime/contact-detector.h>
 
+#include <Core/profiler.h>
+
 #include <algorithm>
 #include <glm/geometric.hpp>
 #include <iostream>
@@ -50,6 +52,7 @@ struct ContactCandidateSanityStats {
   int edgeEdgeCandidates = 0;
 };
 
+#ifndef NDEBUG
 ContactCandidateSanityStats computeContactCandidateSanityStats(
     const GlobalGeometryManager& geometry,
     const GeometryBuffer& geometryDirection,
@@ -122,6 +125,7 @@ ContactCandidateSanityStats computeContactCandidateSanityStats(
   }
   return stats;
 }
+#endif
 #ifndef NDEBUG
 void warnIfContactCandidatesLookSuspicious(
     const RuntimeScene& scene, const GeometryBuffer& geometryDirection,
@@ -187,6 +191,12 @@ ContactDetectionConfig ContactDetector::createCurrentBarrierConfig(
 
 void ContactDetector::applyRoutedContacts(SimulationContext& simulation,
                                           const GlobalContactRouter& routedContacts) {
+  KSK_PROFILE_SCOPE("ContactDetector/ApplyRoutedContacts");
+  KSK_PROFILE_VALUE("contact.routed.global",
+                    static_cast<double>(routedContacts.globalContacts.size()));
+  KSK_PROFILE_VALUE(
+      "contact.routed.internal_subsystems",
+      static_cast<double>(routedContacts.subsystemInternalContacts.size()));
   RuntimeScene& scene = simulation.scene();
   scene.contacts = std::move(routedContacts.globalContacts);
 
@@ -204,6 +214,7 @@ void ContactDetector::applyRoutedContacts(SimulationContext& simulation,
 
 void ContactDetector::rebuildActiveContacts(
     SimulationContext& simulation) const {
+  KSK_PROFILE_SCOPE("ContactDetector/RebuildActiveContacts");
   GeometryBuffer zero_direction =
       GeometryBuffer::CPU(simulation.scene().geometry.pointCount());
   GlobalContactRouter routed_contacts =
@@ -214,20 +225,31 @@ void ContactDetector::rebuildActiveContacts(
 
 CCDStepBoundResult ContactDetector::computeCCDStepBound(
     SimulationContext& simulation, const DofBuffer& direction) const {
+  KSK_PROFILE_SCOPE("ContactDetector/ComputeCCDStepBound");
   RuntimeScene& scene = simulation.scene();
   GeometryBuffer geometry_direction =
       createGeometryDirectionBuffer(direction, scene.geometry.pointCount());
 
-  for (const auto& subsystem : simulation.subsystems())
-    subsystem->mapLocalDirectionToGeometry(
-        direction.slice(subsystem->dofRange()), geometry_direction.view());
+  {
+    KSK_PROFILE_SCOPE("ContactDetector/ComputeCCDStepBound/MapDirections");
+    for (const auto& subsystem : simulation.subsystems()) {
+      subsystem->mapLocalDirectionToGeometry(
+          direction.slice(subsystem->dofRange()), geometry_direction.view());
+    }
+  }
 
   const ContactDetectionConfig ccd_config = createDetectionConfig(scene, 1.0);
   const ContactDetectionConfig current_config =
       createCurrentBarrierConfig(scene);
-  ContactCandidateDetectionResult detected =
-      detectContactCandidatesAndStepSizeAlongDirection(
-          scene.geometry, geometry_direction, ccd_config);
+  ContactCandidateDetectionResult detected;
+  {
+    KSK_PROFILE_SCOPE("ContactDetector/ComputeCCDStepBound/DetectCandidates");
+    detected = detectContactCandidatesAndStepSizeAlongDirection(
+        scene.geometry, geometry_direction, ccd_config);
+  }
+  KSK_PROFILE_VALUE("contact.ccd.candidates",
+                    static_cast<double>(detected.candidates.size()));
+  KSK_PROFILE_VALUE("contact.ccd.step_bound", detected.stepSizeUpperBound);
 #ifndef NDEBUG
   warnIfContactCandidatesLookSuspicious(scene, geometry_direction,
                                         current_config, detected);

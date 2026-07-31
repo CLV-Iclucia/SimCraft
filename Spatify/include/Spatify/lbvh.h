@@ -4,10 +4,13 @@
 
 #ifndef KISEKI_SPATIFY_INCLUDE_SPATIFY_LBVH_H_
 #define KISEKI_SPATIFY_INCLUDE_SPATIFY_LBVH_H_
+#include <algorithm>
 #include <array>
 #include <vector>
 #include <concepts>
 #include <atomic>
+#include <limits>
+#include <utility>
 #include <Spatify/platform.h>
 #include <Spatify/spatial-query.h>
 #include <Spatify/parallel.h>
@@ -30,10 +33,18 @@ class LBVH {
  public:
   template<SpatialQuery Query, typename BBoxQuery>
   void runSpatialQuery(Query&& query, BBoxQuery&& bbox_query) const {
+    runSpatialQuery(std::forward<Query>(query),
+                    std::forward<BBoxQuery>(bbox_query),
+                    [](int) { return true; });
+  }
+
+  template<SpatialQuery Query, typename BBoxQuery, typename NodeQuery>
+  void runSpatialQuery(Query&& query, BBoxQuery&& bbox_query,
+                       NodeQuery&& node_query) const {
     std::array<int, 64> stack{};
     int top{};
     int nodeIdx = 0;
-    if (!bbox_query(bbox[nodeIdx]))
+    if (nPrs <= 0 || !node_query(nodeIdx) || !bbox_query(bbox[nodeIdx]))
       return;
     bool hit = false;
     while (true) {
@@ -47,8 +58,8 @@ class LBVH {
       }
       int lc = lch[nodeIdx];
       int rc = rch[nodeIdx];
-      bool intl = bbox_query(bbox[lc]);
-      bool intr = bbox_query(bbox[rc]);
+      bool intl = node_query(lc) && bbox_query(bbox[lc]);
+      bool intr = node_query(rc) && bbox_query(bbox[rc]);
       if (!intl && !intr) {
         if (!top) return;
         nodeIdx = stack[--top];
@@ -67,6 +78,15 @@ class LBVH {
     assert(nodeIdx >= nPrs - 1);
     assert(nodeIdx < 2 * nPrs - 1);
     return idx[nodeIdx - nPrs + 1];
+  }
+
+  [[nodiscard]] int subtreeMaxPrimitiveIndex(int nodeIdx) const {
+    assert(!subtreeMaxPrimitiveIdx.empty());
+    return subtreeMaxPrimitiveIdx[nodeIdx];
+  }
+
+  [[nodiscard]] bool hasSubtreeMaxPrimitiveIndex() const noexcept {
+    return !subtreeMaxPrimitiveIdx.empty();
   }
 
   [[nodiscard]] bool isLeaf(int index) const {
@@ -111,9 +131,15 @@ class LBVH {
   template <BvhPrimitiveAccessor Accessor>
   void update(Accessor accessor) {
     nPrs = accessor.size();
+    sceneBound = {};
     mortons.resize(2 * nPrs - 1);
     mortonsCopy.resize(2 * nPrs - 1);
     bbox.resize(2 * nPrs - 1);
+    if constexpr (requires { accessor.primitiveIndex(0); }) {
+      subtreeMaxPrimitiveIdx.resize(2 * nPrs - 1);
+    } else {
+      subtreeMaxPrimitiveIdx.clear();
+    }
     fa.resize(2 * nPrs - 1);
     lch.resize(nPrs - 1);
     rch.resize(nPrs - 1);
@@ -168,6 +194,10 @@ class LBVH {
                  [this, &accessor](int i) {
                    int node_idx = nPrs + i - 1;
                    bbox[node_idx] = accessor.bbox(idx[i]);
+                   if constexpr (requires { accessor.primitiveIndex(0); }) {
+                     subtreeMaxPrimitiveIdx[node_idx] =
+                         accessor.primitiveIndex(idx[i]);
+                   }
                  });
     std::vector<std::atomic<bool>> processed(nPrs - 1);
     tbb::parallel_for(0,
@@ -179,6 +209,11 @@ class LBVH {
                      if (!processed[parent].exchange(true)) return;
                      bbox[parent] = bbox[lch[parent]];
                      bbox[parent].expand(bbox[rch[parent]]);
+                     if (!subtreeMaxPrimitiveIdx.empty()) {
+                       subtreeMaxPrimitiveIdx[parent] =
+                           std::max(subtreeMaxPrimitiveIdx[lch[parent]],
+                                    subtreeMaxPrimitiveIdx[rch[parent]]);
+                     }
                      node_idx = parent;
                    }
                  });
@@ -189,6 +224,7 @@ class LBVH {
   std::vector<int> lch{};
   std::vector<int> rch{};
   std::vector<int> idx{};
+  std::vector<int> subtreeMaxPrimitiveIdx{};
   BBox<Real, 3> sceneBound{};
 };
 }

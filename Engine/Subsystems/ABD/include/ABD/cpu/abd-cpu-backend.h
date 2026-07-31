@@ -4,12 +4,24 @@
 #include <Runtime/contact-table.h>
 
 #include <Eigen/Core>
+#ifdef KISEKI_USE_CHOLMOD
+#include <Eigen/CholmodSupport>
+#else
 #include <Eigen/SparseCholesky>
+#endif
 #include <Eigen/SparseCore>
 
 #include <span>
 
 namespace ksk::abd {
+
+#ifdef KISEKI_USE_CHOLMOD
+using ABDLocalSolver =
+    Eigen::CholmodSimplicialLDLT<Eigen::SparseMatrix<double>>;
+#else
+using ABDLocalSolver =
+    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>>;
+#endif
 
 class ABDSubsystem;
 
@@ -44,11 +56,8 @@ class ABDCPUBackend {
       runtime::ConstGeometryView pointGradient,
       runtime::DofView g) const;
   void applyContactGeometryHessianProduct(
-      std::span<const runtime::PointIdx> gradientPoints,
-      runtime::ConstGeometryView pointGradient,
       std::span<const runtime::PointIdx> productPoints,
       runtime::ConstGeometryView pointHessianProduct,
-      runtime::ConstDofView localDq,
       runtime::DofView localY) const;
   void applyInternalContactHessian(runtime::ConstDofView localDq,
                                    runtime::DofView localY) const;
@@ -62,6 +71,9 @@ class ABDCPUBackend {
   Eigen::VectorXd step_start_;
   Eigen::VectorXd inertial_target_;
   Eigen::MatrixXd mass_matrix_;
+  Eigen::SparseMatrix<double> local_matrix_;
+  ABDLocalSolver local_solver_;
+  bool local_solver_ready_ = false;
   double step_dt_ = 0.0;
 };
 

@@ -1,6 +1,8 @@
 #include <Runtime/contact-barrier-energy.h>
 
 #include <Contact/contact-barrier.h>
+#include <Core/profiler.h>
+
 #include <array>
 #include <cstdint>
 #include <stdexcept>
@@ -189,6 +191,9 @@ namespace ksk::runtime
     double computeContactEnergy(const GlobalGeometryManager& geometry,
                                 const ContactStencils& contacts)
     {
+        KSK_PROFILE_SCOPE("ContactBarrierEnergy/ComputeEnergy");
+        KSK_PROFILE_VALUE("contact.energy.stencils",
+                          static_cast<double>(contacts.size()));
         double energy = 0.0;
         for (const ContactStencil& contact : contacts)
         {
@@ -203,6 +208,9 @@ namespace ksk::runtime
         const GlobalGeometryManager& geometry,
         const ContactStencils& contacts)
     {
+        KSK_PROFILE_SCOPE("ContactBarrierEnergy/ComputeGradientWrtGeometry");
+        KSK_PROFILE_VALUE("contact.gradient.stencils",
+                          static_cast<double>(contacts.size()));
         std::vector<PointIdx> points;
         std::vector<glm::dvec3> values;
         std::unordered_map<PointIdx, int> offsets;
@@ -220,6 +228,8 @@ namespace ksk::runtime
                                  offsets);
         }
 
+        KSK_PROFILE_VALUE("contact.gradient.points",
+                          static_cast<double>(points.size()));
         return ContactPotentialGradient{
             .points = std::move(points),
             .gradient = GeometryBuffer::FromCPU(std::move(values)),
@@ -237,6 +247,9 @@ namespace ksk::runtime
         const GlobalGeometryManager& geometry,
         const ContactStencils& contacts)
     {
+        KSK_PROFILE_SCOPE("ContactBarrierEnergy/ComputeHessianWrtGeometry");
+        KSK_PROFILE_VALUE("contact.hessian.stencils",
+                          static_cast<double>(contacts.size()));
         std::vector<ContactGeometryHessianBlock> blocks;
         std::unordered_map<std::uint64_t, int> offsets;
 
@@ -249,6 +262,8 @@ namespace ksk::runtime
             scatterBarrierHessian(contact, hessian, blocks, offsets);
         }
 
+        KSK_PROFILE_VALUE("contact.hessian.blocks",
+                          static_cast<double>(blocks.size()));
         return ContactGeometryHessian{
             .blocks = std::move(blocks),
         };
@@ -259,6 +274,10 @@ namespace ksk::runtime
         const ContactStencils& contacts,
         ConstGeometryView geometryDirection)
     {
+        KSK_PROFILE_SCOPE(
+            "ContactBarrierEnergy/ComputeHessianProductWrtGeometry");
+        KSK_PROFILE_VALUE("contact.hessian_product.stencils",
+                          static_cast<double>(contacts.size()));
         if (!geometryDirection.isCPU())
         {
             throw std::runtime_error(
@@ -279,6 +298,8 @@ namespace ksk::runtime
             scatterBarrierValues(stencil, product, points, values, offsets);
         }
 
+        KSK_PROFILE_VALUE("contact.hessian_product.points",
+                          static_cast<double>(points.size()));
         return ContactPotentialGradient{
             .points = std::move(points),
             .gradient = GeometryBuffer::FromCPU(std::move(values)),

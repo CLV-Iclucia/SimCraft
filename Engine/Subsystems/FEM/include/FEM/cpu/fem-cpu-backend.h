@@ -4,12 +4,24 @@
 #include <Runtime/contact-table.h>
 
 #include <Eigen/Core>
+#ifdef KISEKI_USE_CHOLMOD
+#include <Eigen/CholmodSupport>
+#else
 #include <Eigen/SparseCholesky>
+#endif
 #include <Eigen/SparseCore>
 
 #include <span>
 
 namespace ksk::engine::fem {
+
+#ifdef KISEKI_USE_CHOLMOD
+using FEMLocalSolver =
+    Eigen::CholmodSupernodalLLT<Eigen::SparseMatrix<double>>;
+#else
+using FEMLocalSolver =
+    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>>;
+#endif
 
 class FEMSubsystem;
 
@@ -44,11 +56,8 @@ class FEMCPUBackend {
       runtime::ConstGeometryView pointGradient,
       runtime::DofView g) const;
   void applyContactGeometryHessianProduct(
-      std::span<const runtime::PointIdx> gradientPoints,
-      runtime::ConstGeometryView pointGradient,
       std::span<const runtime::PointIdx> productPoints,
       runtime::ConstGeometryView pointHessianProduct,
-      runtime::ConstDofView localDq,
       runtime::DofView localY) const;
   void applyInternalContactHessian(runtime::ConstDofView localDq,
                                    runtime::DofView localY) const;
@@ -61,7 +70,7 @@ class FEMCPUBackend {
   Eigen::VectorXd inertial_target_;
   Eigen::VectorXd mass_diagonal_;
   Eigen::SparseMatrix<double> local_matrix_;
-  Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> local_solver_;
+  FEMLocalSolver local_solver_;
   bool local_solver_ready_ = false;
   double step_dt_ = 0.0;
 };

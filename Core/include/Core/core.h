@@ -4,6 +4,7 @@
 
 #pragma once
 #include <glm/glm.hpp>
+#include <Core/rtti.h>
 #include <vector>
 #ifdef _WIN32
 #define NOMINMAX

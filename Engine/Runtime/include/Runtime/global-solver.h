@@ -10,6 +10,8 @@
 
 namespace ksk::runtime {
 
+struct ContactGeometryHessian;
+
 struct RuntimeStepResult {
   int iterations = 0;
   double finalGradientNorm = 0.0;
@@ -38,8 +40,7 @@ class GlobalSolverStatsCollector {
   void globalAverage(std::string key, double value);
 
   [[nodiscard]] const StatMap& global() const noexcept { return global_; }
-  [[nodiscard]] const std::vector<StatMap>& frames() const noexcept
-  {
+  [[nodiscard]] const std::vector<StatMap>& frames() const noexcept {
     return frames_;
   }
 
@@ -47,10 +48,8 @@ class GlobalSolverStatsCollector {
   static void add(StatMap& stats, std::string key, double value);
   static void max(StatMap& stats, std::string key, double value);
   static void min(StatMap& stats, std::string key, double value);
-  static void average(StatMap& stats,
-                      std::map<std::string, int>& counts,
-                      std::string key,
-                      double value);
+  static void average(StatMap& stats, std::map<std::string, int>& counts,
+                      std::string key, double value);
 
   [[nodiscard]] StatMap& currentFrame();
 
@@ -63,14 +62,12 @@ class GlobalSolverStatsCollector {
 class GlobalGaussNewtonSolver {
  public:
   void prepare(const RuntimeScene& scene);
-  RuntimeStepResult step(SimulationContext& simulation,
-                         double dt,
+  RuntimeStepResult step(SimulationContext& simulation, double dt,
                          double time = 0.0,
                          GlobalSolverStatsCollector* stats = nullptr);
 
   [[nodiscard]] int scalarCount() const noexcept { return scalar_count_; }
-  [[nodiscard]] int geometryPointCount() const noexcept
-  {
+  [[nodiscard]] int geometryPointCount() const noexcept {
     return geometry_point_count_;
   }
 
@@ -79,28 +76,35 @@ class GlobalGaussNewtonSolver {
                                                 double dt);
   static void assembleContactGradient(SimulationContext& simulation,
                                       DofBuffer& gradient);
-  [[nodiscard]] static bool solveNewtonDirection(SimulationContext& simulation,
-                                                 const DofBuffer& gradient,
-                                                 DofBuffer& direction,
-                                                 GlobalSolverStatsCollector* stats,
-                                                 std::string* failureReason = nullptr);
+  [[nodiscard]] static bool solveNewtonDirection(
+      SimulationContext& simulation, const DofBuffer& gradient,
+      DofBuffer& direction, GlobalSolverStatsCollector* stats,
+      const ContactGeometryHessian* contactHessian = nullptr,
+      std::string* failureReason = nullptr);
+  [[nodiscard]] static bool solveDecoupledDirection(
+      SimulationContext& simulation, const DofBuffer& gradient,
+      DofBuffer& direction, GlobalSolverStatsCollector* stats,
+      const ContactGeometryHessian* contactHessian = nullptr,
+      std::string* failureReason = nullptr);
+  [[nodiscard]] static bool solveCoupledDirection(
+      SimulationContext& simulation, const DofBuffer& gradient,
+      DofBuffer& direction, GlobalSolverStatsCollector* stats,
+      const ContactGeometryHessian* contactHessian = nullptr,
+      std::string* failureReason = nullptr);
   [[nodiscard]] static bool solveSingleSubsystemDirection(
-      SimulationContext& simulation,
-      const DofBuffer& gradient,
+      SimulationContext& simulation, const DofBuffer& gradient,
       DofBuffer& direction);
   [[nodiscard]] static bool solveBlockDiagonalSubsystemDirection(
-      SimulationContext& simulation,
-      const DofBuffer& gradient,
+      SimulationContext& simulation, const DofBuffer& gradient,
       DofBuffer& direction);
-  static void applyGlobalMatrix(SimulationContext& simulation,
-                                const DofBuffer& x,
-                                DofBuffer& y);
-  static void applyGlobalContactHessian(SimulationContext& simulation,
-                                        const DofBuffer& x,
-                                        DofBuffer& y);
+  static void applyGlobalMatrix(
+      SimulationContext& simulation, const DofBuffer& x, DofBuffer& y,
+      const ContactGeometryHessian* contactHessian = nullptr);
+  static void applyGlobalContactHessian(
+      SimulationContext& simulation, const DofBuffer& x, DofBuffer& y,
+      const ContactGeometryHessian* contactHessian = nullptr);
   static void applyPreconditioner(SimulationContext& simulation,
-                                  const DofBuffer& residual,
-                                  DofBuffer& z);
+                                  const DofBuffer& residual, DofBuffer& z);
 
   int scalar_count_ = 0;
   int geometry_point_count_ = 0;
@@ -112,17 +116,16 @@ class SimulationRunner {
   SimulationRunner() = default;
   SimulationRunner(SimulationContext simulation, double timeStep);
 
-  [[nodiscard]] RuntimeStepResult step(GlobalSolverStatsCollector* stats = nullptr);
-  [[nodiscard]] RuntimeStepResult run(int steps,
-                                      GlobalSolverStatsCollector* stats = nullptr);
+  [[nodiscard]] RuntimeStepResult step(
+      GlobalSolverStatsCollector* stats = nullptr);
+  [[nodiscard]] RuntimeStepResult run(
+      int steps, GlobalSolverStatsCollector* stats = nullptr);
 
   [[nodiscard]] SimulationContext& simulation() noexcept { return simulation_; }
-  [[nodiscard]] const SimulationContext& simulation() const noexcept
-  {
+  [[nodiscard]] const SimulationContext& simulation() const noexcept {
     return simulation_;
   }
-  [[nodiscard]] const RuntimeStepResult& lastStep() const noexcept
-  {
+  [[nodiscard]] const RuntimeStepResult& lastStep() const noexcept {
     return last_step_;
   }
   [[nodiscard]] double time() const noexcept { return time_; }

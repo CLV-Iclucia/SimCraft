@@ -13,9 +13,21 @@ if (MSVC)
     add_compile_options(/Zc:preprocessor)
 endif()
 
+if(MSVC)
+  add_compile_options(/GR)
+else()
+  add_compile_options(-frtti)
+endif()
+
 find_package(TBB REQUIRED)
 find_package(GTest REQUIRED)
 find_package(Eigen3 REQUIRED)
+
+option(KISEKI_USE_CHOLMOD "Use CHOLMOD LDLT for selected CPU local solvers" ON)
+if(KISEKI_USE_CHOLMOD)
+  find_package(CHOLMOD CONFIG REQUIRED)
+  message(STATUS "CHOLMOD local solvers ENABLED")
+endif()
 
 # Tracy profiler — enable with -DKISEKI_PROFILE=ON
 option(KISEKI_PROFILE "Enable Tracy profiler instrumentation" ON)

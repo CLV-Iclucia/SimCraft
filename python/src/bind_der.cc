@@ -153,6 +153,11 @@ py::array_t<double> rodPositions(const PyRuntimeSimulation& sim, int rodIndex)
 
 void bind_der(py::module_& m)
 {
+  py::enum_<runtime::GlobalSolveMode>(m, "GlobalSolveMode")
+      .value("Decoupled", runtime::GlobalSolveMode::Decoupled)
+      .value("Coupled", runtime::GlobalSolveMode::Coupled)
+      .export_values();
+
   py::class_<runtime::GlobalSolverConfig>(m, "GlobalSolverConfig")
       .def(py::init<>())
       .def_readwrite("max_newton_iterations",
@@ -171,10 +176,16 @@ void bind_der(py::module_& m)
                      &runtime::GlobalSolverConfig::ccdStepSizeScale)
       .def_readwrite("pcg_tolerance",
                      &runtime::GlobalSolverConfig::pcgTolerance)
+      .def_readwrite("enable_pcg_warm_start",
+                     &runtime::GlobalSolverConfig::enablePCGWarmStart)
       .def_readwrite("enable_contact",
-                     &runtime::GlobalSolverConfig::enableContact)
+                      &runtime::GlobalSolverConfig::enableContact)
+      .def_readwrite("solve_mode",
+                     &runtime::GlobalSolverConfig::solveMode)
+      .def_readwrite("coupled_diagonal_regularization",
+                     &runtime::GlobalSolverConfig::coupledDiagonalRegularization)
       .def_readwrite("contact_barrier_distance",
-                     &runtime::GlobalSolverConfig::contactBarrierDistance)
+                      &runtime::GlobalSolverConfig::contactBarrierDistance)
       .def_readwrite("contact_stiffness",
                      &runtime::GlobalSolverConfig::contactStiffness);
 

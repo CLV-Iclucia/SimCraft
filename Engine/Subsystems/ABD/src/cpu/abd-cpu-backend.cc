@@ -264,6 +264,89 @@ glm::dvec3 massWeightedPosition(const glm::dmat4x3& transform,
   return position;
 }
 
+double enclosedSurfaceVolume(const ABDBodyDesc& desc)
+{
+  double signed_volume = 0.0;
+  for (const std::array<int, 3>& tri : desc.surface.triangles) {
+    const glm::dvec3 a = desc.surface.vertices.at(static_cast<size_t>(tri[0]));
+    const glm::dvec3 b = desc.surface.vertices.at(static_cast<size_t>(tri[1]));
+    const glm::dvec3 c = desc.surface.vertices.at(static_cast<size_t>(tri[2]));
+    signed_volume += glm::dot(a, glm::cross(b, c)) / 6.0;
+  }
+  return std::abs(signed_volume);
+}
+
+glm::dmat3 linearPart(const glm::dmat4x3& affine)
+{
+  return glm::dmat3(affine[0], affine[1], affine[2]);
+}
+
+double orthogonalPotentialEnergy(const ABDBodyDesc& desc,
+                                 const glm::dmat4x3& affine)
+{
+  const double scale = desc.orthogonalStiffness * enclosedSurfaceVolume(desc);
+  if (scale <= 0.0) {
+    return 0.0;
+  }
+
+  const glm::dmat3 A = linearPart(affine);
+  double value = 0.0;
+  for (int i = 0; i < 3; ++i) {
+    const double diagonal = glm::dot(A[i], A[i]) - 1.0;
+    value += diagonal * diagonal;
+    for (int j = 0; j < 3; ++j) {
+      if (i == j) {
+        continue;
+      }
+      const double off_diagonal = glm::dot(A[i], A[j]);
+      value += off_diagonal * off_diagonal;
+    }
+  }
+  return scale * value;
+}
+
+glm::dmat3 orthogonalPotentialGradient(const ABDBodyDesc& desc,
+                                       const glm::dmat4x3& affine)
+{
+  const double scale =
+      4.0 * desc.orthogonalStiffness * enclosedSurfaceVolume(desc);
+  if (scale <= 0.0) {
+    return glm::dmat3{0.0};
+  }
+
+  const glm::dmat3 A = linearPart(affine);
+  const glm::dmat3 aat_residual = A * glm::transpose(A) - glm::dmat3(1.0);
+  return scale * aat_residual * A;
+}
+
+glm::dmat3 orthogonalPotentialHessianProduct(const ABDBodyDesc& desc,
+                                             const glm::dmat4x3& affine,
+                                             const glm::dmat3& direction)
+{
+  const double scale =
+      4.0 * desc.orthogonalStiffness * enclosedSurfaceVolume(desc);
+  if (scale <= 0.0) {
+    return glm::dmat3{0.0};
+  }
+
+  const glm::dmat3 A = linearPart(affine);
+  const glm::dmat3 aat_residual = A * glm::transpose(A) - glm::dmat3(1.0);
+  const glm::dmat3 d_aat =
+      direction * glm::transpose(A) + A * glm::transpose(direction);
+  return scale * (d_aat * A + aat_residual * direction);
+}
+
+void addLinearBlock(runtime::DofView view,
+                    int offset,
+                    const glm::dmat3& block)
+{
+  for (int column = 0; column < 3; ++column) {
+    view[offset + 3 * column + 0] += block[column].x;
+    view[offset + 3 * column + 1] += block[column].y;
+    view[offset + 3 * column + 2] += block[column].z;
+  }
+}
+
 }  // namespace
 
 ABDCPUBackend::ABDCPUBackend(ABDSubsystem& subsystem)
@@ -350,23 +433,44 @@ double ABDCPUBackend::evaluateObjective(runtime::ConstDofView q,
   const Eigen::VectorXd local_q =
       gatherLocalVector(q, "ABDCPUBackend::evaluateObjective");
   const Eigen::VectorXd residual = local_q - inertial_target_;
-  double objective = 0.5 * residual.dot(mass_matrix_ * residual) / (dt * dt);
-  for (const ABDBodyRuntimeRef& body : subsystem_.runtime_bodies_) {
-    const ABDBodyDesc& desc =
-        subsystem_.bodies_[static_cast<size_t>(body.body)];
-    objective -= glm::dot(
-        subsystem_.gravity_,
-        massWeightedPosition(readAffine(q, body.scalarOffset),
-                             computeMassFirstMoment(desc)));
+  double objective = 0.0;
+  {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/EvaluateObjective/Inertia");
+    objective += 0.5 * residual.dot(mass_matrix_ * residual) / (dt * dt);
   }
-  for (const runtime::ContactStencil& contact : subsystem_.internal_contacts_) {
-    const std::optional<std::array<ABDContactPoint, 4>> points =
-        gatherContactPoints(subsystem_, contact);
-    if (!points) {
-      continue;
+  {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/EvaluateObjective/OrthogonalPotential");
+    for (const ABDBodyRuntimeRef& body : subsystem_.runtime_bodies_) {
+      const ABDBodyDesc& desc =
+          subsystem_.bodies_[static_cast<size_t>(body.body)];
+      const glm::dmat4x3 affine = readAffine(q, body.scalarOffset);
+      objective += orthogonalPotentialEnergy(desc, affine);
     }
-    objective += ksk::engine::contact::computeGIPCBarrierEnergy(
-        makeBarrierStencil(subsystem_, contact, *points));
+  }
+  {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/EvaluateObjective/Gravity");
+    for (const ABDBodyRuntimeRef& body : subsystem_.runtime_bodies_) {
+      const ABDBodyDesc& desc =
+          subsystem_.bodies_[static_cast<size_t>(body.body)];
+      const glm::dmat4x3 affine = readAffine(q, body.scalarOffset);
+      objective -= glm::dot(
+          subsystem_.gravity_,
+          massWeightedPosition(affine, computeMassFirstMoment(desc)));
+    }
+  }
+  KSK_PROFILE_VALUE("abd.internal_contacts",
+                    static_cast<double>(subsystem_.internal_contacts_.size()));
+  {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/EvaluateObjective/InternalContacts");
+    for (const runtime::ContactStencil& contact : subsystem_.internal_contacts_) {
+      const std::optional<std::array<ABDContactPoint, 4>> points =
+          gatherContactPoints(subsystem_, contact);
+      if (!points) {
+        continue;
+      }
+      objective += ksk::engine::contact::computeGIPCBarrierEnergy(
+          makeBarrierStencil(subsystem_, contact, *points));
+    }
   }
   return objective;
 }
@@ -379,8 +483,87 @@ void ABDCPUBackend::updateInternalConstraints(double time, double dt)
 
 void ABDCPUBackend::prepareLocalOperator(double dt)
 {
-  (void)dt;
-  mass_matrix_ = buildMassMatrix();
+  KSK_PROFILE_SCOPE("ABDCPUBackend/PrepareLocalOperator");
+  const int scalar_count = subsystem_.range_.scalarCount;
+  const double inv_dt2 = dt > 0.0 ? 1.0 / (dt * dt) : 1.0;
+  local_solver_ready_ = false;
+  {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/PrepareLocalOperator/BuildMassMatrix");
+    mass_matrix_ = buildMassMatrix();
+  }
+  std::vector<Eigen::Triplet<double>> triplets;
+  triplets.reserve(static_cast<size_t>(
+      scalar_count * 16 +
+      scalar_count * scalar_count +
+      scalar_count));
+  {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/PrepareLocalOperator/AssembleMassTriplets");
+    for (int col = 0; col < mass_matrix_.cols(); ++col) {
+      for (int row = 0; row < mass_matrix_.rows(); ++row) {
+        const double value = inv_dt2 * mass_matrix_(row, col);
+        if (value != 0.0) {
+          triplets.emplace_back(row, col, value);
+        }
+      }
+    }
+  }
+
+  bool has_orthogonal_potential = false;
+  for (const ABDBodyDesc& desc : subsystem_.bodies_) {
+    has_orthogonal_potential =
+        has_orthogonal_potential ||
+        desc.orthogonalStiffness * enclosedSurfaceVolume(desc) > 0.0;
+  }
+  if (!subsystem_.internal_contacts_.empty() || has_orthogonal_potential) {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/PrepareLocalOperator/AssemblePotentialTriplets");
+    std::vector<double> basis_values(static_cast<size_t>(scalar_count), 0.0);
+    std::vector<double> product_values(static_cast<size_t>(scalar_count), 0.0);
+    for (int column = 0; column < scalar_count; ++column) {
+      std::fill(basis_values.begin(), basis_values.end(), 0.0);
+      std::fill(product_values.begin(), product_values.end(), 0.0);
+      basis_values[static_cast<size_t>(column)] = 1.0;
+      applyInternalContactHessian(
+          runtime::ConstDofView::CPU(basis_values.data(), scalar_count),
+          runtime::DofView::CPU(product_values.data(), scalar_count));
+      for (const ABDBodyRuntimeRef& body : subsystem_.runtime_bodies_) {
+        const ABDBodyDesc& desc =
+            subsystem_.bodies_[static_cast<size_t>(body.body)];
+        addLinearBlock(
+            runtime::DofView::CPU(product_values.data(), scalar_count),
+            body.scalarOffset,
+            orthogonalPotentialHessianProduct(
+                desc,
+                subsystem_.bodyTransform(body.body),
+                linearPart(readAffine(
+                    runtime::ConstDofView::CPU(
+                        basis_values.data(), scalar_count),
+                    body.scalarOffset))));
+      }
+      for (int row = 0; row < scalar_count; ++row) {
+        const double value = product_values[static_cast<size_t>(row)];
+        if (value != 0.0) {
+          triplets.emplace_back(row, column, value);
+        }
+      }
+    }
+  }
+  for (int i = 0; i < scalar_count; ++i) {
+    triplets.emplace_back(i, i, 1.0e-12);
+  }
+
+  {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/PrepareLocalOperator/CompressMatrix");
+    local_matrix_.resize(scalar_count, scalar_count);
+    local_matrix_.setFromTriplets(triplets.begin(), triplets.end());
+  }
+  {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/PrepareLocalOperator/Factorize");
+    local_solver_.compute(local_matrix_);
+  }
+  if (local_solver_.info() != Eigen::Success) {
+    throw std::runtime_error("failed to factor ABD CPU backend local matrix");
+  }
+  local_solver_ready_ = true;
 }
 
 void ABDCPUBackend::assembleLocalGradient(runtime::DofView g) const
@@ -392,41 +575,60 @@ void ABDCPUBackend::assembleLocalGradient(runtime::DofView g) const
     return;
   }
 
-  const Eigen::VectorXd current = gatherCurrentState(subsystem_);
-  const Eigen::VectorXd local_gradient =
-      mass_matrix_ * (current - inertial_target_) / (step_dt_ * step_dt_);
-  for (int i = 0; i < subsystem_.range_.scalarCount; ++i) {
-    g[i] += local_gradient[i];
+  {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/AssembleLocalGradient/Inertia");
+    const Eigen::VectorXd current = gatherCurrentState(subsystem_);
+    const Eigen::VectorXd local_gradient =
+        mass_matrix_ * (current - inertial_target_) / (step_dt_ * step_dt_);
+    for (int i = 0; i < subsystem_.range_.scalarCount; ++i) {
+      g[i] += local_gradient[i];
+    }
   }
-  for (const ABDBodyRuntimeRef& body : subsystem_.runtime_bodies_) {
-    const ABDBodyDesc& desc =
-        subsystem_.bodies_[static_cast<size_t>(body.body)];
-    const Eigen::Vector4d mass_first_moment = computeMassFirstMoment(desc);
-    for (int column = 0; column < 4; ++column) {
-      const glm::dvec3 gravity_gradient =
-          -subsystem_.gravity_ * mass_first_moment[column];
-      g[body.scalarOffset + 3 * column + 0] += gravity_gradient.x;
-      g[body.scalarOffset + 3 * column + 1] += gravity_gradient.y;
-      g[body.scalarOffset + 3 * column + 2] += gravity_gradient.z;
+  {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/AssembleLocalGradient/OrthogonalPotential");
+    for (const ABDBodyRuntimeRef& body : subsystem_.runtime_bodies_) {
+      const ABDBodyDesc& desc =
+          subsystem_.bodies_[static_cast<size_t>(body.body)];
+      addLinearBlock(
+          g, body.scalarOffset,
+          orthogonalPotentialGradient(desc, subsystem_.bodyTransform(body.body)));
+    }
+  }
+  {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/AssembleLocalGradient/Gravity");
+    for (const ABDBodyRuntimeRef& body : subsystem_.runtime_bodies_) {
+      const ABDBodyDesc& desc =
+          subsystem_.bodies_[static_cast<size_t>(body.body)];
+      const Eigen::Vector4d mass_first_moment = computeMassFirstMoment(desc);
+      for (int column = 0; column < 4; ++column) {
+        const glm::dvec3 gravity_gradient =
+            -subsystem_.gravity_ * mass_first_moment[column];
+        g[body.scalarOffset + 3 * column + 0] += gravity_gradient.x;
+        g[body.scalarOffset + 3 * column + 1] += gravity_gradient.y;
+        g[body.scalarOffset + 3 * column + 2] += gravity_gradient.z;
+      }
     }
   }
 
-  for (const runtime::ContactStencil& contact : subsystem_.internal_contacts_) {
-    const std::optional<std::array<ABDContactPoint, 4>> points =
-        gatherContactPoints(subsystem_, contact);
-    if (!points) {
-      continue;
-    }
-    const ksk::engine::contact::LocalBarrierGradient contact_gradient =
-        ksk::engine::contact::computeGIPCBarrierGradient(
-            makeBarrierStencil(subsystem_, contact, *points));
-    const int count = contactPointCount(contact.type);
-    for (int i = 0; i < count; ++i) {
-      const ABDContactPoint& point = (*points)[static_cast<size_t>(i)];
-      const int offset =
-          subsystem_.runtime_bodies_[static_cast<size_t>(point.body)].scalarOffset;
-      scatterAffineGradient(
-          g, offset, contact_gradient.gradient[static_cast<size_t>(i)], point.Xh);
+  {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/AssembleLocalGradient/InternalContacts");
+    for (const runtime::ContactStencil& contact : subsystem_.internal_contacts_) {
+      const std::optional<std::array<ABDContactPoint, 4>> points =
+          gatherContactPoints(subsystem_, contact);
+      if (!points) {
+        continue;
+      }
+      const ksk::engine::contact::LocalBarrierGradient contact_gradient =
+          ksk::engine::contact::computeGIPCBarrierGradient(
+              makeBarrierStencil(subsystem_, contact, *points));
+      const int count = contactPointCount(contact.type);
+      for (int i = 0; i < count; ++i) {
+        const ABDContactPoint& point = (*points)[static_cast<size_t>(i)];
+        const int offset =
+            subsystem_.runtime_bodies_[static_cast<size_t>(point.body)].scalarOffset;
+        scatterAffineGradient(
+            g, offset, contact_gradient.gradient[static_cast<size_t>(i)], point.Xh);
+      }
     }
   }
 }
@@ -442,62 +644,67 @@ void ABDCPUBackend::applyLocalMatrix(runtime::ConstDofView x,
                   "ABDCPUBackend::applyLocalMatrix");
 
   const double inv_dt2 = step_dt_ > 0.0 ? 1.0 / (step_dt_ * step_dt_) : 1.0;
-  const Eigen::VectorXd local_x =
-      gatherLocalVector(x, "ABDCPUBackend::applyLocalMatrix");
-  const Eigen::VectorXd local_y = inv_dt2 * (mass_matrix_ * local_x);
-  for (int i = 0; i < subsystem_.range_.scalarCount; ++i) {
-    y[i] += local_y[i];
+  {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/ApplyLocalMatrix/Inertia");
+    const Eigen::VectorXd local_x =
+        gatherLocalVector(x, "ABDCPUBackend::applyLocalMatrix");
+    const Eigen::VectorXd local_y = inv_dt2 * (mass_matrix_ * local_x);
+    for (int i = 0; i < subsystem_.range_.scalarCount; ++i) {
+      y[i] += local_y[i];
+    }
   }
 
-  applyInternalContactHessian(x, y);
+  {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/ApplyLocalMatrix/InternalContactHessian");
+    applyInternalContactHessian(x, y);
+  }
+  {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/ApplyLocalMatrix/OrthogonalHessian");
+    for (const ABDBodyRuntimeRef& body : subsystem_.runtime_bodies_) {
+      const ABDBodyDesc& desc =
+          subsystem_.bodies_[static_cast<size_t>(body.body)];
+      addLinearBlock(y,
+                     body.scalarOffset,
+                     orthogonalPotentialHessianProduct(
+                         desc,
+                         subsystem_.bodyTransform(body.body),
+                         linearPart(readAffine(x, body.scalarOffset))));
+    }
+  }
 }
 
 void ABDCPUBackend::solveLocalSystem(runtime::ConstDofView b,
                                      runtime::DofView x) const
 {
+  KSK_PROFILE_SCOPE("ABDCPUBackend/SolveLocalSystem");
   requireCPU(b, "ABDCPUBackend::solveLocalSystem");
   requireCPU(x, "ABDCPUBackend::solveLocalSystem");
   requireDofCount(b, subsystem_.range_.scalarCount,
                   "ABDCPUBackend::solveLocalSystem");
   requireDofCount(x, subsystem_.range_.scalarCount,
                   "ABDCPUBackend::solveLocalSystem");
+  if (local_matrix_.rows() != subsystem_.range_.scalarCount) {
+    throw std::runtime_error("ABD CPU backend local operator is not prepared");
+  }
+  if (!local_solver_ready_) {
+    throw std::runtime_error("ABD CPU backend local solver is not prepared");
+  }
 
-  const double inv_dt2 = step_dt_ > 0.0 ? 1.0 / (step_dt_ * step_dt_) : 1.0;
-  Eigen::MatrixXd matrix = inv_dt2 * mass_matrix_;
-  if (!subsystem_.internal_contacts_.empty()) {
-    std::vector<double> basis_values(
-        static_cast<size_t>(subsystem_.range_.scalarCount), 0.0);
-    std::vector<double> product_values(
-        static_cast<size_t>(subsystem_.range_.scalarCount), 0.0);
-    for (int column = 0; column < subsystem_.range_.scalarCount; ++column) {
-      std::fill(basis_values.begin(), basis_values.end(), 0.0);
-      std::fill(product_values.begin(), product_values.end(), 0.0);
-      basis_values[static_cast<size_t>(column)] = 1.0;
-      applyInternalContactHessian(
-          runtime::ConstDofView::CPU(
-              basis_values.data(), subsystem_.range_.scalarCount),
-          runtime::DofView::CPU(
-              product_values.data(), subsystem_.range_.scalarCount));
-      for (int row = 0; row < subsystem_.range_.scalarCount; ++row) {
-        matrix(row, column) += product_values[static_cast<size_t>(row)];
-      }
-    }
+  Eigen::VectorXd local_x;
+  {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/SolveLocalSystem/Solve");
+    const Eigen::VectorXd local_b =
+        gatherLocalVector(b, "ABDCPUBackend::solveLocalSystem");
+    local_x = local_solver_.solve(local_b);
   }
-  for (int i = 0; i < matrix.rows(); ++i) {
-    matrix(i, i) += 1.0e-12;
-  }
-  Eigen::LDLT<Eigen::MatrixXd> solver(matrix);
-  if (solver.info() != Eigen::Success) {
-    throw std::runtime_error("failed to factor ABD CPU backend local matrix");
-  }
-  const Eigen::VectorXd local_b =
-      gatherLocalVector(b, "ABDCPUBackend::solveLocalSystem");
-  const Eigen::VectorXd local_x = solver.solve(local_b);
-  if (solver.info() != Eigen::Success) {
+  if (local_solver_.info() != Eigen::Success) {
     throw std::runtime_error("failed to solve ABD CPU backend local system");
   }
-  for (int i = 0; i < subsystem_.range_.scalarCount; ++i) {
-    x[i] = local_x[i];
+  {
+    KSK_PROFILE_SCOPE("ABDCPUBackend/SolveLocalSystem/ScatterSolution");
+    for (int i = 0; i < subsystem_.range_.scalarCount; ++i) {
+      x[i] = local_x[i];
+    }
   }
 }
 
@@ -560,22 +767,19 @@ void ABDCPUBackend::scatterContactGradient(
 }
 
 void ABDCPUBackend::applyContactGeometryHessianProduct(
-    std::span<const runtime::PointIdx> gradientPoints,
-    runtime::ConstGeometryView pointGradient,
     std::span<const runtime::PointIdx> productPoints,
     runtime::ConstGeometryView pointHessianProduct,
-    runtime::ConstDofView localDq,
     runtime::DofView localY) const
 {
-  (void)gradientPoints;
-  (void)pointGradient;
-  (void)localDq;
   scatterContactGradient(productPoints, pointHessianProduct, localY);
 }
 
 void ABDCPUBackend::applyInternalContactHessian(runtime::ConstDofView localDq,
                                                 runtime::DofView localY) const
 {
+  KSK_PROFILE_SCOPE("ABDCPUBackend/ApplyInternalContactHessian");
+  KSK_PROFILE_VALUE("abd.internal_contact_hessian.contacts",
+                    static_cast<double>(subsystem_.internal_contacts_.size()));
   requireCPU(localDq, "ABDCPUBackend::applyInternalContactHessian");
   requireCPU(localY, "ABDCPUBackend::applyInternalContactHessian");
   requireDofCount(localDq, subsystem_.range_.scalarCount,

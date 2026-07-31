@@ -125,24 +125,14 @@ void DERGpuBackend::scatterContactGradient(
 }
 
 void DERGpuBackend::applyContactGeometryHessianProduct(
-    std::span<const runtime::PointIdx> gradientPoints,
-    runtime::ConstGeometryView pointGradient,
     std::span<const runtime::PointIdx> productPoints,
     runtime::ConstGeometryView pointHessianProduct,
-    runtime::ConstDofView localDq,
     runtime::DofView localY) const
 {
-  (void)gradientPoints;
   (void)productPoints;
-  requireGPU(pointGradient, "DERGpuBackend::applyContactGeometryHessianProduct");
   requireGPU(pointHessianProduct, "DERGpuBackend::applyContactGeometryHessianProduct");
-  requireGPU(localDq, "DERGpuBackend::applyContactGeometryHessianProduct");
   requireGPU(localY, "DERGpuBackend::applyContactGeometryHessianProduct");
-  requireSameDevice(localDq, localY,
-                    "DERGpuBackend::applyContactGeometryHessianProduct");
-  requireSameDevice(localDq, pointGradient,
-                    "DERGpuBackend::applyContactGeometryHessianProduct");
-  requireSameDevice(localDq, pointHessianProduct,
+  requireSameDevice(localY, pointHessianProduct,
                     "DERGpuBackend::applyContactGeometryHessianProduct");
   unsupported("DERGpuBackend::applyContactGeometryHessianProduct");
 }

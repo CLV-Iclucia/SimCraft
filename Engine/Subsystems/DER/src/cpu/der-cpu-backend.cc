@@ -1027,27 +1027,12 @@ namespace ksk::der
     }
 
     void DERCPUBackend::applyContactGeometryHessianProduct(
-        std::span<const runtime::PointIdx> gradientPoints,
-        runtime::ConstGeometryView pointGradient,
         std::span<const runtime::PointIdx> productPoints,
         runtime::ConstGeometryView pointHessianProduct,
-        runtime::ConstDofView localDq,
         runtime::DofView localY) const
     {
-        requireCPU(pointGradient, "DERCpuBackend::applyContactGeometryHessianProduct");
         requireCPU(pointHessianProduct, "DERCpuBackend::applyContactGeometryHessianProduct");
-        requireCPU(localDq, "DERCpuBackend::applyContactGeometryHessianProduct");
         requireCPU(localY, "DERCpuBackend::applyContactGeometryHessianProduct");
-        if (gradientPoints.size() != static_cast<size_t>(pointGradient.pointCount()))
-        {
-            throw std::invalid_argument("contact point and gradient counts differ");
-        }
-        requireDofCount(localDq,
-                        subsystem_.localScalarCount(),
-                        "DERCpuBackend::applyContactGeometryHessianProduct");
-
-        (void)gradientPoints;
-        (void)localDq;
 
         scatterContactGradient(productPoints, pointHessianProduct, localY);
     }

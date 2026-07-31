@@ -30,7 +30,7 @@ public:
 
     template<typename T>
     T* findSolver(std::string_view name) {
-        return dynamic_cast<T*>(findSolver(name));
+        return static_cast<T*>(findSolver(name));
     }
 
     const std::vector<std::shared_ptr<FluidModularSolver>>& solvers() const {

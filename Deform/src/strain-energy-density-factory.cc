@@ -2,6 +2,7 @@
 // Created by CreeperIclucia-Vader on 25-5-29.
 //
 #include <Deform/strain-energy-density-factory.h>
+#include <Core/rtti.h>
 #include <spdlog/spdlog.h>
 namespace ksk::deform {
 template <typename T>
@@ -17,7 +18,7 @@ void StrainEnergyDensityFactory<T>::registerCreator(const std::string &name,
   if (creators_.find(name) != creators_.end())
     throw std::runtime_error("Duplicate registration: " + name);
   creators_[name] = std::move(creator);
-  spdlog::info("Registered StrainEnergyDensity<{}>: {}", typeid(T).name(),
+  spdlog::info("Registered StrainEnergyDensity<{}>: {}", core::TypeName<T>(),
                name);
 }
 

@@ -4,12 +4,15 @@
 #include <FEM/cpu/fem-cpu-backend.h>
 #include <FEM/fem-subsystem.h>
 #include <Maths/tensor.h>
+#include <tbb/parallel_for.h>
 
 #include <algorithm>
 #include <glm/geometric.hpp>
 #include <map>
 #include <memory>
+#include <numeric>
 #include <set>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -373,49 +376,61 @@ void addClothGradient(const ClothMeshDesc& mesh, const Eigen::VectorXd& localQ,
   }
 }
 
-void addClothHessian(const ClothMeshDesc& mesh, const Eigen::VectorXd& localQ,
-                     int meshBase,
-                     std::vector<Eigen::Triplet<double>>& triplets) {
-  SIM_PROFILE_SCOPE_COLOR("FEMSubsystem/AddClothHessian",
-                          ksk::core::profiler_colors::kCyan);
-  for (const auto& triangle : mesh.triangles) {
-    KSK_PROFILE_SCOPE("FEMSubsystem/AddClothHessian/Triangle");
-    const auto kinematics =
-        clothTriangleKinematics(mesh, localQ, meshBase, triangle);
-    if (!kinematics) {
-      continue;
-    }
+void fillClothHessianTriplets(
+    const ClothMeshDesc& mesh, const Eigen::VectorXd& localQ, int meshBase,
+    const std::array<int, 3>& triangle,
+    std::span<Eigen::Triplet<double>, 81> triplets) {
+  const auto kinematics =
+      clothTriangleKinematics(mesh, localQ, meshBase, triangle);
+  assert(kinematics.has_value());
 
-    Matrix6x6 hessian_F;
-    {
-      KSK_PROFILE_SCOPE("FEMSubsystem/AddClothHessian/FHessian");
-      hessian_F =
-          stretchHessian(kinematics->F, mesh.material.stretchStiffness) +
-          shearHessian(kinematics->F, mesh.material.stretchStiffness);
-    }
+  const Matrix6x6 hessian_F =
+      stretchHessian(kinematics->F, mesh.material.stretchStiffness) +
+      shearHessian(kinematics->F, mesh.material.stretchStiffness);
+  const Eigen::Matrix<double, 9, 9> local_hessian =
+      kinematics->area * kinematics->pFpx * hessian_F *
+      kinematics->pFpx.transpose();
 
-    Eigen::Matrix<double, 9, 9> local_hessian;
-    {
-      KSK_PROFILE_SCOPE("FEMSubsystem/AddClothHessian/Local9x9");
-      local_hessian = kinematics->area * kinematics->pFpx * hessian_F *
-                      kinematics->pFpx.transpose();
+  int index = 0;
+  for (int row_vertex = 0; row_vertex < 3; ++row_vertex) {
+    for (int col_vertex = 0; col_vertex < 3; ++col_vertex) {
+      for (int row_lane = 0; row_lane < 3; ++row_lane) {
+        for (int col_lane = 0; col_lane < 3; ++col_lane) {
+          triplets[index++] = Eigen::Triplet<double>(
+              meshBase + 3 * triangle[row_vertex] + row_lane,
+              meshBase + 3 * triangle[col_vertex] + col_lane,
+              local_hessian(3 * row_vertex + row_lane,
+                            3 * col_vertex + col_lane));
+        }
+      }
     }
+  }
+}
 
-    {
-      KSK_PROFILE_SCOPE("FEMSubsystem/AddClothHessian/EmitTriplets");
-      for (int row_vertex = 0; row_vertex < 3; ++row_vertex) {
-        for (int col_vertex = 0; col_vertex < 3; ++col_vertex) {
-          for (int row_lane = 0; row_lane < 3; ++row_lane) {
-            for (int col_lane = 0; col_lane < 3; ++col_lane) {
-              const double value = local_hessian(3 * row_vertex + row_lane,
-                                                 3 * col_vertex + col_lane);
-              if (value != 0.0) {
-                triplets.emplace_back(
-                    meshBase + 3 * triangle[row_vertex] + row_lane,
-                    meshBase + 3 * triangle[col_vertex] + col_lane, value);
-              }
-            }
-          }
+void fillTetHessianTriplets(
+    const TetMeshDesc& mesh, const Eigen::VectorXd& localQ, int meshBase,
+    const std::array<int, 4>& tet,
+    std::span<Eigen::Triplet<double>, 144> triplets) {
+  const auto model = createEnergy(mesh.material);
+  const Eigen::Matrix3d local_X = restTetEdges(mesh, tet);
+  const double volume = local_X.determinant() / 6.0;
+  assert(volume > 0.0);
+  deform::DeformationGradient<double, 3> dg(local_X);
+  dg.updateCurrentConfig(tetEdges(mesh, localQ, meshBase, tet));
+  const Eigen::Matrix<double, 12, 12> local_hessian =
+      dg.gradient().transpose() * model.filteredEnergyHessian(dg) *
+      dg.gradient() * volume;
+
+  int index = 0;
+  for (int row_vertex = 0; row_vertex < 4; ++row_vertex) {
+    for (int col_vertex = 0; col_vertex < 4; ++col_vertex) {
+      for (int row_lane = 0; row_lane < 3; ++row_lane) {
+        for (int col_lane = 0; col_lane < 3; ++col_lane) {
+          triplets[index++] = Eigen::Triplet<double>(
+              meshBase + 3 * tet[row_vertex] + row_lane,
+              meshBase + 3 * tet[col_vertex] + col_lane,
+              local_hessian(3 * row_vertex + row_lane,
+                            3 * col_vertex + col_lane));
         }
       }
     }
@@ -639,14 +654,11 @@ void FEMSubsystem::scatterContactGradient(
 }
 
 void FEMSubsystem::applyContactGeometryHessianProduct(
-    std::span<const runtime::PointIdx> gradientPoints,
-    runtime::ConstGeometryView pointGradient,
     std::span<const runtime::PointIdx> productPoints,
     runtime::ConstGeometryView pointHessianProduct,
-    runtime::ConstDofView localDq, runtime::DofView localY) const {
+    runtime::DofView localY) const {
   cpu_backend_->applyContactGeometryHessianProduct(
-      gradientPoints, pointGradient, productPoints, pointHessianProduct,
-      localDq, localY);
+      productPoints, pointHessianProduct, localY);
 }
 
 void FEMSubsystem::applyInternalContactHessian(runtime::ConstDofView localDq,
@@ -798,49 +810,86 @@ void FEMSubsystem::assembleElasticHessian(
     std::vector<Eigen::Triplet<double>>& triplets) const {
   SIM_PROFILE_SCOPE_COLOR("FEMSubsystem/ElasticHessian",
                           ksk::core::profiler_colors::kCyan);
-  for (const auto& pr : primitives_) {
-    std::visit(
-        [&](const auto& primitive) {
-          using Primitive = std::decay_t<decltype(primitive)>;
-          const auto& mesh = primitive.mesh;
-          const int mesh_base = primitive.offset.q;
-          if constexpr (std::is_same_v<Primitive, FEMTetMeshPrimitive>) {
-            const auto model = createEnergy(mesh.material);
-            for (const auto& tet : mesh.tets) {
-              const Eigen::Matrix3d local_X = restTetEdges(mesh, tet);
-              const double volume = local_X.determinant() / 6.0;
-              if (volume <= 0.0) {
-                throw std::runtime_error(
-                    "FEM tet has non-positive rest volume");
+  struct ElasticHessianJob {
+    size_t primitive = 0;
+    size_t element = 0;
+    size_t offset = 0;
+    size_t count = 0;
+  };
+
+  std::vector<ElasticHessianJob> jobs;
+  jobs.reserve(primitives_.size());
+  {
+    KSK_PROFILE_SCOPE("FEMSubsystem/ElasticHessian/Count");
+    size_t offset = triplets.size();
+    for (size_t primitive_index = 0; primitive_index < primitives_.size();
+         ++primitive_index) {
+      std::visit(
+          [&](const auto& primitive) {
+            using Primitive = std::decay_t<decltype(primitive)>;
+            const auto& mesh = primitive.mesh;
+            if constexpr (std::is_same_v<Primitive, FEMTetMeshPrimitive>) {
+              jobs.reserve(jobs.size() + mesh.tets.size());
+              for (size_t element = 0; element < mesh.tets.size(); ++element) {
+                jobs.push_back(ElasticHessianJob{
+                    .primitive = primitive_index,
+                    .element = element,
+                    .offset = offset,
+                    .count = 144,
+                });
+                offset += 144;
               }
-              deform::DeformationGradient<double, 3> dg(local_X);
-              dg.updateCurrentConfig(tetEdges(mesh, localQ, mesh_base, tet));
-              const Eigen::Matrix<double, 12, 12> local_hessian =
-                  dg.gradient().transpose() * model.filteredEnergyHessian(dg) *
-                  dg.gradient() * volume;
-              for (int row_vertex = 0; row_vertex < 4; ++row_vertex) {
-                for (int col_vertex = 0; col_vertex < 4; ++col_vertex) {
-                  for (int row_lane = 0; row_lane < 3; ++row_lane) {
-                    for (int col_lane = 0; col_lane < 3; ++col_lane) {
-                      const int row =
-                          mesh_base + 3 * tet[row_vertex] + row_lane;
-                      const int col =
-                          mesh_base + 3 * tet[col_vertex] + col_lane;
-                      const double value = local_hessian(
-                          3 * row_vertex + row_lane, 3 * col_vertex + col_lane);
-                      if (value != 0.0) {
-                        triplets.emplace_back(row, col, value);
-                      }
-                    }
-                  }
+            } else {
+              jobs.reserve(jobs.size() + mesh.triangles.size());
+              for (size_t element = 0; element < mesh.triangles.size();
+                   ++element) {
+                if (!clothTriangleKinematics(
+                        mesh, localQ, primitive.offset.q,
+                        mesh.triangles[static_cast<size_t>(element)])) {
+                  continue;
                 }
+                jobs.push_back(ElasticHessianJob{
+                    .primitive = primitive_index,
+                    .element = element,
+                    .offset = offset,
+                    .count = 81,
+                });
+                offset += 81;
               }
             }
-          } else {
-            addClothHessian(mesh, localQ, mesh_base, triplets);
-          }
-        },
-        pr);
+          },
+          primitives_[primitive_index]);
+    }
+    triplets.resize(offset);
+  }
+
+  {
+    KSK_PROFILE_SCOPE("FEMSubsystem/ElasticHessian/FillTriplets");
+    tbb::parallel_for(size_t{0}, jobs.size(), [&](size_t job_index) {
+      const ElasticHessianJob& job = jobs[job_index];
+      std::visit(
+          [&](const auto& primitive) {
+            using Primitive = std::decay_t<decltype(primitive)>;
+            const auto& mesh = primitive.mesh;
+            const int mesh_base = primitive.offset.q;
+            if constexpr (std::is_same_v<Primitive, FEMTetMeshPrimitive>) {
+              assert(job.count == 144);
+              fillTetHessianTriplets(
+                  mesh, localQ, mesh_base,
+                  mesh.tets[static_cast<size_t>(job.element)],
+                  std::span<Eigen::Triplet<double>, 144>(
+                      triplets.data() + job.offset, 144));
+            } else {
+              assert(job.count == 81);
+              fillClothHessianTriplets(
+                  mesh, localQ, mesh_base,
+                  mesh.triangles[static_cast<size_t>(job.element)],
+                  std::span<Eigen::Triplet<double>, 81>(
+                      triplets.data() + job.offset, 81));
+            }
+          },
+          primitives_[job.primitive]);
+    });
   }
 }
 

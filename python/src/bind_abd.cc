@@ -249,9 +249,14 @@ void bind_abd(py::module_& m)
                        std::optional<py::array_t<double>> initialTransform,
                        std::optional<py::array_t<double>> initialVelocity,
                        double density,
-                       double contactThickness) {
+                       double contactThickness,
+                       double orthogonalStiffness) {
              if (density <= 0.0) {
                throw py::value_error("density must be positive");
+             }
+             if (orthogonalStiffness < 0.0) {
+               throw py::value_error(
+                   "orthogonal_stiffness must be non-negative");
              }
              if (contactThickness < 0.0) {
                throw py::value_error("contact_thickness must be non-negative");
@@ -272,6 +277,7 @@ void bind_abd(py::module_& m)
                  parseAffine(initialVelocity, "initial_velocity",
                              glm::dmat4x3{0.0});
              body->desc.density = density;
+             body->desc.orthogonalStiffness = orthogonalStiffness;
              body->desc.contactThickness = contactThickness;
              return body;
            }),
@@ -281,7 +287,8 @@ void bind_abd(py::module_& m)
            py::arg("initial_transform") = py::none(),
            py::arg("initial_velocity") = py::none(),
            py::arg("density") = 1.0,
-           py::arg("contact_thickness") = 0.0)
+           py::arg("contact_thickness") = 0.0,
+           py::arg("orthogonal_stiffness") = 1.0e6)
       .def_property_readonly("num_vertices", [](const PyABDRigidBody& self) {
         return self.desc.surface.vertices.size();
       })
@@ -309,6 +316,18 @@ void bind_abd(py::module_& m)
               throw py::value_error("density must be positive");
             }
             self.desc.density = density;
+          })
+      .def_property(
+          "orthogonal_stiffness",
+          [](const PyABDRigidBody& self) {
+            return self.desc.orthogonalStiffness;
+          },
+          [](PyABDRigidBody& self, double stiffness) {
+            if (stiffness < 0.0) {
+              throw py::value_error(
+                  "orthogonal_stiffness must be non-negative");
+            }
+            self.desc.orthogonalStiffness = stiffness;
           })
       .def_property(
           "contact_thickness",

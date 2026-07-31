@@ -4,6 +4,7 @@
   "dependencies": [
     "tbb",
     "eigen3",
+    "suitesparse-cholmod",
     "gtest",
     "glfw3",
     "glad",

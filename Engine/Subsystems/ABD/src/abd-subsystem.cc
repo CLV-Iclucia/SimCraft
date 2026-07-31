@@ -200,16 +200,12 @@ void ABDSubsystem::scatterContactGradient(
 }
 
 void ABDSubsystem::applyContactGeometryHessianProduct(
-    std::span<const runtime::PointIdx> gradientPoints,
-    runtime::ConstGeometryView pointGradient,
     std::span<const runtime::PointIdx> productPoints,
     runtime::ConstGeometryView pointHessianProduct,
-    runtime::ConstDofView localDq,
     runtime::DofView localY) const
 {
   cpu_backend_->applyContactGeometryHessianProduct(
-      gradientPoints, pointGradient, productPoints, pointHessianProduct,
-      localDq, localY);
+      productPoints, pointHessianProduct, localY);
 }
 
 void ABDSubsystem::applyInternalContactHessian(runtime::ConstDofView localDq,
