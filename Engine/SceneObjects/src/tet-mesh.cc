@@ -2,7 +2,7 @@
 
 namespace ksk::scene {
 
-std::vector<runtime::PropertyDescriptor> TetMeshObjectDesc::listProperties()
+std::vector<runtime::PropertyDescriptor> TetMeshObject::listProperties()
     const
 {
   const int vertex_count = static_cast<int>(mesh.vertices.size());
@@ -18,7 +18,7 @@ std::vector<runtime::PropertyDescriptor> TetMeshObjectDesc::listProperties()
   };
 }
 
-std::vector<runtime::PropertyDescriptor> ClothMeshObjectDesc::listProperties()
+std::vector<runtime::PropertyDescriptor> ClothMeshObject::listProperties()
     const
 {
   const int vertex_count = static_cast<int>(mesh.vertices.size());

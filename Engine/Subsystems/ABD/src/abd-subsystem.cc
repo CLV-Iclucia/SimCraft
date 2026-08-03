@@ -78,7 +78,8 @@ void ABDSubsystem::declareGeometry(runtime::GlobalGeometryManager& geometry)
             runtime::GeometryBodyCollisionFilter{
                 .group = runtime::kDefaultCollisionGroup,
                 .mask = runtime::kAllCollisionGroups,
-                .enabled = true});
+                .enabled = true,
+                .frictionCoefficient = body_desc.frictionCoefficient});
     runtime_body.geometryBody = geometry_body;
 
     runtime::GeometryMeshDesc surface = body_desc.surface;
@@ -159,6 +160,12 @@ void ABDSubsystem::applyLocalMatrix(runtime::ConstDofView x,
                                     runtime::DofView y) const
 {
   cpu_backend_->applyLocalMatrix(x, y);
+}
+
+void ABDSubsystem::appendLocalMatrixEntries(
+    std::vector<runtime::SparseMatrixEntry>& entries) const
+{
+  cpu_backend_->appendLocalMatrixEntries(entries);
 }
 
 void ABDSubsystem::solveLocalSystem(runtime::ConstDofView b,

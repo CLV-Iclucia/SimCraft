@@ -2,6 +2,7 @@
 
 #include <Runtime/buffers.h>
 #include <Runtime/contact-table.h>
+#include <Runtime/subsystem.h>
 
 #include <Eigen/Core>
 #ifdef KISEKI_USE_CHOLMOD
@@ -46,6 +47,8 @@ class FEMCPUBackend {
   void assembleLocalGradient(runtime::DofView g) const;
   void applyLocalMatrix(runtime::ConstDofView x,
                         runtime::DofView y) const;
+  void appendLocalMatrixEntries(
+      std::vector<runtime::SparseMatrixEntry>& entries) const;
   void solveLocalSystem(runtime::ConstDofView b,
                         runtime::DofView x) const;
 

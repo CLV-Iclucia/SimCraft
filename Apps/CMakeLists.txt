@@ -10,16 +10,6 @@ add_executable(cube-drop cube-drop/main.cc)
 target_link_libraries(cube-drop PUBLIC Kiseki::FEM cxxopts Kiseki::Renderer)
 target_compile_features(cube-drop PUBLIC cxx_std_20)
 
-# Multi-Body Collision example (equivalent to python/examples/multi_body.py)
-add_executable(multi-body multi-body/main.cc)
-target_link_libraries(multi-body PUBLIC Kiseki::FEM cxxopts Kiseki::Renderer)
-target_compile_features(multi-body PUBLIC cxx_std_20)
-
-# Prescribed Motion example (equivalent to python/examples/prescribed_motion.py)
-add_executable(prescribed-motion prescribed-motion/main.cc)
-target_link_libraries(prescribed-motion PUBLIC Kiseki::FEM cxxopts Kiseki::Renderer)
-target_compile_features(prescribed-motion PUBLIC cxx_std_20)
-
 # FEM Showcase: comprehensive multi-body + mixed-collider test scene
 add_executable(fem-showcase fem-showcase/main.cc)
 target_link_libraries(fem-showcase PUBLIC Kiseki::FEM cxxopts Kiseki::Renderer)
@@ -35,12 +25,18 @@ target_link_libraries(coupled-contact-flow PUBLIC
     Kiseki::DER Kiseki::EngineFEM Kiseki::EngineABD cxxopts Kiseki::Renderer)
 target_compile_features(coupled-contact-flow PUBLIC cxx_std_20)
 
+# ABD rigid sliders on a static mesh collider ramp
+add_executable(abd-friction-ramp abd-friction-ramp/main.cc)
+target_link_libraries(abd-friction-ramp PUBLIC
+    Kiseki::EngineABD Kiseki::SceneObjects cxxopts Kiseki::Renderer)
+target_compile_features(abd-friction-ramp PUBLIC cxx_std_20)
+
 # Fluid Dam Break simulation
 add_executable(fluid-sim fluid-sim/main.cc)
 target_link_libraries(fluid-sim PUBLIC Kiseki::Fluid cxxopts Kiseki::Renderer)
 target_compile_features(fluid-sim PUBLIC cxx_std_20)
 
-message(STATUS "Apps configured: ipc-fem, cube-drop, multi-body, prescribed-motion, energy-check, fem-showcase, der-hair, coupled-contact-flow, fluid-sim")
+message(STATUS "Apps configured: ipc-fem, cube-drop, multi-body, prescribed-motion, energy-check, fem-showcase, der-hair, coupled-contact-flow, abd-friction-ramp, fluid-sim")
 
 # ---- RHI demo apps (require Vulkan + GLFW, no OpenGL Renderer) ----
 if(KISEKI_BUILD_RHI)

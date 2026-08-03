@@ -9,14 +9,14 @@
 
 namespace ksk::scene {
 
-std::vector<runtime::ObjectRef> HairObjectDesc::rodRefs(
+std::vector<runtime::ObjectRef> HairObject::rodRefs(
     const runtime::RuntimeSceneDesc& scene) const
 {
   std::vector<runtime::ObjectRef> result;
   result.reserve(children().size());
   for (runtime::ObjectId childId : children()) {
     runtime::ObjectRef child = scene.findObjectById(childId);
-    if (child.isValid() && child.isA<RodObject>()) {
+    if (child.isValid() && child.isA<der::RodObject>()) {
       result.push_back(child);
     }
   }
@@ -24,17 +24,17 @@ std::vector<runtime::ObjectRef> HairObjectDesc::rodRefs(
 }
 
 runtime::ObjectRef addHair(runtime::RuntimeSceneDesc& scene,
-                           HairObjectDesc hair)
+                           HairObject hair)
 {
-  auto hair_desc = std::make_unique<HairObjectDesc>(
+  auto hair_desc = std::make_unique<HairObject>(
       hair.getTag().empty() ? "hair" : hair.getTag());
   hair_desc->material = hair.material;
   hair_desc->restBlocks = std::move(hair.restBlocks);
 
   runtime::ObjectRef hairRef = scene.registerObject(std::move(hair_desc));
-  auto hairDesc = scene.findObjectDescAs<HairObjectDesc>(hairRef);
+  auto hairDesc = scene.findObjectDescAs<HairObject>(hairRef);
   if (!hairDesc) {
-    throw std::runtime_error("failed to locate registered HairObjectDesc");
+    throw std::runtime_error("failed to locate registered HairObject");
   }
 
   der::DERRodDesc rod;
@@ -47,9 +47,9 @@ runtime::ObjectRef addHair(runtime::RuntimeSceneDesc& scene,
   };
   runtime::ObjectRef rodRef = der::addRod(scene, std::move(rod));
 
-  hairDesc = scene.findObjectDescAs<HairObjectDesc>(hairRef);
+  hairDesc = scene.findObjectDescAs<HairObject>(hairRef);
   if (!hairDesc) {
-    throw std::runtime_error("failed to relocate registered HairObjectDesc");
+    throw std::runtime_error("failed to relocate registered HairObject");
   }
   hairDesc->addChildObject(rodRef.id);
   return hairRef;

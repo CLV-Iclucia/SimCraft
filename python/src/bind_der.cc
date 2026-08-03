@@ -180,14 +180,20 @@ void bind_der(py::module_& m)
                      &runtime::GlobalSolverConfig::enablePCGWarmStart)
       .def_readwrite("enable_contact",
                       &runtime::GlobalSolverConfig::enableContact)
+      .def_readwrite("enable_friction",
+                      &runtime::GlobalSolverConfig::enableFriction)
       .def_readwrite("solve_mode",
-                     &runtime::GlobalSolverConfig::solveMode)
+                      &runtime::GlobalSolverConfig::solveMode)
       .def_readwrite("coupled_diagonal_regularization",
                      &runtime::GlobalSolverConfig::coupledDiagonalRegularization)
       .def_readwrite("contact_barrier_distance",
                       &runtime::GlobalSolverConfig::contactBarrierDistance)
       .def_readwrite("contact_stiffness",
-                     &runtime::GlobalSolverConfig::contactStiffness);
+                     &runtime::GlobalSolverConfig::contactStiffness)
+      .def_readwrite("friction_coefficient",
+                     &runtime::GlobalSolverConfig::frictionCoefficient)
+      .def_readwrite("friction_epsilon",
+                     &runtime::GlobalSolverConfig::frictionEpsilon);
 
   py::class_<runtime::RuntimeStepResult>(m, "RuntimeStepResult")
       .def_readonly("iterations", &runtime::RuntimeStepResult::iterations)

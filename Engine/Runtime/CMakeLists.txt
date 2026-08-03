@@ -4,7 +4,11 @@ file (GLOB_RECURSE RUNTIME_SOURCES CONFIGURE_DEPENDS src/*.cc)
 file (GLOB_RECURSE RUNTIME_HEADERS CONFIGURE_DEPENDS include/Runtime/*.h)
 add_library(Runtime STATIC ${RUNTIME_SOURCES} ${RUNTIME_HEADERS})
 add_library(Kiseki::Runtime ALIAS Runtime)
-target_include_directories(Runtime PUBLIC include)
+target_include_directories(Runtime PUBLIC
+    include
+    ${CMAKE_SOURCE_DIR}/Engine/SceneObjects/include
+    ${CMAKE_SOURCE_DIR}/ReflectGen/runtime
+)
 target_link_libraries(Runtime PUBLIC Kiseki::Core Kiseki::RHI Kiseki::Spatify Kiseki::Maths Kiseki::EngineContactIPC Eigen3::Eigen)
 target_compile_features(Runtime PUBLIC cxx_std_20)
 

@@ -11,10 +11,9 @@
 
 #include <glm/glm.hpp>
 
-namespace ksk::scene {
+#include "tet-mesh.generated.h"
 
-struct TetMeshObject {};
-struct ClothMeshObject {};
+namespace ksk::scene {
 
 struct TetMaterial {
   double density = 1000.0;
@@ -50,22 +49,12 @@ struct TetMeshDesc {
   return mesh.meshView();
 }
 
-struct TetMeshObjectDesc final : runtime::SceneObjectDesc {
-  using ObjectType = TetMeshObject;
+struct KLASS() TetMeshObject final : runtime::SceneObject {
+  KLASS_GENERATED_BODY()
 
-  explicit TetMeshObjectDesc(std::string tag = {})
-      : SceneObjectDesc(std::move(tag))
+  explicit TetMeshObject(std::string tag = {})
+      : SceneObject(std::move(tag))
   {
-  }
-
-  [[nodiscard]] runtime::ObjectTypeId typeId() const noexcept override
-  {
-    return runtime::elementTypeId<TetMeshObject>();
-  }
-
-  [[nodiscard]] std::string_view typeName() const noexcept override
-  {
-    return "TetMeshObject";
   }
 
   [[nodiscard]] std::vector<runtime::PropertyDescriptor> listProperties()
@@ -104,22 +93,12 @@ struct ClothMeshDesc {
   return mesh.meshView();
 }
 
-struct ClothMeshObjectDesc final : runtime::SceneObjectDesc {
-  using ObjectType = ClothMeshObject;
+struct KLASS() ClothMeshObject final : runtime::SceneObject {
+  KLASS_GENERATED_BODY()
 
-  explicit ClothMeshObjectDesc(std::string tag = {})
-      : SceneObjectDesc(std::move(tag))
+  explicit ClothMeshObject(std::string tag = {})
+      : SceneObject(std::move(tag))
   {
-  }
-
-  [[nodiscard]] runtime::ObjectTypeId typeId() const noexcept override
-  {
-    return runtime::elementTypeId<ClothMeshObject>();
-  }
-
-  [[nodiscard]] std::string_view typeName() const noexcept override
-  {
-    return "ClothMeshObject";
   }
 
   [[nodiscard]] std::vector<runtime::PropertyDescriptor> listProperties()

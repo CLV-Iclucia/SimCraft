@@ -14,10 +14,66 @@ def merge_units(target: str, units: list[UnitIR]) -> RegistryIR:
         classes.extend(unit.classes)
 
     registry = RegistryIR(target=target, units=seen_units, classes=classes)
+    _resolve_base_names(registry)
     validate_registry(registry)
     _assign_symbols_and_depths(registry)
     _sort_classes(registry)
     return registry
+
+
+def _resolve_base_names(registry: RegistryIR) -> None:
+    by_name = {class_ir.qualified_name: class_ir for class_ir in registry.classes}
+    for class_ir in registry.classes:
+        base = class_ir.direct_base
+        if not base:
+            continue
+        resolved = _resolve_type_name(base.qualified_name, class_ir.namespace, by_name)
+        if resolved:
+            base.qualified_name = resolved
+
+
+def _resolve_type_name(
+    spelling: str,
+    current_namespace: str,
+    by_name: dict[str, ClassIR],
+) -> str | None:
+    spelling = spelling.strip()
+    if not spelling:
+        return None
+
+    candidates = _qualified_name_candidates(spelling, current_namespace)
+    for candidate in candidates:
+        if candidate in by_name:
+            return candidate
+
+    suffix = f"::{spelling}"
+    suffix_matches = [
+        qualified for qualified in by_name
+        if qualified.endswith(suffix) or qualified == spelling
+    ]
+    if len(suffix_matches) == 1:
+        return suffix_matches[0]
+    if len(suffix_matches) > 1:
+        matches = ", ".join(sorted(suffix_matches))
+        raise ReflectionError(
+            f"ambiguous reflected type name {spelling}; candidates: {matches}"
+        )
+    return None
+
+
+def _qualified_name_candidates(spelling: str, current_namespace: str) -> list[str]:
+    candidates: list[str] = []
+
+    def add(candidate: str) -> None:
+        if candidate and candidate not in candidates:
+            candidates.append(candidate)
+
+    add(spelling)
+    namespace_parts = current_namespace.split("::") if current_namespace else []
+    for count in range(len(namespace_parts), -1, -1):
+        prefix = "::".join(namespace_parts[:count])
+        add(f"{prefix}::{spelling}" if prefix else spelling)
+    return candidates
 
 
 def validate_registry(registry: RegistryIR) -> None:

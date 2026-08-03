@@ -5,6 +5,17 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 get_filename_component(REFLECTGEN_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" DIRECTORY)
 get_filename_component(REFLECTGEN_ROOT "${REFLECTGEN_CMAKE_DIR}/.." ABSOLUTE)
 
+function(_reflectgen_write_file_if_changed path content)
+    set(current)
+    if(EXISTS "${path}")
+        file(READ "${path}" current)
+    endif()
+
+    if(NOT current STREQUAL content)
+        file(WRITE "${path}" "${content}")
+    endif()
+endfunction()
+
 function(_reflectgen_collect_target_sources out_var source_target)
     set(result)
 
@@ -111,10 +122,11 @@ function(reflectgen_add_unit)
     set(unit_dir "${CMAKE_CURRENT_BINARY_DIR}/reflectgen/${RFG_TARGET}")
     set(input_list "${unit_dir}/${RFG_TARGET}.inputs.txt")
     file(MAKE_DIRECTORY "${unit_dir}")
-    file(WRITE "${input_list}" "")
+    set(input_list_content)
     foreach(input IN LISTS inputs)
-        file(APPEND "${input_list}" "${input}\n")
+        string(APPEND input_list_content "${input}\n")
     endforeach()
+    _reflectgen_write_file_if_changed("${input_list}" "${input_list_content}")
 
     set(command_args
         -m reflectgen scan
@@ -166,6 +178,7 @@ function(reflectgen_add_registry)
     set(registry_includes)
     set(registry_defines)
     set(registry_options)
+    set(registry_inputs)
     foreach(source_target IN LISTS RFG_SOURCE_TARGETS)
         if(NOT TARGET "${source_target}")
             message(FATAL_ERROR "ReflectGen SOURCE_TARGET does not exist: ${source_target}")
@@ -180,6 +193,7 @@ function(reflectgen_add_registry)
         foreach(excluded IN LISTS RFG_EXCLUDE_INPUTS)
             list(REMOVE_ITEM auto_inputs "${excluded}")
         endforeach()
+        list(APPEND registry_inputs ${auto_inputs})
 
         set(unit_target "${RFG_TARGET}_${source_target}_Unit")
         reflectgen_add_unit(
@@ -209,29 +223,83 @@ function(reflectgen_add_registry)
     set(registry_dir "${CMAKE_CURRENT_BINARY_DIR}/reflectgen/${RFG_TARGET}")
     set(ir_list "${registry_dir}/${RFG_TARGET}.irs.txt")
     file(MAKE_DIRECTORY "${registry_dir}")
-    file(WRITE "${ir_list}" "")
+    set(ir_list_content)
     foreach(ir IN LISTS ir_paths)
-        file(APPEND "${ir_list}" "${ir}\n")
+        string(APPEND ir_list_content "${ir}\n")
     endforeach()
+    _reflectgen_write_file_if_changed("${ir_list}" "${ir_list_content}")
 
-    set(gen_h "${RFG_OUTPUT_DIR}/${RFG_TARGET}.gen.h")
-    set(gen_cpp "${RFG_OUTPUT_DIR}/${RFG_TARGET}.gen.cpp")
     set(gen_ir "${RFG_OUTPUT_DIR}/${RFG_TARGET}.registry.json")
+    file(MAKE_DIRECTORY "${RFG_OUTPUT_DIR}")
+
+    if(registry_inputs)
+        list(REMOVE_DUPLICATES registry_inputs)
+    endif()
+
+    set(configure_input_list "${registry_dir}/${RFG_TARGET}.configure.inputs.txt")
+    set(configure_ir "${registry_dir}/${RFG_TARGET}.configure.rf.json")
+    set(configure_input_list_content)
+    foreach(input IN LISTS registry_inputs)
+        string(APPEND configure_input_list_content "${input}\n")
+    endforeach()
+    _reflectgen_write_file_if_changed("${configure_input_list}" "${configure_input_list_content}")
+
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E env "PYTHONPATH=${REFLECTGEN_ROOT}" "${Python3_EXECUTABLE}" -m reflectgen scan
+            --target "${RFG_TARGET}_Configure"
+            --input-list "${configure_input_list}"
+            --output-ir "${configure_ir}"
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        RESULT_VARIABLE configure_scan_result
+        OUTPUT_VARIABLE configure_scan_output
+        ERROR_VARIABLE configure_scan_error
+    )
+    if(NOT configure_scan_result EQUAL 0)
+        message(FATAL_ERROR "ReflectGen configure scan ${RFG_TARGET} failed:\n${configure_scan_output}\n${configure_scan_error}")
+    endif()
+
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E env "PYTHONPATH=${REFLECTGEN_ROOT}" "${Python3_EXECUTABLE}" -m reflectgen generate
+            --target "${RFG_TARGET}"
+            --input-ir "${configure_ir}"
+            --output-dir "${RFG_OUTPUT_DIR}"
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        RESULT_VARIABLE configure_generate_result
+        OUTPUT_VARIABLE configure_generate_output
+        ERROR_VARIABLE configure_generate_error
+    )
+    if(NOT configure_generate_result EQUAL 0)
+        message(FATAL_ERROR "ReflectGen configure generate ${RFG_TARGET} failed:\n${configure_generate_output}\n${configure_generate_error}")
+    endif()
+
+    file(GLOB generated_headers "${RFG_OUTPUT_DIR}/*.generated.h")
+    file(GLOB generated_sources "${RFG_OUTPUT_DIR}/*.generated.cpp")
+    if(NOT generated_sources)
+        message(FATAL_ERROR "ReflectGen ${RFG_TARGET} did not generate any .generated.cpp files")
+    endif()
 
     add_custom_command(
-        OUTPUT "${gen_h}" "${gen_cpp}" "${gen_ir}"
+        OUTPUT "${gen_ir}" ${generated_headers} ${generated_sources}
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${RFG_OUTPUT_DIR}"
         COMMAND "${CMAKE_COMMAND}" -E env "PYTHONPATH=${REFLECTGEN_ROOT}" "${Python3_EXECUTABLE}" -m reflectgen generate
             --target "${RFG_TARGET}"
             --input-ir-list "${ir_list}"
             --output-dir "${RFG_OUTPUT_DIR}"
-        DEPENDS ${units} ${ir_paths} "${ir_list}"
+        DEPENDS ${ir_paths} "${ir_list}"
         VERBATIM
         COMMENT "ReflectGen generate ${RFG_TARGET}"
     )
 
-    set_source_files_properties("${gen_cpp}" "${gen_h}" PROPERTIES GENERATED TRUE)
-    add_library("${RFG_TARGET}" STATIC "${gen_cpp}" "${gen_h}")
+    set(generate_target "${RFG_TARGET}_Generate")
+    add_custom_target("${generate_target}"
+        DEPENDS "${gen_ir}" ${generated_headers} ${generated_sources}
+    )
+
+    set_source_files_properties(${generated_headers} ${generated_sources} PROPERTIES GENERATED TRUE)
+    add_library("${RFG_TARGET}" STATIC ${generated_sources} ${generated_headers})
+    add_dependencies("${RFG_TARGET}" "${generate_target}")
+    set_property(TARGET "${RFG_TARGET}" PROPERTY REFLECTGEN_OUTPUT_DIR "${RFG_OUTPUT_DIR}")
+    set_property(TARGET "${RFG_TARGET}" PROPERTY REFLECTGEN_GENERATE_TARGET "${generate_target}")
     target_include_directories("${RFG_TARGET}"
         PUBLIC
             "${RFG_OUTPUT_DIR}"

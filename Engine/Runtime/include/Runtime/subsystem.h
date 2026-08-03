@@ -7,8 +7,15 @@
 #include <Runtime/subsystem-backend.h>
 
 #include <span>
+#include <vector>
 
 namespace ksk::runtime {
+
+struct SparseMatrixEntry {
+  int row = 0;
+  int col = 0;
+  double value = 0.0;
+};
 
 class Subsystem {
  public:
@@ -34,6 +41,8 @@ class Subsystem {
   virtual void prepareLocalOperator(double dt) = 0;
   virtual void assembleLocalGradient(DofView g) const = 0;
   virtual void applyLocalMatrix(ConstDofView x, DofView y) const = 0;
+  virtual void appendLocalMatrixEntries(
+      std::vector<SparseMatrixEntry>& entries) const = 0;
   virtual void solveLocalSystem(ConstDofView b, DofView x) const = 0;
 
   virtual void updateGeometry(GlobalGeometryManager& geometry) const = 0;

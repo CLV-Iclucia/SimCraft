@@ -16,6 +16,14 @@ namespace ksk::engine::contact
         EE,
     };
 
+    enum class EBarrierMollifierDistance
+    {
+        None,
+        PP,
+        PE,
+        EE,
+    };
+
     struct GIPCBarrierStencil
     {
         EBarrierStencil type = EBarrierStencil::PP;
@@ -34,6 +42,8 @@ namespace ksk::engine::contact
         Real dHat = 0.0;
         Real reservedDist = 0.0;
         Real kappa = 0.0;
+        EBarrierMollifierDistance mollifierDistance =
+            EBarrierMollifierDistance::None;
     };
 
     struct LocalBarrierGradient

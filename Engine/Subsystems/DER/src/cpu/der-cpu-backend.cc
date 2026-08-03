@@ -1,22 +1,23 @@
-#include <DER/cpu/der-cpu-backend.h>
-
-#include <DER/der-subsystem.h>
-
 #include <Contact/contact-barrier.h>
+#include <DER/cpu/der-cpu-backend.h>
+#include <DER/der-subsystem.h>
+#include <Runtime/contact-barrier-energy.h>
+#include <spdlog/spdlog.h>
 
 #include <Eigen/Eigenvalues>
 #include <Eigen/SparseCholesky>
-
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <optional>
-#include <spdlog/spdlog.h>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#include "Core/profiler.h"
 
 namespace ksk::der
 {
@@ -437,12 +438,21 @@ namespace ksk::der
                 makeBarrierStencil(*local, contact.type);
             if (g == nullptr)
             {
-                return engine::contact::computeGIPCBarrierEnergy(barrier);
+                return engine::contact::computeGIPCBarrierEnergy(barrier) +
+                       runtime::computeContactFrictionEnergyGradient(
+                           contact, std::span(local->x.data(), local->count),
+                           nullptr);
             }
             const engine::contact::LocalBarrierGradient barrier_gradient =
                 engine::contact::computeGIPCBarrierGradient(barrier);
-            scatterBarrierValues(*local, barrier_gradient.gradient, *g);
-            return barrier_gradient.energy;
+            std::array<glm::dvec3, 4> total_gradient =
+                barrier_gradient.gradient;
+            const double friction_energy =
+                runtime::computeContactFrictionEnergyGradient(
+                    contact, std::span(local->x.data(), local->count),
+                    &total_gradient);
+            scatterBarrierValues(*local, total_gradient, *g);
+            return barrier_gradient.energy + friction_energy;
         }
 
         void applyContactHessianProduct(const DERSubsystem& subsystem,
@@ -461,7 +471,19 @@ namespace ksk::der
                 engine::contact::computeGIPCBarrierHessianProduct(
                     makeBarrierStencil(*local, contact.type),
                     gatherBarrierDirection(*local, dq));
-            scatterBarrierValues(*local, product, y);
+            std::array<glm::dvec3, 4> direction =
+                gatherBarrierDirection(*local, dq);
+            std::array<glm::dvec3, 4> total_product = product;
+            const std::array<glm::dvec3, 4> friction_product =
+                runtime::computeContactFrictionHessianProduct(
+                    contact, std::span(local->x.data(), local->count),
+                    std::span(direction.data(), local->count));
+            for (int i = 0; i < local->count; ++i)
+            {
+                total_product[static_cast<size_t>(i)] +=
+                    friction_product[static_cast<size_t>(i)];
+            }
+            scatterBarrierValues(*local, total_product, y);
         }
 
         void appendContactHessianTriplets(
@@ -479,14 +501,18 @@ namespace ksk::der
             const engine::contact::LocalBarrierHessian hessian =
                 engine::contact::computeGIPCBarrierHessian(
                     makeBarrierStencil(*local, contact.type));
+            const runtime::ContactLocalHessian friction_hessian =
+                runtime::computeContactFrictionHessian(
+                    contact, std::span(local->x.data(), local->count));
             for (int row_point = 0; row_point < local->count; row_point++)
             {
                 const int row_offset = local->qOffsets[row_point];
                 for (int col_point = 0; col_point < local->count; col_point++)
                 {
                     const int col_offset = local->qOffsets[col_point];
-                    const glm::dmat3& block =
-                        hessian.blocks[row_point][col_point];
+                    const glm::dmat3 block =
+                        hessian.blocks[row_point][col_point] +
+                        friction_hessian.blocks[row_point][col_point];
                     for (int row = 0; row < 3; row++)
                     {
                         for (int col = 0; col < 3; col++)
@@ -865,6 +891,32 @@ namespace ksk::der
         for (int i = 0; i < scalar_count; ++i)
         {
             addToVector(y, i, local_y[i]);
+        }
+    }
+
+    void DERCPUBackend::appendLocalMatrixEntries(
+        std::vector<runtime::SparseMatrixEntry>& entries) const
+    {
+        KSK_PROFILE_SCOPE("DERCPUBackend/AppendLocalMatrixEntries");
+        if (local_matrix_.rows() != subsystem_.localScalarCount())
+        {
+            throw std::runtime_error("DER CPU backend local matrix is not prepared");
+        }
+
+        const int offset = subsystem_.range_.scalarOffset;
+        entries.reserve(entries.size() +
+                        static_cast<size_t>(local_matrix_.nonZeros()));
+        for (int outer = 0; outer < local_matrix_.outerSize(); ++outer)
+        {
+            for (Eigen::SparseMatrix<double>::InnerIterator it(local_matrix_, outer);
+                 it; ++it)
+            {
+                entries.push_back(runtime::SparseMatrixEntry{
+                    .row = offset + static_cast<int>(it.row()),
+                    .col = offset + static_cast<int>(it.col()),
+                    .value = it.value(),
+                });
+            }
         }
     }
 

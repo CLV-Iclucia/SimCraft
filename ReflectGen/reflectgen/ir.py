@@ -23,6 +23,7 @@ class DirectBaseIR:
 
 @dataclass
 class ClassIR:
+    kind: str
     name: str
     qualified_name: str
     namespace: str
@@ -72,6 +73,7 @@ def _base_from_dict(data: dict[str, Any] | None) -> DirectBaseIR | None:
 
 def _class_from_dict(data: dict[str, Any]) -> ClassIR:
     return ClassIR(
+        kind=data.get("kind", "class"),
         name=data["name"],
         qualified_name=data["qualified_name"],
         namespace=data.get("namespace", ""),
@@ -86,7 +88,7 @@ def _class_from_dict(data: dict[str, Any]) -> ClassIR:
 
 def write_unit(unit: UnitIR, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_to_dict(unit), indent=2), encoding="utf-8")
+    _write_text_if_changed(path, json.dumps(_to_dict(unit), indent=2))
 
 
 def read_unit(path: Path) -> UnitIR:
@@ -100,5 +102,10 @@ def read_unit(path: Path) -> UnitIR:
 
 def write_registry(registry: RegistryIR, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_to_dict(registry), indent=2), encoding="utf-8")
+    _write_text_if_changed(path, json.dumps(_to_dict(registry), indent=2))
 
+
+def _write_text_if_changed(path: Path, content: str) -> None:
+    if path.exists() and path.read_text(encoding="utf-8") == content:
+        return
+    path.write_text(content, encoding="utf-8")

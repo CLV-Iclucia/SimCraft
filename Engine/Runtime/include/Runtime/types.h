@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include <Core/rtti.h>
+
 #include <cstddef>
 
 namespace ksk::runtime {
@@ -10,13 +12,12 @@ using SubsystemIdx = int;
 using PointIdx = int;
 
 using ObjectId = int;
-using ObjectTypeId = const void*;
+using ObjectTypeId = RF::TypeId;
 
 template <typename T>
-inline ObjectTypeId elementTypeId() noexcept
+constexpr ObjectTypeId elementTypeId() noexcept
 {
-  static const int token = 0;
-  return ObjectTypeId{&token};
+  return RF::TypeOf<T>();
 }
 
 struct SubsystemRange {

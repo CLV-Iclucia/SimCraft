@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include <concepts>
 #include <functional>
 #include <memory>
 #include <string>
@@ -8,12 +9,14 @@
 #include <vector>
 
 #include <glm/glm.hpp>
+#include <glm/mat4x4.hpp>
 
 #include <Runtime/contact-table.h>
 #include <Runtime/dof-layout.h>
 #include <Runtime/global-geometry-manager.h>
 #include <Runtime/solver-config.h>
 #include <Runtime/types.h>
+#include <SceneObjects/scene-object.h>
 
 namespace ksk::runtime {
 
@@ -40,7 +43,7 @@ struct ObjectRef {
   template <typename ObjectT>
   [[nodiscard]] bool isA() const noexcept
   {
-    return typeId() == elementTypeId<ObjectT>();
+    return RF::IsA(typeId(), elementTypeId<ObjectT>());
   }
 };
 
@@ -67,27 +70,12 @@ struct RuntimeScene {
   std::vector<SubsystemBatch> subsystemBatches;
   GlobalGeometryManager geometry;
   ContactStencils contacts;
+  std::vector<glm::dvec3> frictionReferencePositions;
   GlobalSolverConfig solverConfig;
   glm::dvec3 gravity{0.0, -9.81, 0.0};
   BufferLayout buffers;
 
   void refreshBufferLayout() noexcept;
-};
-
-enum class PropertyType
-{
-  Scalar,
-  Vector,
-};
-
-struct PropertyDescriptor {
-  std::string name;
-  PropertyType type = PropertyType::Scalar;
-  int componentCount = 1;
-  int sampleCount = 0;
-  std::string metadata;
-  ObjectId ownerId = -1;
-  std::string ownerTag;
 };
 
 using ScalarConstraintTarget = std::function<double(double)>;
@@ -100,46 +88,16 @@ struct SceneConstraintDesc {
   ScalarConstraintTarget target;
 };
 
-struct SceneObjectDesc {
-  explicit SceneObjectDesc(std::string tag = {})
-      : tag(std::move(tag))
-  {
-  }
-
-  virtual ~SceneObjectDesc() = default;
-
-  [[nodiscard]] virtual ObjectTypeId typeId() const noexcept = 0;
-  [[nodiscard]] virtual std::string_view typeName() const noexcept = 0;
-  [[nodiscard]] virtual std::vector<PropertyDescriptor> listProperties() const
-  {
-    return {};
-  }
-  [[nodiscard]] const std::string& getTag() const noexcept { return tag; }
-
-  void addChildObject(ObjectId child)
-  {
-    childObjects.push_back(child);
-  }
-
-  [[nodiscard]] const std::vector<ObjectId>& children() const noexcept
-  {
-    return childObjects;
-  }
-
- private:
+struct SceneColliderDesc {
+  GeometryMeshDesc mesh;
+  glm::dmat4 transform{1.0};
+  Real frictionCoefficient = -1.0;
   std::string tag;
-  std::vector<ObjectId> childObjects;
-};
-
-template <typename DescT, typename = void>
-struct SceneObjectDescMarker {
-  using type = void;
 };
 
 template <typename DescT>
-struct SceneObjectDescMarker<DescT, std::void_t<typename DescT::ObjectType>> {
-  using type = typename DescT::ObjectType;
-};
+concept SceneObjectDescType =
+    std::is_base_of_v<SceneObject, DescT>;
 
 class SubsystemDesc {
  public:
@@ -181,7 +139,7 @@ struct SceneObjectEntry {
   ObjectId id = -1;
   ObjectTypeId type = nullptr;
   std::string tag;
-  std::unique_ptr<SceneObjectDesc> element;
+  std::unique_ptr<SceneObject> element;
 };
 
 struct SubsystemObjectGroup {
@@ -198,8 +156,10 @@ struct RuntimeSceneDesc {
   std::vector<SubsystemObjectGroup> subsystemObjectGroups;
   std::vector<SceneObjectEntry> elements;
   std::vector<SceneConstraintDesc> constraints;
+  std::vector<SceneColliderDesc> colliders;
 
   void addSubsystem(std::unique_ptr<SubsystemDesc> subsystem);
+  void addCollider(SceneColliderDesc collider);
   void assignObjectToSubsystem(std::string subsystemType,
                                ObjectId object,
                                SubsystemDescFactory factory);
@@ -209,51 +169,43 @@ struct RuntimeSceneDesc {
                      double stiffness,
                      ScalarConstraintTarget target);
   ObjectRef registerObject(ObjectTypeId type, std::string tag = {});
-  ObjectRef registerObject(std::unique_ptr<SceneObjectDesc> element);
+  ObjectRef registerObject(std::unique_ptr<SceneObject> element);
   ObjectRef findObjectById(ObjectId id) const;
-  const SceneObjectDesc* findObjectDesc(ObjectId id) const;
-  SceneObjectDesc* findObjectDesc(ObjectId id);
+  const SceneObject* findObjectDesc(ObjectId id) const;
+  SceneObject* findObjectDesc(ObjectId id);
   template <typename ObjectT>
   const ObjectT* findObjectDescAs(ObjectRef ref) const
   {
-    static_assert(std::is_base_of_v<SceneObjectDesc, ObjectT>,
-                  "findObjectDescAs<T> expects a SceneObjectDesc type");
-    using Marker = typename SceneObjectDescMarker<ObjectT>::type;
-    static_assert(!std::is_void_v<Marker>,
-                  "SceneObjectDesc types used with findObjectDescAs must "
-                  "define using ObjectType = ...");
+    static_assert(SceneObjectDescType<ObjectT>,
+                  "findObjectDescAs<T> expects a SceneObject type");
     if (!ref.isValid()) {
       return nullptr;
     }
-    if (!ref.template isA<Marker>()) {
+    if (!ref.template isA<ObjectT>()) {
       return nullptr;
     }
-    const SceneObjectDesc* desc = findObjectDesc(ref.id);
+    const SceneObject* desc = findObjectDesc(ref.id);
     if (!desc) {
       return nullptr;
     }
-    return static_cast<const ObjectT*>(desc);
+    return RF::Cast<ObjectT>(desc);
   }
   template <typename ObjectT>
   ObjectT* findObjectDescAs(ObjectRef ref)
   {
-    static_assert(std::is_base_of_v<SceneObjectDesc, ObjectT>,
-                  "findObjectDescAs<T> expects a SceneObjectDesc type");
-    using Marker = typename SceneObjectDescMarker<ObjectT>::type;
-    static_assert(!std::is_void_v<Marker>,
-                  "SceneObjectDesc types used with findObjectDescAs must "
-                  "define using ObjectType = ...");
+    static_assert(SceneObjectDescType<ObjectT>,
+                  "findObjectDescAs<T> expects a SceneObject type");
     if (!ref.isValid()) {
       return nullptr;
     }
-    if (!ref.template isA<Marker>()) {
+    if (!ref.template isA<ObjectT>()) {
       return nullptr;
     }
-    SceneObjectDesc* desc = findObjectDesc(ref.id);
+    SceneObject* desc = findObjectDesc(ref.id);
     if (!desc) {
       return nullptr;
     }
-    return static_cast<ObjectT*>(desc);
+    return RF::Cast<ObjectT>(desc);
   }
   [[nodiscard]] std::vector<PropertyDescriptor> listProperties(ObjectRef ref) const;
   [[nodiscard]] std::vector<ObjectRef> findChildren(ObjectRef ref) const;

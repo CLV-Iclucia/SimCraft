@@ -10,9 +10,9 @@
 #include <utility>
 #include <vector>
 
-namespace ksk::scene {
+#include "abd-body.generated.h"
 
-struct ABDBodyObject {};
+namespace ksk::scene {
 
 struct ABDBodyDesc {
   runtime::GeometryMeshDesc surface;
@@ -21,24 +21,14 @@ struct ABDBodyDesc {
   runtime::Real density = 1.0;
   runtime::Real orthogonalStiffness = 1.0e6;
   runtime::Real contactThickness = 0.0;
+  runtime::Real frictionCoefficient = -1.0;
 };
 
-struct ABDBodyObjectDesc final : runtime::SceneObjectDesc {
-  using ObjectType = ABDBodyObject;
+struct KLASS() ABDBodyObject final : runtime::SceneObject {
+  KLASS_GENERATED_BODY()
 
-  explicit ABDBodyObjectDesc(std::string tag = {})
-      : SceneObjectDesc(std::move(tag))
+  explicit ABDBodyObject(std::string tag = {}) : SceneObject(std::move(tag))
   {
-  }
-
-  [[nodiscard]] runtime::ObjectTypeId typeId() const noexcept override
-  {
-    return runtime::elementTypeId<ABDBodyObject>();
-  }
-
-  [[nodiscard]] std::string_view typeName() const noexcept override
-  {
-    return "ABDBodyObject";
   }
 
   [[nodiscard]] std::vector<runtime::PropertyDescriptor> listProperties()

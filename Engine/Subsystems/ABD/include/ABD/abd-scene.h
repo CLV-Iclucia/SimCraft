@@ -9,7 +9,6 @@ namespace ksk::abd {
 
 using ABDBodyDesc = scene::ABDBodyDesc;
 using ABDBodyObject = scene::ABDBodyObject;
-using ABDBodyObjectDesc = scene::ABDBodyObjectDesc;
 
 [[nodiscard]] runtime::ObjectRef addABDBody(runtime::RuntimeSceneDesc& scene,
                                             ABDBodyDesc body,

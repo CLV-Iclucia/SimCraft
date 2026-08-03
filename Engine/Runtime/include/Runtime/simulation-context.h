@@ -26,6 +26,7 @@ class SimulationContext {
   SimulationContext& operator=(SimulationContext&&) noexcept = default;
 
   void rebuild();
+  void setSceneColliders(std::vector<SceneColliderDesc> colliders);
 
   [[nodiscard]] RuntimeScene& scene() noexcept { return scene_; }
   [[nodiscard]] const RuntimeScene& scene() const noexcept { return scene_; }
@@ -41,6 +42,7 @@ class SimulationContext {
   RuntimeScene scene_;
   std::vector<std::unique_ptr<Subsystem>> subsystems_;
   std::vector<std::string> subsystem_type_names_;
+  std::vector<SceneColliderDesc> colliders_;
   glm::dvec3 gravity_{0.0, -9.81, 0.0};
   DofBuffer q_;
   DofBuffer qdot_;

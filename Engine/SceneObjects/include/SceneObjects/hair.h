@@ -8,9 +8,9 @@
 #include <utility>
 #include <vector>
 
-namespace ksk::scene {
+#include "hair.generated.h"
 
-struct HairObject {};
+namespace ksk::scene {
 
 using HairBlock = glm::dvec4;
 
@@ -21,22 +21,12 @@ struct HairMaterial {
   double shearModulus = 1.5e9;
 };
 
-struct HairObjectDesc : runtime::SceneObjectDesc {
-  using ObjectType = HairObject;
+struct KLASS() HairObject : runtime::SceneObject {
+  KLASS_GENERATED_BODY()
 
-  explicit HairObjectDesc(std::string tag = {})
-      : SceneObjectDesc(std::move(tag))
+  explicit HairObject(std::string tag = {})
+      : SceneObject(std::move(tag))
   {
-  }
-
-  [[nodiscard]] runtime::ObjectTypeId typeId() const noexcept override
-  {
-    return runtime::elementTypeId<HairObject>();
-  }
-
-  [[nodiscard]] std::string_view typeName() const noexcept override
-  {
-    return "HairObject";
   }
 
   [[nodiscard]] std::vector<runtime::PropertyDescriptor> listProperties() const override

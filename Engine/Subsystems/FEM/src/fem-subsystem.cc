@@ -614,6 +614,11 @@ void FEMSubsystem::applyLocalMatrix(runtime::ConstDofView x,
   cpu_backend_->applyLocalMatrix(x, y);
 }
 
+void FEMSubsystem::appendLocalMatrixEntries(
+    std::vector<runtime::SparseMatrixEntry>& entries) const {
+  cpu_backend_->appendLocalMatrixEntries(entries);
+}
+
 void FEMSubsystem::solveLocalSystem(runtime::ConstDofView b,
                                     runtime::DofView x) const {
   cpu_backend_->solveLocalSystem(b, x);

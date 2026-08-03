@@ -63,6 +63,8 @@ class DERSubsystem final : public runtime::Subsystem {
   void assembleLocalGradient(runtime::DofView g) const override;
   void applyLocalMatrix(runtime::ConstDofView x,
                         runtime::DofView y) const override;
+  void appendLocalMatrixEntries(
+      std::vector<runtime::SparseMatrixEntry>& entries) const override;
   void solveLocalSystem(runtime::ConstDofView b,
                         runtime::DofView x) const override;
 

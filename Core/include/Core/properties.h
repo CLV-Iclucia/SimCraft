@@ -23,7 +23,6 @@ struct Resource {
   Resource(Resource &&) = delete;
 };
 
-/// 类型擦除的属性集合，用于 Python/UI 端运行时配置
 class Properties {
 public:
     Properties() = default;

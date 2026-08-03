@@ -61,6 +61,17 @@ void SimulationContext::rebuild()
         .geometryCount = geometry_count,
     });
   }
+  for (int collider = 0; collider < static_cast<int>(colliders_.size());
+       ++collider) {
+    const SceneColliderDesc& desc =
+        colliders_[static_cast<size_t>(collider)];
+    const GeometryInstanceIdx instance = scene_.geometry.addColliderInstance(
+        collider, 0, desc.mesh, desc.transform);
+    const GeometryBodyIdx body =
+        scene_.geometry.instances[static_cast<size_t>(instance)].owner.body;
+    scene_.geometry.bodyCollisionFilters[static_cast<size_t>(body)]
+        .frictionCoefficient = desc.frictionCoefficient;
+  }
   scene_.dofs.totalScalars = total_scalars;
   scene_.refreshBufferLayout();
 
@@ -70,6 +81,12 @@ void SimulationContext::rebuild()
     const DofRange range = subsystem->dofRange();
     subsystem->writeState(q_.slice(range), qdot_.slice(range));
   }
+}
+
+void SimulationContext::setSceneColliders(std::vector<SceneColliderDesc> colliders)
+{
+  colliders_ = std::move(colliders);
+  rebuild();
 }
 
 std::vector<std::unique_ptr<Subsystem>>& SimulationContext::subsystems() noexcept

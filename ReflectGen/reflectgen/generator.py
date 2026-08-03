@@ -5,87 +5,99 @@ from pathlib import Path
 from .ir import ClassIR, RegistryIR, write_registry
 
 
-def generate_registry(registry: RegistryIR, output_dir: Path) -> tuple[Path, Path, Path]:
+def generate_registry(registry: RegistryIR, output_dir: Path) -> tuple[list[Path], Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    header_path = output_dir / f"{registry.target}.gen.h"
-    source_path = output_dir / f"{registry.target}.gen.cpp"
     ir_path = output_dir / f"{registry.target}.registry.json"
 
-    header_path.write_text(_render_header(registry), encoding="utf-8")
-    source_path.write_text(_render_source(registry, header_path.name), encoding="utf-8")
+    user_headers = _classes_by_source_header(registry.classes)
+    expected_generated_files = set()
+    for source_file in user_headers:
+        expected_generated_files.add(_generated_header_name(source_file))
+        expected_generated_files.add(_generated_source_name(source_file))
+
+    _remove_legacy_registry_files(output_dir, registry.target)
+    _remove_stale_generated_files(output_dir, expected_generated_files)
+    generated_files: list[Path] = []
+    for source_file, classes in user_headers.items():
+        generated_header = output_dir / _generated_header_name(source_file)
+        generated_source = output_dir / _generated_source_name(source_file)
+        _write_text_if_changed(generated_header, _render_user_header(registry, classes))
+        _write_text_if_changed(
+            generated_source,
+            _render_user_source(registry, source_file, classes),
+        )
+        generated_files.extend([generated_header, generated_source])
     write_registry(registry, ir_path)
 
-    return header_path, source_path, ir_path
+    return generated_files, ir_path
 
 
-def _render_header(registry: RegistryIR) -> str:
+def _classes_by_source_header(classes: list[ClassIR]) -> dict[str, list[ClassIR]]:
+    headers: dict[str, list[ClassIR]] = {}
+    for class_ir in classes:
+        path = Path(class_ir.location.file)
+        if path.suffix.lower() not in {".h", ".hh", ".hpp", ".hxx"}:
+            continue
+        headers.setdefault(path.as_posix(), []).append(class_ir)
+    return headers
+
+
+def _generated_header_name(source_file: str) -> str:
+    return f"{Path(source_file).stem}.generated.h"
+
+
+def _generated_source_name(source_file: str) -> str:
+    return f"{Path(source_file).stem}.generated.cpp"
+
+
+def _remove_stale_generated_files(output_dir: Path, expected_names: set[str]) -> None:
+    for path in output_dir.glob("*.generated.*"):
+        if path.name not in expected_names:
+            path.unlink()
+
+
+def _remove_legacy_registry_files(output_dir: Path, target: str) -> None:
+    for suffix in (".gen.h", ".gen.cpp"):
+        path = output_dir / f"{target}{suffix}"
+        if path.exists():
+            path.unlink()
+
+
+def _write_text_if_changed(path: Path, content: str) -> None:
+    if path.exists() and path.read_text(encoding="utf-8") == content:
+        return
+    path.write_text(content, encoding="utf-8")
+
+
+def _render_user_header(registry: RegistryIR, classes: list[ClassIR]) -> str:
     lines: list[str] = []
     lines.append("#pragma once")
     lines.append("")
-    lines.append("#include <cstdint>")
     lines.append('#include "ReflectionMacros.h"')
     lines.append("")
-    lines.extend(_forward_declarations(registry.classes))
+    lines.extend(_forward_declarations(classes))
     lines.append("")
     lines.append("namespace RF {")
     lines.append("")
 
-    for class_ir in registry.classes:
+    for class_ir in _type_infos_required_by(registry, classes):
         lines.append(f"extern const TypeInfo {class_ir.type_symbol};")
 
     lines.append("")
     lines.append("template<typename T>")
     lines.append("struct StaticType;")
     lines.append("")
-    lines.append("#ifndef KISEKI_CORE_RTTI_RUNTIME_DEFINED")
-    lines.append("template<typename T>")
-    lines.append("constexpr TypeId TypeOf() {")
-    lines.append("    return StaticType<T>::Id();")
-    lines.append("}")
-    lines.append("")
-    lines.append("#endif")
-    lines.append("")
-    lines.append("#ifndef KISEKI_CORE_RTTI_RUNTIME_DEFINED")
-    lines.append("TypeId ParentOf(TypeId id);")
-    lines.append("bool IsA(TypeId self, TypeId target);")
-    lines.append("uintptr_t ToInteger(TypeId id);")
-    lines.append("")
-    lines.append("namespace Detail {")
-    lines.append("template<typename T>")
-    lines.append("auto DynamicTypeOfImpl(const T* object, int) -> decltype(object->GetTypeId()) {")
-    lines.append("    return object ? object->GetTypeId() : InvalidType;")
-    lines.append("}")
-    lines.append("")
-    lines.append("template<typename T>")
-    lines.append("auto DynamicTypeOfImpl(const T* object, long) -> decltype(RF_GetTypeId(object)) {")
-    lines.append("    return object ? RF_GetTypeId(object) : InvalidType;")
-    lines.append("}")
-    lines.append("} // namespace Detail")
-    lines.append("")
-    lines.append("template<typename T>")
-    lines.append("TypeId DynamicTypeOf(const T* object) {")
-    lines.append("    return Detail::DynamicTypeOfImpl(object, 0);")
-    lines.append("}")
-    lines.append("")
-    lines.append("template<typename Target, typename Source>")
-    lines.append("Target* DynamicCast(Source* object) {")
-    lines.append("    if (!object) {")
-    lines.append("        return nullptr;")
-    lines.append("    }")
-    lines.append("    return IsA(DynamicTypeOf(object), TypeOf<Target>())")
-    lines.append("        ? static_cast<Target*>(object)")
-    lines.append("        : nullptr;")
-    lines.append("}")
-    lines.append("")
-    lines.append("#endif")
-    lines.append("")
 
-    for class_ir in registry.classes:
+    for class_ir in classes:
         parent_symbol = _parent_symbol(registry, class_ir)
         lines.append("template<>")
         lines.append(f"struct StaticType<{class_ir.qualified_name}> {{")
-        lines.append(f"    static constexpr TypeId Id() {{ return &{class_ir.type_symbol}; }}")
-        lines.append(f"    static constexpr TypeId Parent() {{ return {parent_symbol}; }}")
+        lines.append(
+            f"    static constexpr TypeId Id() noexcept {{ return &{class_ir.type_symbol}; }}"
+        )
+        lines.append(
+            f"    static constexpr TypeId Parent() noexcept {{ return {parent_symbol}; }}"
+        )
         lines.append("};")
         lines.append("")
 
@@ -94,47 +106,30 @@ def _render_header(registry: RegistryIR) -> str:
     return "\n".join(lines)
 
 
-def _render_source(registry: RegistryIR, header_name: str) -> str:
+def _render_user_source(
+    registry: RegistryIR,
+    source_file: str,
+    classes: list[ClassIR],
+) -> str:
     lines: list[str] = []
-    lines.append(f'#include "{header_name}"')
-    for include in _source_includes(registry.classes):
-        lines.append(f'#include "{include}"')
+    lines.append(f'#include "{Path(source_file).as_posix()}"')
     lines.append("")
     lines.append("namespace RF {")
     lines.append("")
 
-    for class_ir in registry.classes:
+    for class_ir in classes:
         parent_symbol = _parent_symbol(registry, class_ir)
-        lines.append(f"extern const TypeInfo {class_ir.type_symbol} = {{ {parent_symbol}, {class_ir.depth} }};")
+        lines.append(f"const TypeInfo {class_ir.type_symbol} = {{")
+        lines.append(f"    {parent_symbol},")
+        lines.append(f"    {class_ir.depth},")
+        lines.append(f'    "{class_ir.qualified_name}",')
+        lines.append("};")
 
-    lines.append("")
-    lines.append("#ifndef KISEKI_CORE_RTTI_RUNTIME_DEFINED")
-    lines.append("TypeId ParentOf(TypeId id) {")
-    lines.append("    return id ? id->parent : InvalidType;")
-    lines.append("}")
-    lines.append("")
-    lines.append("bool IsA(TypeId self, TypeId target) {")
-    lines.append("    if (!self || !target) {")
-    lines.append("        return false;")
-    lines.append("    }")
-    lines.append("    for (TypeId current = self; current; current = current->parent) {")
-    lines.append("        if (current == target) {")
-    lines.append("            return true;")
-    lines.append("        }")
-    lines.append("    }")
-    lines.append("    return false;")
-    lines.append("}")
-    lines.append("")
-    lines.append("uintptr_t ToInteger(TypeId id) {")
-    lines.append("    return reinterpret_cast<uintptr_t>(id);")
-    lines.append("}")
-    lines.append("")
-    lines.append("#endif")
     lines.append("")
     lines.append("} // namespace RF")
     lines.append("")
 
-    for class_ir in registry.classes:
+    for class_ir in classes:
         if class_ir.has_rtti_body:
             lines.append(f"RF::TypeId {class_ir.qualified_name}::GetTypeId() const {{")
             lines.append(f"    return RF::TypeOf<{class_ir.qualified_name}>();")
@@ -144,16 +139,27 @@ def _render_source(registry: RegistryIR, header_name: str) -> str:
     return "\n".join(lines)
 
 
-def _source_includes(classes: list[ClassIR]) -> list[str]:
-    includes = []
-    seen = set()
+def _type_infos_required_by(
+    registry: RegistryIR,
+    classes: list[ClassIR],
+) -> list[ClassIR]:
+    by_name = {item.qualified_name: item for item in registry.classes}
+    required: set[str] = set()
+
+    def add_with_parents(class_ir: ClassIR) -> None:
+        if class_ir.qualified_name in required:
+            return
+        required.add(class_ir.qualified_name)
+        if class_ir.direct_base:
+            parent = by_name.get(class_ir.direct_base.qualified_name)
+            if parent:
+                add_with_parents(parent)
+
     for class_ir in classes:
-        path = Path(class_ir.location.file)
-        include = path.as_posix()
-        if include not in seen:
-            seen.add(include)
-            includes.append(include)
-    return includes
+        add_with_parents(class_ir)
+
+    return [class_ir for class_ir in registry.classes
+            if class_ir.qualified_name in required]
 
 
 def _forward_declarations(classes: list[ClassIR]) -> list[str]:
@@ -167,11 +173,23 @@ def _forward_declarations(classes: list[ClassIR]) -> list[str]:
 
     lines: list[str] = []
     for name in sorted(globals_):
-        lines.append(f"class {name};")
+        kind = _class_kind(classes, name)
+        lines.append(f"{kind} {name};")
     for namespace in sorted(namespaces):
-        class_names = " ".join(f"class {name};" for name in sorted(set(namespaces[namespace])))
+        class_names = " ".join(
+            f"{_class_kind(classes, f'{namespace}::{name}')} {name};"
+            for name in sorted(set(namespaces[namespace]))
+        )
         lines.append(f"namespace {namespace} {{ {class_names} }}")
     return lines
+
+
+def _class_kind(classes: list[ClassIR], name_or_qualified_name: str) -> str:
+    for class_ir in classes:
+        if (class_ir.qualified_name == name_or_qualified_name or
+                class_ir.name == name_or_qualified_name):
+            return class_ir.kind
+    return "class"
 
 
 def _parent_symbol(registry: RegistryIR, class_ir: ClassIR) -> str:

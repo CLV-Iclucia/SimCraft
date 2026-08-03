@@ -4,6 +4,7 @@
 
 #include <Contact/contact-barrier.h>
 #include <Core/profiler.h>
+#include <Runtime/contact-barrier-energy.h>
 
 #include <Eigen/Cholesky>
 
@@ -14,6 +15,7 @@
 #include <array>
 #include <cmath>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -468,8 +470,12 @@ double ABDCPUBackend::evaluateObjective(runtime::ConstDofView q,
       if (!points) {
         continue;
       }
-      objective += ksk::engine::contact::computeGIPCBarrierEnergy(
-          makeBarrierStencil(subsystem_, contact, *points));
+      const ksk::engine::contact::GIPCBarrierStencil barrier =
+          makeBarrierStencil(subsystem_, contact, *points);
+      const int count = contactPointCount(contact.type);
+      objective += ksk::engine::contact::computeGIPCBarrierEnergy(barrier);
+      objective += runtime::computeContactFrictionEnergyGradient(
+          contact, std::span(barrier.x.data(), count), nullptr);
     }
   }
   return objective;
@@ -618,16 +624,20 @@ void ABDCPUBackend::assembleLocalGradient(runtime::DofView g) const
       if (!points) {
         continue;
       }
+      const ksk::engine::contact::GIPCBarrierStencil barrier =
+          makeBarrierStencil(subsystem_, contact, *points);
       const ksk::engine::contact::LocalBarrierGradient contact_gradient =
-          ksk::engine::contact::computeGIPCBarrierGradient(
-              makeBarrierStencil(subsystem_, contact, *points));
+          ksk::engine::contact::computeGIPCBarrierGradient(barrier);
       const int count = contactPointCount(contact.type);
+      std::array<glm::dvec3, 4> total_gradient = contact_gradient.gradient;
+      runtime::computeContactFrictionEnergyGradient(
+          contact, std::span(barrier.x.data(), count), &total_gradient);
       for (int i = 0; i < count; ++i) {
         const ABDContactPoint& point = (*points)[static_cast<size_t>(i)];
         const int offset =
             subsystem_.runtime_bodies_[static_cast<size_t>(point.body)].scalarOffset;
         scatterAffineGradient(
-            g, offset, contact_gradient.gradient[static_cast<size_t>(i)], point.Xh);
+            g, offset, total_gradient[static_cast<size_t>(i)], point.Xh);
       }
     }
   }
@@ -669,6 +679,29 @@ void ABDCPUBackend::applyLocalMatrix(runtime::ConstDofView x,
                          desc,
                          subsystem_.bodyTransform(body.body),
                          linearPart(readAffine(x, body.scalarOffset))));
+    }
+  }
+}
+
+void ABDCPUBackend::appendLocalMatrixEntries(
+    std::vector<runtime::SparseMatrixEntry>& entries) const
+{
+  KSK_PROFILE_SCOPE("ABDCPUBackend/AppendLocalMatrixEntries");
+  if (local_matrix_.rows() != subsystem_.range_.scalarCount) {
+    throw std::runtime_error("ABD CPU backend local operator is not prepared");
+  }
+
+  const int offset = subsystem_.range_.scalarOffset;
+  entries.reserve(entries.size() +
+                  static_cast<size_t>(local_matrix_.nonZeros()));
+  for (int outer = 0; outer < local_matrix_.outerSize(); ++outer) {
+    for (Eigen::SparseMatrix<double>::InnerIterator it(local_matrix_, outer);
+         it; ++it) {
+      entries.push_back(runtime::SparseMatrixEntry{
+          .row = offset + static_cast<int>(it.row()),
+          .col = offset + static_cast<int>(it.col()),
+          .value = it.value(),
+      });
     }
   }
 }
@@ -808,15 +841,26 @@ void ABDCPUBackend::applyInternalContactHessian(runtime::ConstDofView localDq,
           affineProduct(localDq, offset, point.Xh);
     }
 
+    const ksk::engine::contact::GIPCBarrierStencil barrier =
+        makeBarrierStencil(subsystem_, contact, *points);
     const std::array<glm::dvec3, 4> product =
         ksk::engine::contact::computeGIPCBarrierHessianProduct(
-            makeBarrierStencil(subsystem_, contact, *points), direction);
+            barrier, direction);
+    std::array<glm::dvec3, 4> total_product = product;
+    const std::array<glm::dvec3, 4> friction_product =
+        runtime::computeContactFrictionHessianProduct(
+            contact, std::span(barrier.x.data(), count),
+            std::span(direction.data(), count));
+    for (int i = 0; i < count; ++i) {
+      total_product[static_cast<size_t>(i)] +=
+          friction_product[static_cast<size_t>(i)];
+    }
     for (int i = 0; i < count; ++i) {
       const ABDContactPoint& point = (*points)[static_cast<size_t>(i)];
       const int offset =
           subsystem_.runtime_bodies_[static_cast<size_t>(point.body)].scalarOffset;
       scatterAffineGradient(
-          localY, offset, product[static_cast<size_t>(i)], point.Xh);
+          localY, offset, total_product[static_cast<size_t>(i)], point.Xh);
     }
   }
 }

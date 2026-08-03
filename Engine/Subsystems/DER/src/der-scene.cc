@@ -53,7 +53,7 @@ void DERSubsystemDesc::build(runtime::SubsystemBuildContext& context) const
        ++rod_index) {
     const runtime::ObjectId rodId = rods[rod_index];
     runtime::ObjectRef rodRef = scene.findObjectById(rodId);
-    const RodObjectDesc* rodDesc = scene.findObjectDescAs<RodObjectDesc>(rodRef);
+    const RodObject* rodDesc = scene.findObjectDescAs<RodObject>(rodRef);
     if (!rodDesc) {
       throw std::runtime_error("DER subsystem references a missing rod object");
     }
@@ -80,7 +80,7 @@ void DERSubsystemDesc::build(runtime::SubsystemBuildContext& context) const
 
 runtime::ObjectRef addRod(runtime::RuntimeSceneDesc& scene, DERRodDesc rod)
 {
-  auto rodDesc = std::make_unique<RodObjectDesc>("rod");
+  auto rodDesc = std::make_unique<RodObject>("rod");
   rodDesc->restBlocks = rod.restBlocks;
   rodDesc->material = rod.material;
 

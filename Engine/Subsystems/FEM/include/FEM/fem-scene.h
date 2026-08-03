@@ -9,11 +9,9 @@ namespace ksk::engine::fem {
 using TetMaterial = scene::TetMaterial;
 using TetMeshDesc = scene::TetMeshDesc;
 using TetMeshObject = scene::TetMeshObject;
-using TetMeshObjectDesc = scene::TetMeshObjectDesc;
 using ClothMaterial = scene::ClothMaterial;
 using ClothMeshDesc = scene::ClothMeshDesc;
 using ClothMeshObject = scene::ClothMeshObject;
-using ClothMeshObjectDesc = scene::ClothMeshObjectDesc;
 
 [[nodiscard]] runtime::ObjectRef addTetMesh(runtime::RuntimeSceneDesc& scene,
                                             TetMeshDesc mesh,

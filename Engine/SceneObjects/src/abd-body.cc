@@ -2,7 +2,7 @@
 
 namespace ksk::scene {
 
-std::vector<runtime::PropertyDescriptor> ABDBodyObjectDesc::listProperties()
+std::vector<runtime::PropertyDescriptor> ABDBodyObject::listProperties()
     const
 {
   return {
@@ -11,6 +11,8 @@ std::vector<runtime::PropertyDescriptor> ABDBodyObjectDesc::listProperties()
        "ABD orthogonality stiffness"},
       {"contactThickness", runtime::PropertyType::Scalar, 1, 1,
        "ABD body contact thickness"},
+      {"frictionCoefficient", runtime::PropertyType::Scalar, 1, 1,
+       "ABD body friction coefficient override"},
       {"affine", runtime::PropertyType::Scalar, 12, 1,
        "ABD affine transform block"},
   };

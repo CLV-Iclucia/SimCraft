@@ -4,9 +4,8 @@
 
 namespace ksk::runtime::detail {
 
-[[nodiscard]] GlobalContactRouter runCCDOnCPU(
+[[nodiscard]] GlobalContactRouter rebuildActiveContactsOnCPU(
     const GlobalGeometryManager& geometry,
-    const GeometryBuffer& geometryDirection,
     const ContactDetectionConfig& config);
 
 [[nodiscard]] ContactCandidates detectContactCandidatesAlongDirectionOnCPU(
@@ -14,23 +13,7 @@ namespace ksk::runtime::detail {
     const GeometryBuffer& geometryDirection,
     const ContactDetectionConfig& config);
 
-[[nodiscard]] ContactWorkList gatherCollisionWorkListAlongDirectionOnCPU(
-    const GlobalGeometryManager& geometry,
-    const GeometryBuffer& geometryDirection,
-    const ContactDetectionConfig& config);
-
-[[nodiscard]] ContactCandidateDetectionResult
-detectContactCandidatesAndStepSizeAlongDirectionOnCPU(
-    const GlobalGeometryManager& geometry,
-    const GeometryBuffer& geometryDirection,
-    const ContactDetectionConfig& config);
-
-[[nodiscard]] GlobalContactRouter refreshActiveContactsFromCandidatesOnCPU(
-    const GlobalGeometryManager& geometry,
-    const ContactCandidates& candidates,
-    const ContactDetectionConfig& config);
-
-[[nodiscard]] ContactDetectionOutput runCCDOnGPU(
+[[nodiscard]] Real computeStepSizeUpperBoundAlongDirectionOnCPU(
     const GlobalGeometryManager& geometry,
     const GeometryBuffer& geometryDirection,
     const ContactDetectionConfig& config);

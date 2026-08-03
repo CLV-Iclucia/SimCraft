@@ -11,6 +11,7 @@ namespace RF {
 struct TypeInfo {
   const TypeInfo* parent;
   uint32_t depth;
+  const char* name;
 };
 
 using TypeId = const TypeInfo*;
@@ -22,7 +23,7 @@ template <typename T>
 struct StaticType;
 
 template <typename T>
-constexpr TypeId TypeOf()
+constexpr TypeId TypeOf() noexcept
 {
   return StaticType<T>::Id();
 }
@@ -48,6 +49,11 @@ constexpr bool IsA(TypeId self, TypeId target) noexcept
 inline uintptr_t ToInteger(TypeId id) noexcept
 {
   return reinterpret_cast<uintptr_t>(id);
+}
+
+constexpr std::string_view NameOf(TypeId id) noexcept
+{
+  return id && id->name ? std::string_view{id->name} : std::string_view{};
 }
 
 #define KISEKI_CORE_RTTI_RUNTIME_DEFINED 1

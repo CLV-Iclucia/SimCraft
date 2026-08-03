@@ -47,8 +47,7 @@ ksk::abd::ABDBodyDesc makeRigidBox(const glm::dvec3& half_extents,
   };
   body.initialTransform[3] = center;
   body.initialVelocity[3] = velocity;
-  body.density = 850.0;
-  body.contactThickness = 1.0e-3;
+  body.density = 1000.0;
   return body;
 }
 
@@ -219,8 +218,10 @@ int main(int argc, char** argv) {
   scene.solverConfig.maxNewtonIterations = 100;
   scene.solverConfig.maxPcgIterations = 1000;
   scene.solverConfig.enableContact = !no_contact;
-  scene.solverConfig.maxLineSearchIterations = 10;
+  scene.solverConfig.maxLineSearchIterations = 20;
   scene.solverConfig.contactBarrierDistance = 1.0e-3;
+  scene.solverConfig.solveMode = ksk::runtime::GlobalSolveMode::Decoupled;
+  scene.solverConfig.enableContact = true;
 
   const ksk::runtime::ObjectRef cloth =
       ksk::engine::fem::addClothMesh(scene, makeClothSheet(), "cloth-sheet");

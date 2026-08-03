@@ -32,18 +32,21 @@ TEST(ContactDetectionRegression, FindsSweptDeformableDeformablePointTriangle)
   GeometryBuffer direction = GeometryBuffer::CPU(geometry.pointCount());
   direction.cpu()[static_cast<size_t>(point)] = glm::dvec3{0.0, 0.0, -2.0};
 
-  const ContactCandidateDetectionResult result =
-      detectContactCandidatesAndStepSizeAlongDirection(
+  const ContactDetectionConfig config{
+      .dHat = 0.01,
+      .stiffness = 1.0,
+      .toi = 1.0,
+  };
+  const ContactCandidates candidates =
+      detectContactCandidatesAlongDirection(
           geometry,
           direction,
-          ContactDetectionConfig{
-              .dHat = 0.01,
-              .stiffness = 1.0,
-              .toi = 1.0,
-          });
+          config);
+  const Real step_size_upper_bound =
+      computeStepSizeUpperBoundAlongDirection(geometry, direction, config);
 
-  EXPECT_TRUE(hasPointTriangleCandidate(result.candidates, point));
-  EXPECT_LT(result.stepSizeUpperBound, 1.0);
+  EXPECT_TRUE(hasPointTriangleCandidate(candidates, point));
+  EXPECT_LT(step_size_upper_bound, 1.0);
 }
 
 TEST(ContactDetectionRegression, FindsSweptDeformableRigidPointTriangle)
@@ -84,18 +87,21 @@ TEST(ContactDetectionRegression, FindsSweptDeformableRigidPointTriangle)
   GeometryBuffer direction = GeometryBuffer::CPU(geometry.pointCount());
   direction.cpu()[static_cast<size_t>(point)] = glm::dvec3{0.0, 0.0, -2.0};
 
-  const ContactCandidateDetectionResult result =
-      detectContactCandidatesAndStepSizeAlongDirection(
+  const ContactDetectionConfig config{
+      .dHat = 0.01,
+      .stiffness = 1.0,
+      .toi = 1.0,
+  };
+  const ContactCandidates candidates =
+      detectContactCandidatesAlongDirection(
           geometry,
           direction,
-          ContactDetectionConfig{
-              .dHat = 0.01,
-              .stiffness = 1.0,
-              .toi = 1.0,
-          });
+          config);
+  const Real step_size_upper_bound =
+      computeStepSizeUpperBoundAlongDirection(geometry, direction, config);
 
-  EXPECT_TRUE(hasPointTriangleCandidate(result.candidates, point));
-  EXPECT_LT(result.stepSizeUpperBound, 1.0);
+  EXPECT_TRUE(hasPointTriangleCandidate(candidates, point));
+  EXPECT_LT(step_size_upper_bound, 1.0);
 }
 
 }  // namespace

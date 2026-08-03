@@ -1,14 +1,6 @@
 ﻿//
 // GIPC Barrier (RANK=2)
 //
-// b鈧?I鈧? = 魏 路 艥虏 路 (I鈧?1)虏 路 [ln(I鈧?]虏
-// I鈧?= d虏/d虃虏, 艥 = d虃虏
-//
-//   - dHat is d虃
-//   - dHatSqr() = d虃虏 = GIPC.cu "dHat"
-//   - all _d_* returns d虏
-//   - I鈧?= d虏/d虃虏
-//
 
 #pragma once
 #include <Contact/types.h>

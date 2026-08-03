@@ -49,8 +49,8 @@ void ABDSubsystemDesc::build(runtime::SubsystemBuildContext& context) const
   const runtime::RuntimeSceneDesc& scene = context.sceneDesc();
   for (const runtime::ObjectId body_id : bodies_) {
     runtime::ObjectRef body_ref = scene.findObjectById(body_id);
-    const ABDBodyObjectDesc* body_desc =
-        scene.findObjectDescAs<ABDBodyObjectDesc>(body_ref);
+    const ABDBodyObject* body_desc =
+        scene.findObjectDescAs<ABDBodyObject>(body_ref);
     if (!body_desc) {
       throw std::runtime_error("ABD subsystem references a missing body object");
     }
@@ -69,7 +69,7 @@ runtime::ObjectRef addABDBody(runtime::RuntimeSceneDesc& scene,
                               ABDBodyDesc body,
                               std::string tag)
 {
-  auto body_desc = std::make_unique<ABDBodyObjectDesc>(std::move(tag));
+  auto body_desc = std::make_unique<ABDBodyObject>(std::move(tag));
   body_desc->body = std::move(body);
 
   runtime::ObjectRef body_ref = scene.registerObject(std::move(body_desc));

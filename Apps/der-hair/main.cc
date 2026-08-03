@@ -19,7 +19,7 @@
 
 namespace {
 
-ksk::scene::HairObjectDesc makeHair(int segments,
+ksk::scene::HairObject makeHair(int segments,
                                     double length,
                                     double yOffset,
                                     double zOffset,
@@ -29,7 +29,7 @@ ksk::scene::HairObjectDesc makeHair(int segments,
     throw std::invalid_argument("hair strand requires at least two segments");
   }
 
-  ksk::scene::HairObjectDesc hair("hair");
+  ksk::scene::HairObject hair("hair");
   hair.material = material;
   hair.restBlocks.reserve(static_cast<size_t>(segments + 1));
   const double amplitude = length / 15.0;
@@ -76,7 +76,7 @@ void addTwistTestConstraints(ksk::runtime::RuntimeSceneDesc& scene,
                              const double& twistTarget)
 {
   const auto* hair =
-      scene.findObjectDescAs<ksk::scene::HairObjectDesc>(hairRef);
+      scene.findObjectDescAs<ksk::scene::HairObject>(hairRef);
   if (!hair) {
     throw std::runtime_error("cannot pin root of a non-hair object");
   }

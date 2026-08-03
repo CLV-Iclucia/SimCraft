@@ -10,30 +10,21 @@
 #include <utility>
 #include <vector>
 
-namespace ksk::der {
+#include "der-scene.generated.h"
 
-using RodObject = scene::RodObject;
+namespace ksk::der {
 
 struct DERRodDesc {
   std::vector<RodDof> restBlocks;
   RodMaterial material;
 };
 
-struct RodObjectDesc final : runtime::SceneObjectDesc {
-  using ObjectType = RodObject;
+struct KLASS() RodObject final : runtime::SceneObject {
+  KLASS_GENERATED_BODY()
 
-  explicit RodObjectDesc(std::string tag = {}) : SceneObjectDesc(std::move(tag))
+  explicit RodObject(std::string tag = {})
+      : SceneObject(std::move(tag))
   {
-  }
-
-  [[nodiscard]] runtime::ObjectTypeId typeId() const noexcept override
-  {
-    return runtime::elementTypeId<RodObject>();
-  }
-
-  [[nodiscard]] std::string_view typeName() const noexcept override
-  {
-    return "DERRodObject";
   }
 
   [[nodiscard]] std::vector<runtime::PropertyDescriptor> listProperties() const override
@@ -62,6 +53,6 @@ runtime::ObjectRef addRod(runtime::RuntimeSceneDesc& scene, DERRodDesc rod);
 namespace ksk::scene {
 
 [[nodiscard]] runtime::ObjectRef addHair(runtime::RuntimeSceneDesc& scene,
-                                         HairObjectDesc hair);
+                                         HairObject hair);
 
 }  // namespace ksk::scene

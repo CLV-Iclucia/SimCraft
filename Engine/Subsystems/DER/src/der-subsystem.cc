@@ -197,6 +197,12 @@ void DERSubsystem::applyLocalMatrix(runtime::ConstDofView x,
   cpu_backend_->applyLocalMatrix(x, y);
 }
 
+void DERSubsystem::appendLocalMatrixEntries(
+    std::vector<runtime::SparseMatrixEntry>& entries) const
+{
+  cpu_backend_->appendLocalMatrixEntries(entries);
+}
+
 void DERSubsystem::solveLocalSystem(runtime::ConstDofView b,
                                     runtime::DofView x) const
 {

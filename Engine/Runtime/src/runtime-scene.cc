@@ -87,6 +87,14 @@ void RuntimeSceneDesc::addSubsystem(std::unique_ptr<SubsystemDesc> subsystem)
   subsystems.push_back(std::move(subsystem));
 }
 
+void RuntimeSceneDesc::addCollider(SceneColliderDesc collider)
+{
+  if (collider.mesh.vertices.empty()) {
+    throw std::runtime_error("cannot add collider with no vertices");
+  }
+  colliders.push_back(std::move(collider));
+}
+
 void RuntimeSceneDesc::assignObjectToSubsystem(
     std::string subsystemType,
     ObjectId object,
@@ -148,20 +156,20 @@ ObjectRef RuntimeSceneDesc::registerObject(ObjectTypeId type,
   return ObjectRef{id, type, elements.back().tag};
 }
 
-ObjectRef RuntimeSceneDesc::registerObject(std::unique_ptr<SceneObjectDesc> element)
+ObjectRef RuntimeSceneDesc::registerObject(std::unique_ptr<SceneObject> element)
 {
   if (!element) {
     throw std::runtime_error("cannot register null scene element");
   }
   const ObjectId id{static_cast<int>(elements.size())};
-  const ObjectTypeId type = element->typeId();
+  const ObjectTypeId type = element->GetTypeId();
   const std::string tag = element->getTag();
   elements.push_back(
       SceneObjectEntry{id, type, tag, std::move(element)});
   return ObjectRef{id, type, elements.back().tag};
 }
 
-const SceneObjectDesc* RuntimeSceneDesc::findObjectDesc(ObjectId id) const
+const SceneObject* RuntimeSceneDesc::findObjectDesc(ObjectId id) const
 {
   if (id < 0 || id >= static_cast<int>(elements.size())) {
     return nullptr;
@@ -173,7 +181,7 @@ const SceneObjectDesc* RuntimeSceneDesc::findObjectDesc(ObjectId id) const
   return entry.element.get();
 }
 
-SceneObjectDesc* RuntimeSceneDesc::findObjectDesc(ObjectId id)
+SceneObject* RuntimeSceneDesc::findObjectDesc(ObjectId id)
 {
   if (id < 0 || id >= static_cast<int>(elements.size())) {
     return nullptr;
@@ -187,7 +195,7 @@ SceneObjectDesc* RuntimeSceneDesc::findObjectDesc(ObjectId id)
 
 std::vector<PropertyDescriptor> RuntimeSceneDesc::listProperties(ObjectRef ref) const
 {
-  const SceneObjectDesc* desc = findObjectDesc(ref.id);
+  const SceneObject* desc = findObjectDesc(ref.id);
   if (!desc) {
     return {};
   }
@@ -202,7 +210,7 @@ std::vector<PropertyDescriptor> RuntimeSceneDesc::listProperties(ObjectRef ref) 
 std::vector<ObjectRef> RuntimeSceneDesc::findChildren(ObjectRef ref) const
 {
   std::vector<ObjectRef> result;
-  const SceneObjectDesc* desc = findObjectDesc(ref.id);
+  const SceneObject* desc = findObjectDesc(ref.id);
   if (!desc) {
     return result;
   }
@@ -229,7 +237,7 @@ std::vector<ObjectRef> RuntimeSceneDesc::findObjects(ObjectTypeId type) const
   std::vector<ObjectRef> result;
   result.reserve(elements.size());
   for (const auto& entry : elements) {
-    if (entry.type == type) {
+    if (RF::IsA(entry.type, type)) {
       result.emplace_back(ObjectRef{entry.id, entry.type, entry.tag});
     }
   }
@@ -268,7 +276,11 @@ SimulationContext buildSimulation(const RuntimeSceneDesc& scene)
     }
     subsystem->build(context);
   }
-  return context.finish();
+  SimulationContext simulation = context.finish();
+  if (!scene.colliders.empty()) {
+    simulation.setSceneColliders(scene.colliders);
+  }
+  return simulation;
 }
 
 }  // namespace ksk::runtime

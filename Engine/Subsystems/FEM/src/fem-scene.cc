@@ -54,15 +54,15 @@ void FEMSubsystemDesc::build(runtime::SubsystemBuildContext& context) const
        ++mesh_index) {
     const runtime::ObjectId mesh_id = meshes[mesh_index];
     runtime::ObjectRef mesh_ref = scene.findObjectById(mesh_id);
-    if (const TetMeshObjectDesc* mesh_desc =
-            scene.findObjectDescAs<TetMeshObjectDesc>(mesh_ref)) {
+    if (const TetMeshObject* mesh_desc =
+            scene.findObjectDescAs<TetMeshObject>(mesh_ref)) {
       runtime_primitives.push_back(FEMTetMeshPrimitive{
           .mesh = mesh_desc->mesh,
           .offset = {},
           .runtime = {},
       });
-    } else if (const ClothMeshObjectDesc* cloth_desc =
-                   scene.findObjectDescAs<ClothMeshObjectDesc>(mesh_ref)) {
+    } else if (const ClothMeshObject* cloth_desc =
+                   scene.findObjectDescAs<ClothMeshObject>(mesh_ref)) {
       runtime_primitives.push_back(FEMClothPrimitive{
           .mesh = cloth_desc->mesh,
           .offset = {},
@@ -95,7 +95,7 @@ runtime::ObjectRef addTetMesh(runtime::RuntimeSceneDesc& scene,
                               TetMeshDesc mesh,
                               std::string tag)
 {
-  auto mesh_desc = std::make_unique<TetMeshObjectDesc>(std::move(tag));
+  auto mesh_desc = std::make_unique<TetMeshObject>(std::move(tag));
   mesh_desc->mesh = std::move(mesh);
 
   runtime::ObjectRef mesh_ref = scene.registerObject(std::move(mesh_desc));
@@ -107,7 +107,7 @@ runtime::ObjectRef addClothMesh(runtime::RuntimeSceneDesc& scene,
                                 ClothMeshDesc mesh,
                                 std::string tag)
 {
-  auto mesh_desc = std::make_unique<ClothMeshObjectDesc>(std::move(tag));
+  auto mesh_desc = std::make_unique<ClothMeshObject>(std::move(tag));
   mesh_desc->mesh = std::move(mesh);
 
   runtime::ObjectRef mesh_ref = scene.registerObject(std::move(mesh_desc));

@@ -10,6 +10,7 @@ CLASS_RE = re.compile(
     r"\b(?P<kind>class|struct)\s+"
     r"(?P<attrs>(?:(?:RF_CLASS|KLASS)\s*\([^)]*\)\s*)*)"
     r"(?P<name>[A-Za-z_]\w*)\s*"
+    r"(?:final\s*)?"
     r"(?P<bases>:[^{;]+)?\{",
     re.MULTILINE,
 )
@@ -53,12 +54,20 @@ def _scan_text(text: str, file_path: Path) -> list[ClassIR]:
 
         classes.append(
             ClassIR(
+                kind=match.group("kind"),
                 name=name,
                 qualified_name=qualified_name,
                 namespace=namespace,
                 location=SourceLocation(str(file_path), line, column),
                 annotations={"class": "rf.class"},
-                direct_base=_parse_direct_base(match.group("bases"), namespace, clean, file_path, match.start()),
+                direct_base=_parse_direct_base(
+                    match.group("bases"),
+                    namespace,
+                    clean,
+                    file_path,
+                    match.start(),
+                    match.group("kind"),
+                ),
                 has_rtti_body=bool(RTTI_BODY_RE.search(body)),
             )
         )
@@ -111,6 +120,7 @@ def _parse_direct_base(
     text: str,
     file_path: Path,
     class_pos: int,
+    kind: str,
 ) -> DirectBaseIR | None:
     if not bases:
         return None
@@ -122,7 +132,7 @@ def _parse_direct_base(
         return None
 
     first = chunks[0]
-    access = "private"
+    access = "public" if kind == "struct" else "private"
     is_virtual = False
     tokens = first.split()
     filtered: list[str] = []
@@ -136,15 +146,11 @@ def _parse_direct_base(
 
     base_name = " ".join(filtered).strip()
     if base_name.startswith("::"):
-        qualified = base_name[2:]
-    elif "::" in base_name or not namespace:
-        qualified = base_name
-    else:
-        qualified = f"{namespace}::{base_name}"
+        base_name = base_name[2:]
 
     line, column = _line_col(text, class_pos)
     return DirectBaseIR(
-        qualified_name=qualified,
+        qualified_name=base_name,
         access=access,
         is_virtual=is_virtual,
         location=SourceLocation(str(file_path), line, column),
@@ -160,4 +166,3 @@ def _line_col(text: str, pos: int) -> tuple[int, int]:
     last_newline = text.rfind("\n", 0, pos)
     column = pos + 1 if last_newline < 0 else pos - last_newline
     return line, column
-

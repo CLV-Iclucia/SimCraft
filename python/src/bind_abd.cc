@@ -250,7 +250,8 @@ void bind_abd(py::module_& m)
                        std::optional<py::array_t<double>> initialVelocity,
                        double density,
                        double contactThickness,
-                       double orthogonalStiffness) {
+                       double orthogonalStiffness,
+                       double frictionCoefficient) {
              if (density <= 0.0) {
                throw py::value_error("density must be positive");
              }
@@ -279,6 +280,7 @@ void bind_abd(py::module_& m)
              body->desc.density = density;
              body->desc.orthogonalStiffness = orthogonalStiffness;
              body->desc.contactThickness = contactThickness;
+             body->desc.frictionCoefficient = frictionCoefficient;
              return body;
            }),
            py::arg("vertices"),
@@ -288,7 +290,8 @@ void bind_abd(py::module_& m)
            py::arg("initial_velocity") = py::none(),
            py::arg("density") = 1.0,
            py::arg("contact_thickness") = 0.0,
-           py::arg("orthogonal_stiffness") = 1.0e6)
+           py::arg("orthogonal_stiffness") = 1.0e6,
+           py::arg("friction_coefficient") = -1.0)
       .def_property_readonly("num_vertices", [](const PyABDRigidBody& self) {
         return self.desc.surface.vertices.size();
       })
@@ -339,6 +342,14 @@ void bind_abd(py::module_& m)
               throw py::value_error("contact_thickness must be non-negative");
             }
             self.desc.contactThickness = contactThickness;
+          })
+      .def_property(
+          "friction_coefficient",
+          [](const PyABDRigidBody& self) {
+            return self.desc.frictionCoefficient;
+          },
+          [](PyABDRigidBody& self, double frictionCoefficient) {
+            self.desc.frictionCoefficient = frictionCoefficient;
           });
 
   py::class_<PyABDScene, std::shared_ptr<PyABDScene>>(m, "ABDScene")

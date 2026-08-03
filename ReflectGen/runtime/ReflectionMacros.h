@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string_view>
 
 #if defined(__has_include)
 #if __has_include(<Core/rtti.h>)
@@ -13,10 +14,16 @@ namespace RF {
 struct TypeInfo {
     const TypeInfo* parent;
     uint32_t depth;
+    const char* name;
 };
 
 using TypeId = const TypeInfo*;
 inline constexpr TypeId InvalidType = nullptr;
+
+constexpr std::string_view NameOf(TypeId id) noexcept
+{
+    return id && id->name ? std::string_view{id->name} : std::string_view{};
+}
 }
 #define KISEKI_CORE_RTTI_TYPES_DEFINED 1
 #endif

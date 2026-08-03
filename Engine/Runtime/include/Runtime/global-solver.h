@@ -76,6 +76,8 @@ class GlobalGaussNewtonSolver {
                                                 double dt);
   static void assembleContactGradient(SimulationContext& simulation,
                                       DofBuffer& gradient);
+  static void assembleContactFrictionGradient(SimulationContext& simulation,
+                                              DofBuffer& gradient);
   [[nodiscard]] static bool solveNewtonDirection(
       SimulationContext& simulation, const DofBuffer& gradient,
       DofBuffer& direction, GlobalSolverStatsCollector* stats,

@@ -61,12 +61,10 @@ struct ContactWorkList {
 
   std::vector<GeometryBodyBounds> bodies;
   std::vector<BodyPairWork> bodyPairs;
-  std::vector<std::array<int, 2>> pointTriangles;
-  std::vector<std::array<int, 2>> edgeEdges;
 
   [[nodiscard]] bool empty() const noexcept
   {
-    return bodyPairs.empty() && pointTriangles.empty() && edgeEdges.empty();
+    return bodyPairs.empty();
   }
 };
 
@@ -89,11 +87,6 @@ struct DeviceRoutedContactTables {
 using ContactDetectionOutput =
     std::variant<GlobalContactRouter, DeviceRoutedContactTables>;
 
-struct ContactCandidateDetectionResult {
-  ContactCandidates candidates;
-  Real stepSizeUpperBound = 1.0;
-};
-
 enum class ContactDetectionStorage {
   Auto,
   Host,
@@ -105,11 +98,13 @@ struct ContactDetectionConfig {
   Real dHat = 1.0e-3;
   Real stiffness = 1.0e5;
   Real toi = 1.0;
+  Real frictionCoefficient = 0.0;
+  Real frictionEpsilon = 1.0e-6;
+  const std::vector<glm::dvec3>* frictionReferencePositions = nullptr;
 };
 
-[[nodiscard]] GlobalContactRouter runCCD(
+[[nodiscard]] GlobalContactRouter rebuildActiveContacts(
     const GlobalGeometryManager& geometry,
-    const GeometryBuffer& geometryDirection,
     const ContactDetectionConfig& config = {});
 
 [[nodiscard]] ContactCandidates detectContactCandidatesAlongDirection(
@@ -117,18 +112,7 @@ struct ContactDetectionConfig {
     const GeometryBuffer& geometryDirection,
     const ContactDetectionConfig& config = {});
 
-[[nodiscard]] ContactCandidateDetectionResult
-detectContactCandidatesAndStepSizeAlongDirection(
-    const GlobalGeometryManager& geometry,
-    const GeometryBuffer& geometryDirection,
-    const ContactDetectionConfig& config = {});
-
-[[nodiscard]] GlobalContactRouter refreshActiveContactsFromCandidates(
-    const GlobalGeometryManager& geometry,
-    const ContactCandidates& candidates,
-    const ContactDetectionConfig& config = {});
-
-[[nodiscard]] ContactDetectionOutput detectContactTablesAlongDirection(
+[[nodiscard]] Real computeStepSizeUpperBoundAlongDirection(
     const GlobalGeometryManager& geometry,
     const GeometryBuffer& geometryDirection,
     const ContactDetectionConfig& config = {});

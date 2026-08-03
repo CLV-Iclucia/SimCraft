@@ -58,9 +58,9 @@ def _run_generate(args: argparse.Namespace) -> None:
         ir_paths.extend(_read_list_file(Path(args.input_ir_list)))
     units = [read_unit(path) for path in ir_paths]
     registry = merge_units(args.target, units)
-    header, source, ir = generate_registry(registry, Path(args.output_dir))
-    print(f"reflectgen: generated {header}")
-    print(f"reflectgen: generated {source}")
+    generated_files, ir = generate_registry(registry, Path(args.output_dir))
+    for path in generated_files:
+        print(f"reflectgen: generated {path}")
     print(f"reflectgen: wrote {ir}")
 
 
@@ -91,4 +91,3 @@ def _read_list_file(path: Path) -> list[Path]:
 
 if __name__ == "__main__":
     main()
-
