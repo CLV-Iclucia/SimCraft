@@ -9,10 +9,8 @@ std::vector<runtime::PropertyDescriptor> ABDBodyObject::listProperties()
       {"density", runtime::PropertyType::Scalar, 1, 1, "ABD body density"},
       {"orthogonalStiffness", runtime::PropertyType::Scalar, 1, 1,
        "ABD orthogonality stiffness"},
-      {"contactThickness", runtime::PropertyType::Scalar, 1, 1,
-       "ABD body contact thickness"},
-      {"frictionCoefficient", runtime::PropertyType::Scalar, 1, 1,
-       "ABD body friction coefficient override"},
+      {"physicalMaterial", runtime::PropertyType::Scalar, 1, 1,
+       "ABD body physical material id"},
       {"affine", runtime::PropertyType::Scalar, 12, 1,
        "ABD affine transform block"},
   };

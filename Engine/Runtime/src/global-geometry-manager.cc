@@ -338,7 +338,8 @@ GeometryInstanceIdx GlobalGeometryManager::addInstance(
   for (const auto& triangle : mesh.triangles) {
     addTriangle(PointIdx{point_range.first + triangle[0]},
                 PointIdx{point_range.first + triangle[1]},
-                PointIdx{point_range.first + triangle[2]}, mesh.radius);
+                PointIdx{point_range.first + triangle[2]},
+                2.0 * mesh.radius);
   }
 
   instances.push_back(GeometryInstance{

@@ -1,8 +1,8 @@
 #include <Contact/contact-barrier.h>
 #include <Core/profiler.h>
-#include <Runtime/contact-barrier-energy.h>
 #include <FEM/cpu/fem-cpu-backend.h>
 #include <FEM/fem-subsystem.h>
+#include <Runtime/contact-barrier-energy.h>
 #include <tbb/parallel_for.h>
 
 #include <Eigen/Sparse>
@@ -62,19 +62,6 @@ Eigen::VectorXd gatherLocalVector(runtime::ConstDofView view, int scalarCount) {
     local[i] = view[i];
   }
   return local;
-}
-
-int contactPointCount(runtime::ContactCase type) {
-  switch (type) {
-    case runtime::ContactCase::PP:
-      return 2;
-    case runtime::ContactCase::PE:
-      return 3;
-    case runtime::ContactCase::PT:
-    case runtime::ContactCase::EE:
-      return 4;
-  }
-  return 0;
 }
 
 const char* contactCaseName(runtime::ContactCase type) {
@@ -224,19 +211,13 @@ double appendContactGradientAndEnergy(const FEMSubsystem& subsystem,
       makeBarrierStencil(*local, contact.type);
 
   if (g == nullptr) {
-    return ksk::engine::contact::computeGIPCBarrierEnergy(barrier) +
-           runtime::computeContactFrictionEnergyGradient(
-               contact, std::span(local->x.data(), local->count), nullptr);
+    return ksk::engine::contact::computeGIPCBarrierEnergy(barrier);
   }
 
   const contact::LocalBarrierGradient barrier_gradient =
       ksk::engine::contact::computeGIPCBarrierGradient(barrier);
-  std::array<glm::dvec3, 4> total_gradient = barrier_gradient.gradient;
-  const double friction_energy =
-      runtime::computeContactFrictionEnergyGradient(
-          contact, std::span(local->x.data(), local->count), &total_gradient);
-  scatterBarrierValues(*local, total_gradient, *g);
-  return barrier_gradient.energy + friction_energy;
+  scatterBarrierValues(*local, barrier_gradient.gradient, *g);
+  return barrier_gradient.energy;
 }
 
 void applyContactHessianProduct(const FEMSubsystem& subsystem,
@@ -252,17 +233,7 @@ void applyContactHessianProduct(const FEMSubsystem& subsystem,
       ksk::engine::contact::computeGIPCBarrierHessianProduct(
           makeBarrierStencil(*local, contact.type),
           gatherBarrierDirection(*local, dq));
-  std::array<glm::dvec3, 4> direction = gatherBarrierDirection(*local, dq);
-  std::array<glm::dvec3, 4> total_product = product;
-  const std::array<glm::dvec3, 4> friction_product =
-      runtime::computeContactFrictionHessianProduct(
-          contact, std::span(local->x.data(), local->count),
-          std::span(direction.data(), local->count));
-  for (int i = 0; i < local->count; ++i) {
-    total_product[static_cast<size_t>(i)] +=
-        friction_product[static_cast<size_t>(i)];
-  }
-  scatterBarrierValues(*local, total_product, y);
+  scatterBarrierValues(*local, product, y);
 }
 
 size_t contactHessianTripletCount(const FEMSubsystem& subsystem,
@@ -287,17 +258,12 @@ void fillContactHessianTriplets(const FEMSubsystem& subsystem,
   const ksk::engine::contact::LocalBarrierHessian hessian =
       ksk::engine::contact::computeGIPCBarrierHessian(
           makeBarrierStencil(*local, contact.type));
-  const runtime::ContactLocalHessian friction_hessian =
-      runtime::computeContactFrictionHessian(
-          contact, std::span(local->x.data(), local->count));
   size_t index = 0;
   for (int row_point = 0; row_point < local->count; row_point++) {
     const int row_offset = local->qOffsets[row_point];
     for (int col_point = 0; col_point < local->count; col_point++) {
       const int col_offset = local->qOffsets[col_point];
-      const glm::dmat3 block =
-          hessian.blocks[row_point][col_point] +
-          friction_hessian.blocks[row_point][col_point];
+      const glm::dmat3 block = hessian.blocks[row_point][col_point];
       for (int row = 0; row < 3; row++) {
         for (int col = 0; col < 3; col++) {
           triplets[index++] = Eigen::Triplet<double>(
@@ -506,8 +472,9 @@ void FEMCPUBackend::prepareLocalOperator(double dt) {
                           internal_contact_offset);
     }
     const size_t contact_triplet_count =
-        counts.empty() ? 0 : offsets.back() + counts.back() -
-                                internal_contact_offset;
+        counts.empty()
+            ? 0
+            : offsets.back() + counts.back() - internal_contact_offset;
     triplets.resize(internal_contact_offset + contact_triplet_count);
 
     {

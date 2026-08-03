@@ -85,8 +85,8 @@ MollifiedFeatureGeometry mollifiedFeatureGeometry(
 
   const glm::dvec3 edge_a = stencil.x[1] - stencil.x[0];
   const glm::dvec3 edge_b = stencil.x[3] - stencil.x[2];
-  geometry.i1 = glm::dot(glm::cross(edge_a, edge_b),
-                         glm::cross(edge_a, edge_b));
+  geometry.i1 =
+      glm::dot(glm::cross(edge_a, edge_b), glm::cross(edge_a, edge_b));
   if (geometry.i1 <= 0.0) {
     return geometry;
   }
@@ -140,12 +140,10 @@ Real addMollifiedFeatureGradient(const GIPCBarrierStencil& stencil,
   }
 
   const gipc::Barrier barrier(stencil.dHat);
-  Eigen::Matrix<Real, 9, 1> flatten_pk1 =
-      Eigen::Matrix<Real, 9, 1>::Zero();
+  Eigen::Matrix<Real, 9, 1> flatten_pk1 = Eigen::Matrix<Real, 9, 1>::Zero();
   flatten_pk1(4) =
       stencil.kappa *
-      barrier.mollifierP1(geometry.i1, geometry.i2, geometry.epsX) *
-      geometry.c;
+      barrier.mollifierP1(geometry.i1, geometry.i2, geometry.epsX) * geometry.c;
   flatten_pk1(8) =
       stencil.kappa *
       barrier.mollifierP2(geometry.i1, geometry.i2, geometry.epsX) *
@@ -157,8 +155,7 @@ Real addMollifiedFeatureGradient(const GIPCBarrierStencil& stencil,
   return mollifiedFeatureEnergy(stencil);
 }
 
-LocalBarrierHessian mollifiedFeatureHessian(
-    const GIPCBarrierStencil& stencil) {
+LocalBarrierHessian mollifiedFeatureHessian(const GIPCBarrierStencil& stencil) {
   LocalBarrierHessian result;
   const MollifiedFeatureGeometry geometry = mollifiedFeatureGeometry(stencil);
   if (!geometry.active) {
@@ -192,8 +189,7 @@ LocalBarrierHessian mollifiedFeatureHessian(
   const Real lambda_g1g =
       stencil.kappa *
       barrier.mollifierLambdaG1G(geometry.i1, geometry.i2, geometry.epsX);
-  const gipc::PD2x2Result pd =
-      gipc::makePD2x2(lambda10, lambda_g1g, lambda20);
+  const gipc::PD2x2Result pd = gipc::makePD2x2(lambda10, lambda_g1g, lambda20);
   for (int index = 0; index < pd.numPositive; ++index) {
     const Real a = pd.eigenVecs[index].x;
     const Real b = pd.eigenVecs[index].y;
@@ -204,8 +200,8 @@ LocalBarrierHessian mollifiedFeatureHessian(
     projected_hessian(8, 8) += lambda * b * b;
   }
 
-  return scatterFlatHessian<4>(
-      pfpx.PFPx.transpose() * projected_hessian * pfpx.PFPx);
+  return scatterFlatHessian<4>(pfpx.PFPx.transpose() * projected_hessian *
+                               pfpx.PFPx);
 }
 
 template <int N>
@@ -342,19 +338,6 @@ LocalBarrierHessian mollifiedEEHessian(const GIPCBarrierStencil& stencil) {
 }
 }  // namespace
 
-int stencilPointCount(EBarrierStencil type) noexcept {
-  switch (type) {
-    case EBarrierStencil::PP:
-      return 2;
-    case EBarrierStencil::PE:
-      return 3;
-    case EBarrierStencil::PT:
-    case EBarrierStencil::EE:
-      return 4;
-  }
-  return 0;
-}
-
 Real computeGIPCBarrierEnergy(const GIPCBarrierStencil& stencil) {
   if (stencil.dHat <= 0.0 || stencil.kappa <= 0.0) {
     return 0.0;
@@ -369,8 +352,8 @@ Real computeGIPCBarrierEnergy(const GIPCBarrierStencil& stencil) {
                                 stencil.restX[3])) {
     return shared::shMollifiedEnergyEEWithOffset(
         stencil.x[0], stencil.x[1], stencil.x[2], stencil.x[3],
-        stencil.restX[0], stencil.restX[1], stencil.restX[2],
-        stencil.restX[3], stencil.dHat, stencil.kappa, stencil.reservedDist);
+        stencil.restX[0], stencil.restX[1], stencil.restX[2], stencil.restX[3],
+        stencil.dHat, stencil.kappa, stencil.reservedDist);
   }
   gipc::Barrier barrier(stencil.dHat);
   Real i5 = stencilI5(stencil);

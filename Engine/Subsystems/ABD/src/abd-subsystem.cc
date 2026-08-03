@@ -79,11 +79,10 @@ void ABDSubsystem::declareGeometry(runtime::GlobalGeometryManager& geometry)
                 .group = runtime::kDefaultCollisionGroup,
                 .mask = runtime::kAllCollisionGroups,
                 .enabled = true,
-                .frictionCoefficient = body_desc.frictionCoefficient});
+                .physicalMaterial = body_desc.physicalMaterial});
     runtime_body.geometryBody = geometry_body;
 
     runtime::GeometryMeshDesc surface = body_desc.surface;
-    surface.radius = body_desc.contactThickness;
     runtime_body.surfacePrototype =
         geometry.addGeometryPrototype(std::move(surface));
 

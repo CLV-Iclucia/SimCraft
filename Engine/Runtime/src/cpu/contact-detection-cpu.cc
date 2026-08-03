@@ -1,8 +1,7 @@
-#include <Runtime/contact-detection.h>
-
-#include <Contact/contact-barrier.h>
+#include <Contact/shared/ipc-distance.h>
 #include <Core/dynamic-bitset.h>
 #include <Core/profiler.h>
+#include <Runtime/contact-detection.h>
 #include <Spatify/lbvh.h>
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
@@ -21,12 +20,18 @@
 #include <vector>
 
 #include "../contact-detection-impl.h"
+#include "../contact-geometry-utils.h"
 
 namespace ksk::runtime {
 namespace {
 constexpr int kMaxACCDIterations = 2000;
 constexpr Real kACCDGapFraction = 0.1;
 constexpr Real kBVHMinimumExtent = 1.0e-12;
+
+using detail::closestSegmentParameters;
+using detail::pointEdgeProjectionParameter;
+using detail::safeNormalize;
+using detail::triangleBarycentric;
 
 enum class PointTriangleDistanceType {
   P_A,
@@ -154,10 +159,6 @@ struct CurrentActiveContactWork {
   size_t edgeEdgeLeafPairs = 0;
 };
 
-int stencilPointCount(ContactCase type);
-Real pointEdgeProjectionParameter(const glm::dvec3& p, const glm::dvec3& a,
-                                  const glm::dvec3& b);
-
 spatify::BBox<Real, 3> ensureFiniteBVHBounds(spatify::BBox<Real, 3> bounds) {
   for (int axis = 0; axis < 3; ++axis) {
     const Real extent = bounds.hi[axis] - bounds.lo[axis];
@@ -179,7 +180,7 @@ void makeBoundsSafeForLBVH(std::vector<PrimitiveRef>& primitives) {
 
 [[nodiscard]] spatify::LBVH<Real> buildLBVH(
     std::vector<PrimitiveRef>& primitives) {
-//  makeBoundsSafeForLBVH(primitives);
+  //  makeBoundsSafeForLBVH(primitives);
   spatify::LBVH<Real> tree;
 
   if (!primitives.empty())
@@ -190,7 +191,7 @@ void makeBoundsSafeForLBVH(std::vector<PrimitiveRef>& primitives) {
 
 [[nodiscard]] spatify::LBVH<Real> buildIndexedLBVH(
     std::vector<PrimitiveRef>& primitives) {
-//  makeBoundsSafeForLBVH(primitives);
+  //  makeBoundsSafeForLBVH(primitives);
   spatify::LBVH<Real> tree;
 
   if (!primitives.empty())
@@ -228,8 +229,7 @@ bool isRigidBody(const GlobalGeometryManager& geometry, GeometryBodyIdx body) {
   return geometry.geometryBody(body).type & Rigid;
 }
 
-GeometryBodyIdx pointBody(const GlobalGeometryManager& geometry,
-                          int point) {
+GeometryBodyIdx pointBody(const GlobalGeometryManager& geometry, int point) {
   return geometry.pointOwner(point).body;
 }
 
@@ -255,233 +255,6 @@ bool edgeEdgeCollisionEnabled(const GlobalGeometryManager& geometry,
   return geometryPairCollisionEnabled(geometry, first[0], second[0]);
 }
 
-glm::dvec3 safeNormalize(glm::dvec3 value, glm::dvec3 fallback) {
-  const Real length = glm::length(value);
-  if (std::isfinite(length) && length > 1.0e-12) {
-    return value / length;
-  }
-  const Real fallback_length = glm::length(fallback);
-  if (std::isfinite(fallback_length) && fallback_length > 1.0e-12) {
-    return fallback / fallback_length;
-  }
-  return glm::dvec3(0.0, 1.0, 0.0);
-}
-
-std::array<Real, 3> triangleBarycentric(const glm::dvec3& p,
-                                        const glm::dvec3& a,
-                                        const glm::dvec3& b,
-                                        const glm::dvec3& c) {
-  const glm::dvec3 v0 = b - a;
-  const glm::dvec3 v1 = c - a;
-  const glm::dvec3 v2 = p - a;
-  const Real d00 = glm::dot(v0, v0);
-  const Real d01 = glm::dot(v0, v1);
-  const Real d11 = glm::dot(v1, v1);
-  const Real d20 = glm::dot(v2, v0);
-  const Real d21 = glm::dot(v2, v1);
-  const Real denom = d00 * d11 - d01 * d01;
-  if (std::abs(denom) <= 1.0e-18) {
-    return {1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0};
-  }
-  Real v = (d11 * d20 - d01 * d21) / denom;
-  Real w = (d00 * d21 - d01 * d20) / denom;
-  Real u = 1.0 - v - w;
-  u = std::clamp(u, 0.0, 1.0);
-  v = std::clamp(v, 0.0, 1.0);
-  w = std::clamp(w, 0.0, 1.0);
-  const Real sum = u + v + w;
-  if (sum > 1.0e-18) {
-    u /= sum;
-    v /= sum;
-    w /= sum;
-  }
-  return {u, v, w};
-}
-
-std::array<Real, 2> closestSegmentParameters(const glm::dvec3& p1,
-                                             const glm::dvec3& q1,
-                                             const glm::dvec3& p2,
-                                             const glm::dvec3& q2) {
-  const glm::dvec3 d1 = q1 - p1;
-  const glm::dvec3 d2 = q2 - p2;
-  const glm::dvec3 r = p1 - p2;
-  const Real a = glm::dot(d1, d1);
-  const Real e = glm::dot(d2, d2);
-  const Real f = glm::dot(d2, r);
-  Real s = 0.0;
-  Real t = 0.0;
-
-  if (a <= 1.0e-18 && e <= 1.0e-18) {
-    return {0.0, 0.0};
-  }
-  if (a <= 1.0e-18) {
-    t = std::clamp(f / e, 0.0, 1.0);
-  } else {
-    const Real c = glm::dot(d1, r);
-    if (e <= 1.0e-18) {
-      s = std::clamp(-c / a, 0.0, 1.0);
-    } else {
-      const Real b = glm::dot(d1, d2);
-      const Real denom = a * e - b * b;
-      if (std::abs(denom) > 1.0e-18) {
-        s = std::clamp((b * f - c * e) / denom, 0.0, 1.0);
-      }
-      t = (b * s + f) / e;
-      if (t < 0.0) {
-        t = 0.0;
-        s = std::clamp(-c / a, 0.0, 1.0);
-      } else if (t > 1.0) {
-        t = 1.0;
-        s = std::clamp((b - c) / a, 0.0, 1.0);
-      }
-    }
-  }
-  return {s, t};
-}
-
-Real contactFrictionCoefficient(const ContactStencil& stencil,
-                                const GlobalGeometryManager& geometry,
-                                const ContactDetectionConfig& config) {
-  Real coefficient = config.frictionCoefficient;
-  bool has_override = false;
-  const int count = stencilPointCount(stencil.type);
-  for (int i = 0; i < count; ++i) {
-    const int id = stencil.geometryIds[static_cast<size_t>(i)];
-    if (id < 0 || id >= geometry.pointCount()) {
-      continue;
-    }
-    const GeometryBodyIdx body = geometry.pointOwner(PointIdx{id}).body;
-    if (body < 0 ||
-        body >= static_cast<int>(geometry.bodyCollisionFilters.size())) {
-      continue;
-    }
-    const Real body_coefficient =
-        geometry.bodyCollisionFilters[static_cast<size_t>(body)]
-            .frictionCoefficient;
-    if (body_coefficient < 0.0) {
-      continue;
-    }
-    coefficient =
-        has_override ? std::min(coefficient, body_coefficient)
-                     : body_coefficient;
-    has_override = true;
-  }
-  return coefficient;
-}
-
-ksk::engine::contact::EBarrierStencil barrierStencilType(ContactCase type) {
-  switch (type) {
-    case ContactCase::PP:
-      return ksk::engine::contact::EBarrierStencil::PP;
-    case ContactCase::PE:
-      return ksk::engine::contact::EBarrierStencil::PE;
-    case ContactCase::PT:
-      return ksk::engine::contact::EBarrierStencil::PT;
-    case ContactCase::EE:
-      return ksk::engine::contact::EBarrierStencil::EE;
-  }
-  return ksk::engine::contact::EBarrierStencil::PP;
-}
-
-Real estimateFrictionNormalForce(const ContactStencil& stencil,
-                                 const std::array<glm::dvec3, 4>& x) {
-  engine::contact::GIPCBarrierStencil barrier;
-  barrier.type = barrierStencilType(stencil.type);
-  barrier.dHat = stencil.dHat;
-  barrier.reservedDist = stencil.thickness;
-  barrier.kappa = stencil.stiffness;
-  const int count = stencilPointCount(stencil.type);
-
-  for (int i = 0; i < count; ++i) {
-    barrier.x[i] = x[i];
-    barrier.restX[i] = stencil.frictionReferenceX[i];
-  }
-
-  const engine::contact::LocalBarrierGradient gradient =
-      ksk::engine::contact::computeGIPCBarrierGradient(barrier);
-  glm::dvec3 relative_gradient(0.0);
-  Real weight_norm_sqr = 0.0;
-  for (int i = 0; i < count; ++i) {
-    const Real weight = stencil.frictionWeights[static_cast<size_t>(i)];
-    relative_gradient += weight * gradient.gradient[static_cast<size_t>(i)];
-    weight_norm_sqr += weight * weight;
-  }
-  if (weight_norm_sqr <= 1.0e-18) {
-    return 0.0;
-  }
-  return std::abs(glm::dot(relative_gradient, stencil.frictionNormal)) /
-         weight_norm_sqr;
-}
-
-void initializeFriction(ContactStencil& stencil,
-                        const GlobalGeometryManager& geometry,
-                        const ContactDetectionConfig& config) {
-  const Real coefficient =
-      contactFrictionCoefficient(stencil, geometry, config);
-  if (coefficient <= 0.0) {
-    return;
-  }
-
-  const int count = stencilPointCount(stencil.type);
-  std::array<glm::dvec3, 4> x{
-      glm::dvec3(0.0), glm::dvec3(0.0), glm::dvec3(0.0), glm::dvec3(0.0)};
-  for (int i = 0; i < count; ++i) {
-    const int id = stencil.geometryIds[i];
-    if (id < 0) {
-      return;
-    }
-    x[i] = geometry.worldPosition(PointIdx{id});
-    if (config.frictionReferencePositions != nullptr &&
-        id < config.frictionReferencePositions->size()) {
-      stencil.frictionReferenceX[i] = (*config.frictionReferencePositions)[id];
-    } else {
-      stencil.frictionReferenceX[i] = x[i];
-    }
-  }
-
-  switch (stencil.type) {
-    case ContactCase::PP:
-      stencil.frictionWeights = {1.0, -1.0, 0.0, 0.0};
-      break;
-    case ContactCase::PE: {
-      const Real t = pointEdgeProjectionParameter(x[0], x[1], x[2]);
-      stencil.frictionWeights = {1.0, -(1.0 - t), -t, 0.0};
-      break;
-    }
-    case ContactCase::PT: {
-      const glm::dvec3 normal = safeNormalize(glm::cross(x[2] - x[1],
-                                                        x[3] - x[1]),
-                                             x[0] - x[1]);
-      const glm::dvec3 projected = x[0] - normal * glm::dot(x[0] - x[1], normal);
-      const auto bary = triangleBarycentric(projected, x[1], x[2], x[3]);
-      stencil.frictionWeights = {1.0, -bary[0], -bary[1], -bary[2]};
-      break;
-    }
-    case ContactCase::EE: {
-      const auto params = closestSegmentParameters(x[0], x[1], x[2], x[3]);
-      const Real s = params[0];
-      const Real t = params[1];
-      stencil.frictionWeights = {1.0 - s, s, -(1.0 - t), -t};
-      break;
-    }
-  }
-
-  glm::dvec3 relative(0.0);
-  for (int i = 0; i < count; ++i) {
-    relative += stencil.frictionWeights[i] * x[i];
-  }
-  glm::dvec3 fallback = relative;
-  if (stencil.type == ContactCase::PT) {
-    fallback = glm::cross(x[2] - x[1], x[3] - x[1]);
-  } else if (stencil.type == ContactCase::EE) {
-    fallback = glm::cross(x[1] - x[0], x[3] - x[2]);
-  }
-  stencil.frictionNormal = safeNormalize(relative, fallback);
-  stencil.frictionCoefficient = coefficient;
-  stencil.frictionEpsilon = std::max<Real>(config.frictionEpsilon, 1.0e-12);
-  stencil.frictionNormalForce = estimateFrictionNormalForce(stencil, x);
-}
-
 [[nodiscard]] std::vector<size_t> exclusiveOffsets(
     const std::vector<size_t>& counts) {
   std::vector<size_t> offsets(counts.size() + 1, size_t{0});
@@ -504,7 +277,6 @@ ContactStencil makeStencil(ContactCase type, std::array<int, 4> ids,
       .stiffness = config.stiffness,
       .thickness = reserved_dist,
   };
-  initializeFriction(stencil, geometry, config);
   return stencil;
 }
 
@@ -520,8 +292,7 @@ ContactCandidate makeCandidate(EContactCandidate kind, std::array<int, 4> ids,
   };
 }
 
-void addCandidateHit(CandidateDetectionResult& result,
-                     CandidateHit hit) {
+void addCandidateHit(CandidateDetectionResult& result, CandidateHit hit) {
   if (hit.toi) {
     result.stepSizeUpperBound =
         std::min(result.stepSizeUpperBound, std::clamp(*hit.toi, 0.0, 1.0));
@@ -596,13 +367,12 @@ Real triangleSurfaceOffset(const GlobalGeometryManager& geometry,
   Real offset = 0.0;
   for (const GeometryTriangle& candidate : geometry.triangles) {
     const std::array points{candidate.p0, candidate.p1, candidate.p2};
-    const bool same =
-        (points[0] == triangle[0] || points[0] == triangle[1] ||
-         points[0] == triangle[2]) &&
-        (points[1] == triangle[0] || points[1] == triangle[1] ||
-         points[1] == triangle[2]) &&
-        (points[2] == triangle[0] || points[2] == triangle[1] ||
-         points[2] == triangle[2]);
+    const bool same = (points[0] == triangle[0] || points[0] == triangle[1] ||
+                       points[0] == triangle[2]) &&
+                      (points[1] == triangle[0] || points[1] == triangle[1] ||
+                       points[1] == triangle[2]) &&
+                      (points[2] == triangle[0] || points[2] == triangle[1] ||
+                       points[2] == triangle[2]);
     if (same) {
       offset = std::max(offset, candidate.thickness);
     }
@@ -612,11 +382,10 @@ Real triangleSurfaceOffset(const GlobalGeometryManager& geometry,
 
 Real edgeSurfaceOffset(const GlobalGeometryManager& geometry, PointIdx p0,
                        PointIdx p1, Real fallback = 0.0) {
-  Real offset =
-      std::max({pointRadius(geometry, p0), pointRadius(geometry, p1), fallback});
+  Real offset = std::max(
+      {pointRadius(geometry, p0), pointRadius(geometry, p1), fallback});
   for (const GeometryEdge& edge : geometry.edges) {
-    if ((edge.p0 == p0 && edge.p1 == p1) ||
-        (edge.p0 == p1 && edge.p1 == p0)) {
+    if ((edge.p0 == p0 && edge.p1 == p1) || (edge.p0 == p1 && edge.p1 == p0)) {
       offset = std::max(offset, edge.radius);
     }
   }
@@ -630,284 +399,35 @@ Real pointEdgeSurfaceOffset(const GlobalGeometryManager& geometry,
          edgeSurfaceOffset(geometry, edge0, edge1, fallback);
 }
 
-Real distanceSqrPointPoint(const glm::dvec3& a, const glm::dvec3& b) {
-  const glm::dvec3 d = a - b;
-  return glm::dot(d, d);
-}
-
-Real distanceSqrPointLine(const glm::dvec3& p, const glm::dvec3& a,
-                          const glm::dvec3& b) {
-  const glm::dvec3 e = b - a;
-  const Real e_len2 = glm::dot(e, e);
-  if (e_len2 == 0.0) {
-    return distanceSqrPointPoint(p, a);
-  }
-  const glm::dvec3 c = glm::cross(e, p - a);
-  return glm::dot(c, c) / e_len2;
-}
-
-Real distanceSqrPointPlane(const glm::dvec3& p, const glm::dvec3& a,
-                           const glm::dvec3& b, const glm::dvec3& c) {
-  const glm::dvec3 normal = glm::cross(b - a, c - a);
-  const Real n_len2 = glm::dot(normal, normal);
-  if (n_len2 == 0.0) {
-    return std::min({distanceSqrPointLine(p, a, b),
-                     distanceSqrPointLine(p, b, c),
-                     distanceSqrPointLine(p, c, a)});
-  }
-  const Real d = glm::dot(p - a, normal);
-  return d * d / n_len2;
-}
-
-Real distanceSqrLineLine(const glm::dvec3& a0, const glm::dvec3& a1,
-                         const glm::dvec3& b0, const glm::dvec3& b1) {
-  const glm::dvec3 normal = glm::cross(a1 - a0, b1 - b0);
-  const Real n_len2 = glm::dot(normal, normal);
-  if (n_len2 == 0.0) {
-    return distanceSqrPointLine(a0, b0, b1);
-  }
-  const Real d = glm::dot(a0 - b0, normal);
-  return d * d / n_len2;
-}
-
-void pointTriangleEdgeTest(const glm::dvec3& from, const glm::dvec3& to,
-                           const glm::dvec3& point, const glm::dvec3& normal,
-                           Real& s, Real& t) {
-  const glm::dvec3 e = to - from;
-  const glm::dvec3 n = glm::cross(e, normal);
-  const Real a00 = glm::dot(e, e);
-  const Real a01 = glm::dot(e, n);
-  const Real a11 = glm::dot(n, n);
-  const Real b0 = glm::dot(e, point - from);
-  const Real b1 = glm::dot(n, point - from);
-  const Real det = a00 * a11 - a01 * a01;
-  if (det == 0.0) {
-    s = 0.0;
-    t = -1.0;
-    return;
-  }
-  s = (a11 * b0 - a01 * b1) / det;
-  t = (a00 * b1 - a01 * b0) / det;
-}
-
 PointTriangleDistanceType decidePointTriangleDistanceType(const glm::dvec3& p,
                                                           const glm::dvec3& a,
                                                           const glm::dvec3& b,
                                                           const glm::dvec3& c) {
-  const glm::dvec3 normal = glm::cross(b - a, c - a);
-  if (glm::dot(normal, normal) == 0.0) {
-    const Real da = distanceSqrPointLine(p, a, b);
-    const Real db = distanceSqrPointLine(p, b, c);
-    const Real dc = distanceSqrPointLine(p, c, a);
-    if (da <= db && da <= dc) {
-      return PointTriangleDistanceType::P_AB;
-    }
-    if (db <= dc) {
-      return PointTriangleDistanceType::P_BC;
-    }
-    return PointTriangleDistanceType::P_CA;
-  }
-
-  Real s0 = 0.0;
-  Real t0 = 0.0;
-  pointTriangleEdgeTest(a, b, p, normal, s0, t0);
-  if (s0 > 0.0 && s0 < 1.0 && t0 >= 0.0) {
-    return PointTriangleDistanceType::P_AB;
-  }
-
-  Real s1 = 0.0;
-  Real t1 = 0.0;
-  pointTriangleEdgeTest(b, c, p, normal, s1, t1);
-  if (s1 > 0.0 && s1 < 1.0 && t1 >= 0.0) {
-    return PointTriangleDistanceType::P_BC;
-  }
-
-  Real s2 = 0.0;
-  Real t2 = 0.0;
-  pointTriangleEdgeTest(c, a, p, normal, s2, t2);
-  if (s2 > 0.0 && s2 < 1.0 && t2 >= 0.0) {
-    return PointTriangleDistanceType::P_CA;
-  }
-
-  if (s0 <= 0.0 && s2 >= 1.0) {
-    return PointTriangleDistanceType::P_A;
-  }
-  if (s1 <= 0.0 && s0 >= 1.0) {
-    return PointTriangleDistanceType::P_B;
-  }
-  if (s2 <= 0.0 && s1 >= 1.0) {
-    return PointTriangleDistanceType::P_C;
-  }
-  return PointTriangleDistanceType::P_ABC;
-}
-
-EdgeEdgeDistanceType decideEdgeEdgeParallelDistanceType(const glm::dvec3& ea0,
-                                                        const glm::dvec3& ea1,
-                                                        const glm::dvec3& eb0,
-                                                        const glm::dvec3& eb1) {
-  const glm::dvec3 ea = ea1 - ea0;
-  const Real ea_sqr = glm::dot(ea, ea);
-  if (ea_sqr == 0.0) {
-    return EdgeEdgeDistanceType::A_C;
-  }
-  const Real alpha = glm::dot(eb0 - ea0, ea) / ea_sqr;
-  const Real beta = glm::dot(eb1 - ea0, ea) / ea_sqr;
-
-  int eac = 0;
-  int ebc = 0;
-  if (alpha < 0.0) {
-    eac = (0.0 <= beta && beta <= 1.0) ? 2 : 0;
-    ebc = (beta <= alpha) ? 0 : (beta <= 1.0 ? 1 : 2);
-  } else if (alpha > 1.0) {
-    eac = (0.0 <= beta && beta <= 1.0) ? 2 : 1;
-    ebc = (beta >= alpha) ? 0 : (0.0 <= beta ? 1 : 2);
-  } else {
-    eac = 2;
-    ebc = 0;
-  }
-
-  if (ebc < 2) {
-    const int code = (eac << 1) | ebc;
-    switch (code) {
-      case 0:
-        return EdgeEdgeDistanceType::A_C;
-      case 1:
-        return EdgeEdgeDistanceType::A_D;
-      case 2:
-        return EdgeEdgeDistanceType::B_C;
-      case 3:
-        return EdgeEdgeDistanceType::B_D;
-      case 4:
-        return EdgeEdgeDistanceType::AB_C;
-      default:
-        return EdgeEdgeDistanceType::AB_D;
-    }
-  }
-
-  return eac == 0 ? EdgeEdgeDistanceType::A_CD : EdgeEdgeDistanceType::B_CD;
+  return static_cast<PointTriangleDistanceType>(
+      engine::contact::shared::shDecidePointTriangleDistanceType(p, a, b, c));
 }
 
 EdgeEdgeDistanceType decideEdgeEdgeDistanceType(const glm::dvec3& ea0,
                                                 const glm::dvec3& ea1,
                                                 const glm::dvec3& eb0,
                                                 const glm::dvec3& eb1) {
-  constexpr Real parallel_threshold = 1.0e-20;
-  const glm::dvec3 u = ea1 - ea0;
-  const glm::dvec3 v = eb1 - eb0;
-  const glm::dvec3 w = ea0 - eb0;
-
-  const Real a = glm::dot(u, u);
-  const Real b = glm::dot(u, v);
-  const Real c = glm::dot(v, v);
-  const Real d = glm::dot(u, w);
-  const Real e = glm::dot(v, w);
-  const Real det = a * c - b * b;
-
-  if (a == 0.0 && c == 0.0) {
-    return EdgeEdgeDistanceType::A_C;
-  }
-  if (a == 0.0) {
-    return EdgeEdgeDistanceType::A_CD;
-  }
-  if (c == 0.0) {
-    return EdgeEdgeDistanceType::AB_C;
-  }
-
-  const Real parallel_tolerance = parallel_threshold * std::max(1.0, a * c);
-  const glm::dvec3 uxv = glm::cross(u, v);
-  if (glm::dot(uxv, uxv) < parallel_tolerance) {
-    return decideEdgeEdgeParallelDistanceType(ea0, ea1, eb0, eb1);
-  }
-
-  EdgeEdgeDistanceType default_case = EdgeEdgeDistanceType::AB_CD;
-  const Real sN = b * e - c * d;
-  Real tN = 0.0;
-  Real tD = 0.0;
-  if (sN <= 0.0) {
-    tN = e;
-    tD = c;
-    default_case = EdgeEdgeDistanceType::A_CD;
-  } else if (sN >= det) {
-    tN = e + b;
-    tD = c;
-    default_case = EdgeEdgeDistanceType::B_CD;
-  } else {
-    tN = a * e - b * d;
-    tD = det;
-  }
-
-  if (tN <= 0.0) {
-    if (-d <= 0.0) {
-      return EdgeEdgeDistanceType::A_C;
-    }
-    return -d >= a ? EdgeEdgeDistanceType::B_C : EdgeEdgeDistanceType::AB_C;
-  }
-  if (tN >= tD) {
-    if ((-d + b) <= 0.0) {
-      return EdgeEdgeDistanceType::A_D;
-    }
-    return (-d + b) >= a ? EdgeEdgeDistanceType::B_D
-                         : EdgeEdgeDistanceType::AB_D;
-  }
-  return default_case;
+  return static_cast<EdgeEdgeDistanceType>(
+      engine::contact::shared::shDecideEdgeEdgeDistanceType(ea0, ea1, eb0,
+                                                            eb1));
 }
 
 Real pointTriangleDistanceSqrByType(PointTriangleDistanceType type,
                                     const glm::dvec3& p, const glm::dvec3& a,
                                     const glm::dvec3& b, const glm::dvec3& c) {
-  switch (type) {
-    case PointTriangleDistanceType::P_A:
-      return distanceSqrPointPoint(p, a);
-    case PointTriangleDistanceType::P_B:
-      return distanceSqrPointPoint(p, b);
-    case PointTriangleDistanceType::P_C:
-      return distanceSqrPointPoint(p, c);
-    case PointTriangleDistanceType::P_AB:
-      return distanceSqrPointLine(p, a, b);
-    case PointTriangleDistanceType::P_BC:
-      return distanceSqrPointLine(p, b, c);
-    case PointTriangleDistanceType::P_CA:
-      return distanceSqrPointLine(p, c, a);
-    case PointTriangleDistanceType::P_ABC:
-      return distanceSqrPointPlane(p, a, b, c);
-  }
-  return 0.0;
+  return engine::contact::shared::shDistanceSqrPointTriangleByType(
+      static_cast<int>(type), p, a, b, c);
 }
 
 Real edgeEdgeDistanceSqrByType(EdgeEdgeDistanceType type, const glm::dvec3& a0,
                                const glm::dvec3& a1, const glm::dvec3& b0,
                                const glm::dvec3& b1) {
-  switch (type) {
-    case EdgeEdgeDistanceType::A_C:
-      return distanceSqrPointPoint(a0, b0);
-    case EdgeEdgeDistanceType::A_D:
-      return distanceSqrPointPoint(a0, b1);
-    case EdgeEdgeDistanceType::B_C:
-      return distanceSqrPointPoint(a1, b0);
-    case EdgeEdgeDistanceType::B_D:
-      return distanceSqrPointPoint(a1, b1);
-    case EdgeEdgeDistanceType::AB_C:
-      return distanceSqrPointLine(b0, a0, a1);
-    case EdgeEdgeDistanceType::AB_D:
-      return distanceSqrPointLine(b1, a0, a1);
-    case EdgeEdgeDistanceType::A_CD:
-      return distanceSqrPointLine(a0, b0, b1);
-    case EdgeEdgeDistanceType::B_CD:
-      return distanceSqrPointLine(a1, b0, b1);
-    case EdgeEdgeDistanceType::AB_CD:
-      return distanceSqrLineLine(a0, a1, b0, b1);
-  }
-  return 0.0;
-}
-
-Real pointEdgeProjectionParameter(const glm::dvec3& p, const glm::dvec3& a,
-                                  const glm::dvec3& b) {
-  const glm::dvec3 e = b - a;
-  const Real e_len2 = glm::dot(e, e);
-  if (e_len2 == 0.0) {
-    return 0.0;
-  }
-  return glm::dot(p - a, e) / e_len2;
+  return engine::contact::shared::shDistanceSqrEdgeEdgeByType(
+      static_cast<int>(type), a0, a1, b0, b1);
 }
 
 std::optional<Real> runACCD(bool edgeEdge, std::array<glm::dvec3, 4> x,
@@ -941,7 +461,7 @@ std::optional<Real> runACCD(bool edgeEdge, std::array<glm::dvec3, 4> x,
 
   Real dis = distance();
   if (dis <= reserved_distance) {
-    return 0.0;
+    return std::nullopt;
   }
   const Real initial_gap = dis - reserved_distance;
   const Real gap = kACCDGapFraction * initial_gap;
@@ -986,8 +506,7 @@ std::optional<CandidateHit> makeSweptPointTriangleCandidate(
       geometry.triangles.at(static_cast<size_t>(triangle_id)).thickness;
   const PointTriangleDistanceType type =
       decidePointTriangleDistanceType(p, a, b, c);
-  const Real distance_sqr =
-      pointTriangleDistanceSqrByType(type, p, a, b, c);
+  const Real distance_sqr = pointTriangleDistanceSqrByType(type, p, a, b, c);
   const std::optional<Real> toi =
       runACCD(false, {p, a, b, c},
               {direction[point], direction[triangle[0]], direction[triangle[1]],
@@ -1039,8 +558,7 @@ std::optional<CandidateHit> makeSweptEdgeEdgeCandidate(
       geometry.edges.at(static_cast<size_t>(first_id)).radius +
       geometry.edges.at(static_cast<size_t>(second_id)).radius;
   const EdgeEdgeDistanceType type = decideEdgeEdgeDistanceType(a0, a1, b0, b1);
-  const Real distance_sqr =
-      edgeEdgeDistanceSqrByType(type, a0, a1, b0, b1);
+  const Real distance_sqr = edgeEdgeDistanceSqrByType(type, a0, a1, b0, b1);
   const std::optional<Real> toi =
       runACCD(true, {a0, a1, b0, b1},
               {direction[first[0]], direction[first[1]], direction[second[0]],
@@ -1092,9 +610,10 @@ ContactStencil createPointEdgeStencil(PointIdx point, PointIdx edge0,
                                       const GlobalGeometryManager& geometry,
                                       const ContactDetectionConfig& config,
                                       Real fallback_edge_offset = 0.0) {
-  return makeStencil(ContactCase::PE, {point, edge0, edge1, -1}, geometry, config,
+  return makeStencil(ContactCase::PE, {point, edge0, edge1, -1}, geometry,
+                     config,
                      pointEdgeSurfaceOffset(geometry, point, edge0, edge1,
-                                             fallback_edge_offset));
+                                            fallback_edge_offset));
 }
 
 std::optional<ContactStencil> createPointTriangleStencil(
@@ -1115,11 +634,10 @@ std::optional<ContactStencil> createPointTriangleStencil(
   std::optional<Real> toi;
 
   if (enable_ccd) {
-    toi =
-        runACCD(false, {p, a, b, c},
-                {direction[point], direction[triangle[0]],
-                 direction[triangle[1]], direction[triangle[2]]},
-                config.toi, point_offset + triangle_radius);
+    toi = runACCD(false, {p, a, b, c},
+                  {direction[point], direction[triangle[0]],
+                   direction[triangle[1]], direction[triangle[2]]},
+                  config.toi, point_offset + triangle_radius);
   }
 
   if (!shouldKeepByDistanceOrCCD(distance_sqr, toi, config,
@@ -1146,8 +664,7 @@ std::optional<ContactStencil> createPointTriangleStencil(
     case PointTriangleDistanceType::P_ABC:
       return makeStencil(ContactCase::PT,
                          {point, triangle[0], triangle[1], triangle[2]},
-                         geometry, config,
-                         point_offset + triangle_radius);
+                         geometry, config, point_offset + triangle_radius);
   }
   return std::nullopt;
 }
@@ -1180,9 +697,8 @@ ContactStencil createEdgeEdgeFeatureStencil(
                                     config, second_offset);
     case EdgeEdgeDistanceType::AB_CD:
       return makeStencil(ContactCase::EE,
-                         {first[0], first[1], second[0], second[1]},
-                         geometry, config,
-                         first_offset + second_offset);
+                         {first[0], first[1], second[0], second[1]}, geometry,
+                         config, first_offset + second_offset);
   }
   return makeStencil(ContactCase::EE, {-1, -1, -1, -1}, geometry, config);
 }
@@ -1190,8 +706,8 @@ ContactStencil createEdgeEdgeFeatureStencil(
 ContactStencil createMollifiedEdgeEdgeStencil(
     EdgeEdgeDistanceType type, const std::array<PointIdx, 2>& first,
     const std::array<PointIdx, 2>& second,
-    const GlobalGeometryManager& geometry,
-    const ContactDetectionConfig& config, Real reserved_dist) {
+    const GlobalGeometryManager& geometry, const ContactDetectionConfig& config,
+    Real reserved_dist) {
   std::array<int, 4> ids{first[0], first[1], second[0], second[1]};
   ContactMollifierDistance distance = ContactMollifierDistance::EE;
 
@@ -1280,19 +796,18 @@ std::optional<ContactStencil> createEdgeEdgeStencil(
   const Real distance_sqr = edgeEdgeDistanceSqrByType(type, a0, a1, b0, b1);
   std::optional<Real> toi;
   if (enable_ccd) {
-    toi =
-        runACCD(true, {a0, a1, b0, b1},
-                {direction[first[0]], direction[first[1]], direction[second[0]],
-                 direction[second[1]]},
-                config.toi, reserved_dist);
+    toi = runACCD(true, {a0, a1, b0, b1},
+                  {direction[first[0]], direction[first[1]],
+                   direction[second[0]], direction[second[1]]},
+                  config.toi, reserved_dist);
   }
   if (!shouldKeepByDistanceOrCCD(distance_sqr, toi, config, reserved_dist)) {
     return std::nullopt;
   }
 
   if (edgeEdgeUsesGIPCMollifier(first, second, geometry)) {
-    return createMollifiedEdgeEdgeStencil(type, first, second, geometry,
-                                          config, reserved_dist);
+    return createMollifiedEdgeEdgeStencil(type, first, second, geometry, config,
+                                          reserved_dist);
   }
 
   return createEdgeEdgeFeatureStencil(type, first, second, geometry, config,
@@ -1337,9 +852,8 @@ void validateCPUCCDInput(const GlobalGeometryManager& geometry,
   primitives.reserve(geometry.pointCount());
   for (int point = 0; point < geometry.pointCount(); point++) {
     const GeometryBodyIdx body = pointBody(geometry, point);
-    const bool point_only_body =
-        geometry.bodyEdgeRange(body).count == 0 &&
-        geometry.bodyTriangleRange(body).count == 0;
+    const bool point_only_body = geometry.bodyEdgeRange(body).count == 0 &&
+                                 geometry.bodyTriangleRange(body).count == 0;
     if (!surface_points.test(point) && !point_only_body) {
       continue;
     }
@@ -1392,7 +906,8 @@ void validateCPUCCDInput(const GlobalGeometryManager& geometry,
 
   topology.deformable_points.reserve(topology.points.size());
   for (size_t index = 0; index < topology.points.size(); ++index) {
-    if (isDeformableBody(geometry, pointBody(geometry, topology.points[index].id))) {
+    if (isDeformableBody(geometry,
+                         pointBody(geometry, topology.points[index].id))) {
       topology.deformable_points.push_back(index);
     }
   }
@@ -1443,8 +958,8 @@ void refreshPrimitiveBounds(const GlobalGeometryManager& geometry,
     switch (kind) {
       case PrimitiveKind::Point:
         primitive.bounds =
-            geometry.trajectoryPointBounds(PointIdx{primitive.id}, direction,
-                                           toi)
+            geometry
+                .trajectoryPointBounds(PointIdx{primitive.id}, direction, toi)
                 .dilate(primitive.reserved_dist);
         break;
       case PrimitiveKind::Edge:
@@ -1472,25 +987,24 @@ void refreshCurrentPrimitiveBounds(const GlobalGeometryManager& geometry,
     PrimitiveRef& primitive = primitives[index];
     switch (kind) {
       case PrimitiveKind::Point:
-        primitive.bounds =
-            geometry.pointBounds(PointIdx{primitive.id})
-                .dilate(primitive.reserved_dist);
+        primitive.bounds = geometry.pointBounds(PointIdx{primitive.id})
+                               .dilate(primitive.reserved_dist);
         break;
       case PrimitiveKind::Edge:
         primitive.bounds =
             geometry.edgeBounds(primitive.id).dilate(primitive.reserved_dist);
         break;
       case PrimitiveKind::Triangle:
-        primitive.bounds =
-            geometry.triangleBounds(primitive.id)
-                .dilate(primitive.reserved_dist);
+        primitive.bounds = geometry.triangleBounds(primitive.id)
+                               .dilate(primitive.reserved_dist);
         break;
     }
   });
 }
 
 [[nodiscard]] std::vector<PrimitiveRef> selectPrimitiveRefs(
-    const std::vector<PrimitiveRef>& source, const std::vector<size_t>& indices) {
+    const std::vector<PrimitiveRef>& source,
+    const std::vector<size_t>& indices) {
   std::vector<PrimitiveRef> selected(indices.size());
   tbb::parallel_for(size_t{0}, indices.size(), [&](size_t index) {
     selected[index] = source[indices[index]];
@@ -1585,7 +1099,8 @@ int bodyPairSideForPrimitiveBody(const ContactWorkList::BodyPairWork& pair,
 }
 
 void gatherPointRefsThroughBodyPairBVH(
-    const GlobalGeometryManager& geometry, const std::vector<PrimitiveRef>& points,
+    const GlobalGeometryManager& geometry,
+    const std::vector<PrimitiveRef>& points,
     const std::vector<PrimitiveRef>& pair_primitives,
     const spatify::LBVH<Real>& pair_tree, const ContactWorkList& work,
     std::vector<BodyPairPrimitiveRef>& refs) {
@@ -1644,7 +1159,8 @@ void gatherPointRefsThroughBodyPairBVH(
 }
 
 void gatherEdgeRefsThroughBodyPairBVH(
-    const GlobalGeometryManager& geometry, const std::vector<PrimitiveRef>& edges,
+    const GlobalGeometryManager& geometry,
+    const std::vector<PrimitiveRef>& edges,
     const std::vector<PrimitiveRef>& pair_primitives,
     const spatify::LBVH<Real>& pair_tree, const ContactWorkList& work,
     std::vector<BodyPairPrimitiveRef>& refs) {
@@ -1703,12 +1219,12 @@ void gatherEdgeRefsThroughBodyPairBVH(
 }
 
 [[nodiscard]] RigidInvolvedPairRefs buildRigidInvolvedPairRefs(
-    const GlobalGeometryManager& geometry, const std::vector<PrimitiveRef>& points,
+    const GlobalGeometryManager& geometry,
+    const std::vector<PrimitiveRef>& points,
     const std::vector<PrimitiveRef>& edges, const ContactWorkList& work) {
   RigidInvolvedPairRefs refs;
   std::vector<PrimitiveRef> pair_primitives = buildBodyPairPrimitives(work);
-  if (pair_primitives.empty())
-    return refs;
+  if (pair_primitives.empty()) return refs;
 
   const spatify::LBVH<Real> pair_tree = buildLBVH(pair_primitives);
   gatherPointRefsThroughBodyPairBVH(geometry, points, pair_primitives,
@@ -1719,7 +1235,8 @@ void gatherEdgeRefsThroughBodyPairBVH(
 }
 
 size_t queryPointRefsAgainstRigidTrianglesForActiveStencils(
-    const GlobalGeometryManager& geometry, const std::vector<PrimitiveRef>& points,
+    const GlobalGeometryManager& geometry,
+    const std::vector<PrimitiveRef>& points,
     const std::vector<PrimitiveRef>& rigid_triangles,
     const spatify::LBVH<Real>& rigid_triangle_tree,
     const RigidInvolvedPairRefs& refs, const ContactWorkList& work,
@@ -1748,14 +1265,11 @@ size_t queryPointRefsAgainstRigidTrianglesForActiveStencils(
         [&](int primitive_index) {
           const PrimitiveRef& triangle =
               rigid_triangles[static_cast<size_t>(primitive_index)];
-          if (triangleBody(geometry, triangle.id) != target_body)
-            return false;
+          if (triangleBody(geometry, triangle.id) != target_body) return false;
 
-          if (!triangle.bounds.overlap(pair.iAABB))
-            return false;
+          if (!triangle.bounds.overlap(pair.iAABB)) return false;
 
-          if (geometry.triangleContainsPoint(triangle.id,
-                                             PointIdx{point.id}))
+          if (geometry.triangleContainsPoint(triangle.id, PointIdx{point.id}))
             return false;
 
           if (!pointTriangleCollisionEnabled(geometry, PointIdx{point.id},
@@ -1765,11 +1279,10 @@ size_t queryPointRefsAgainstRigidTrianglesForActiveStencils(
           ++leaf_pairs;
           const Real triangle_thickness =
               geometry.triangles[static_cast<size_t>(triangle.id)].thickness;
-          std::optional<ContactStencil> stencil =
-              createPointTriangleStencil(
-                  PointIdx{point.id}, geometry.globalTriangle(triangle.id),
-                  geometry, std::span<const glm::dvec3>{}, config,
-                  triangle_thickness, false);
+          std::optional<ContactStencil> stencil = createPointTriangleStencil(
+              PointIdx{point.id}, geometry.globalTriangle(triangle.id),
+              geometry, std::span<const glm::dvec3>{}, config,
+              triangle_thickness, false);
           if (stencil) {
             local.push_back(std::move(*stencil));
           }
@@ -1789,7 +1302,8 @@ size_t queryPointRefsAgainstRigidTrianglesForActiveStencils(
 }
 
 size_t queryEdgeRefsAgainstRigidEdgesForActiveStencils(
-    const GlobalGeometryManager& geometry, const std::vector<PrimitiveRef>& edges,
+    const GlobalGeometryManager& geometry,
+    const std::vector<PrimitiveRef>& edges,
     const std::vector<PrimitiveRef>& rigid_edges,
     const spatify::LBVH<Real>& rigid_edge_tree,
     const RigidInvolvedPairRefs& refs, const ContactWorkList& work,
@@ -1809,7 +1323,8 @@ size_t queryEdgeRefsAgainstRigidEdgesForActiveStencils(
     if (!isRigidBody(geometry, target_body)) {
       return;
     }
-    const PrimitiveRef& query_edge = edges.at(static_cast<size_t>(ref.primitive));
+    const PrimitiveRef& query_edge =
+        edges.at(static_cast<size_t>(ref.primitive));
     const GeometryBounds query_bounds =
         ensureFiniteBVHBounds(query_edge.bounds.dilate(query_dilation));
     ContactStencils& local = local_stencils.local();
@@ -1818,18 +1333,15 @@ size_t queryEdgeRefsAgainstRigidEdgesForActiveStencils(
         [&](int primitive_index) {
           const PrimitiveRef& candidate =
               rigid_edges.at(static_cast<size_t>(primitive_index));
-          if (edgeBody(geometry, candidate.id) != target_body)
-            return false;
+          if (edgeBody(geometry, candidate.id) != target_body) return false;
 
-          if (!candidate.bounds.overlap(pair.iAABB))
-            return false;
+          if (!candidate.bounds.overlap(pair.iAABB)) return false;
 
           if (query_edge.id == candidate.id ||
               geometry.edgesAdjacent(query_edge.id, candidate.id))
             return false;
 
-          if (!edgeEdgeCollisionEnabled(geometry, query_edge.id,
-                                        candidate.id))
+          if (!edgeEdgeCollisionEnabled(geometry, query_edge.id, candidate.id))
             return false;
 
           ++leaf_pairs;
@@ -1837,12 +1349,10 @@ size_t queryEdgeRefsAgainstRigidEdgesForActiveStencils(
           const int second_edge = std::max(query_edge.id, candidate.id);
           const Real first_offset = query_edge.reserved_dist;
           const Real second_offset = candidate.reserved_dist;
-          std::optional<ContactStencil> stencil =
-              createEdgeEdgeStencil(
-                  geometry.globalEdge(first_edge),
-                  geometry.globalEdge(second_edge), geometry,
-                  std::span<const glm::dvec3>{}, config, first_offset,
-                  second_offset, false);
+          std::optional<ContactStencil> stencil = createEdgeEdgeStencil(
+              geometry.globalEdge(first_edge), geometry.globalEdge(second_edge),
+              geometry, std::span<const glm::dvec3>{}, config, first_offset,
+              second_offset, false);
           if (stencil) {
             local.push_back(std::move(*stencil));
           }
@@ -1908,11 +1418,9 @@ void gatherGeometryBodyBounds(const GlobalGeometryManager& geometry,
 size_t gatherGlobalDeformablePointTriangleStencils(
     const GlobalGeometryManager& geometry,
     const std::vector<PrimitiveRef>& deformable_points,
-    const std::vector<PrimitiveRef>& deformable_triangles,
-    Real query_dilation, const ContactDetectionConfig& config,
-    ContactStencils& stencils) {
-  if (deformable_triangles.empty())
-    return 0;
+    const std::vector<PrimitiveRef>& deformable_triangles, Real query_dilation,
+    const ContactDetectionConfig& config, ContactStencils& stencils) {
+  if (deformable_triangles.empty()) return 0;
 
   std::vector<PrimitiveRef> tree_triangles = deformable_triangles;
   const spatify::LBVH<Real> triangle_tree = buildLBVH(tree_triangles);
@@ -1929,8 +1437,7 @@ size_t gatherGlobalDeformablePointTriangleStencils(
         [&](int primitive_index) {
           const PrimitiveRef& triangle = tree_triangles[primitive_index];
 
-          if (geometry.triangleContainsPoint(triangle.id,
-                                             PointIdx{point.id}))
+          if (geometry.triangleContainsPoint(triangle.id, PointIdx{point.id}))
             return false;
 
           if (!pointTriangleCollisionEnabled(geometry, PointIdx{point.id},
@@ -1940,11 +1447,10 @@ size_t gatherGlobalDeformablePointTriangleStencils(
           ++leaf_pairs;
           const Real triangle_thickness =
               geometry.triangles[static_cast<size_t>(triangle.id)].thickness;
-          std::optional<ContactStencil> stencil =
-              createPointTriangleStencil(
-                  PointIdx{point.id}, geometry.globalTriangle(triangle.id),
-                  geometry, std::span<const glm::dvec3>{}, config,
-                  triangle_thickness, false);
+          std::optional<ContactStencil> stencil = createPointTriangleStencil(
+              PointIdx{point.id}, geometry.globalTriangle(triangle.id),
+              geometry, std::span<const glm::dvec3>{}, config,
+              triangle_thickness, false);
           if (stencil) {
             local.push_back(std::move(*stencil));
           }
@@ -1965,11 +1471,9 @@ size_t gatherGlobalDeformablePointTriangleStencils(
 
 size_t gatherGlobalDeformableEdgeEdgeStencils(
     const GlobalGeometryManager& geometry,
-    const std::vector<PrimitiveRef>& deformable_edges,
-    Real query_dilation, const ContactDetectionConfig& config,
-    ContactStencils& stencils) {
-  if (deformable_edges.empty())
-    return 0;
+    const std::vector<PrimitiveRef>& deformable_edges, Real query_dilation,
+    const ContactDetectionConfig& config, ContactStencils& stencils) {
+  if (deformable_edges.empty()) return 0;
 
   std::vector<PrimitiveRef> tree_edges = deformable_edges;
   const spatify::LBVH<Real> edge_tree = buildIndexedLBVH(tree_edges);
@@ -1986,25 +1490,21 @@ size_t gatherGlobalDeformableEdgeEdgeStencils(
     edge_tree.runSpatialQuery(
         [&](int primitive_index) {
           const PrimitiveRef& candidate = tree_edges[primitive_index];
-          if (candidate.id <= query_edge.id)
-            return false;
+          if (candidate.id <= query_edge.id) return false;
 
-          if (geometry.edgesAdjacent(query_edge.id, candidate.id))
-            return false;
+          if (geometry.edgesAdjacent(query_edge.id, candidate.id)) return false;
 
-          if (!edgeEdgeCollisionEnabled(geometry, query_edge.id,
-                                        candidate.id))
+          if (!edgeEdgeCollisionEnabled(geometry, query_edge.id, candidate.id))
             return false;
 
           ++leaf_pairs;
           const Real first_offset = query_edge.reserved_dist;
           const Real second_offset = candidate.reserved_dist;
           std::optional<ContactStencil> stencil =
-              createEdgeEdgeStencil(
-                  geometry.globalEdge(query_edge.id),
-                  geometry.globalEdge(candidate.id), geometry,
-                  std::span<const glm::dvec3>{}, config, first_offset,
-                  second_offset, false);
+              createEdgeEdgeStencil(geometry.globalEdge(query_edge.id),
+                                    geometry.globalEdge(candidate.id), geometry,
+                                    std::span<const glm::dvec3>{}, config,
+                                    first_offset, second_offset, false);
           if (stencil) {
             local.push_back(std::move(*stencil));
           }
@@ -2014,8 +1514,7 @@ size_t gatherGlobalDeformableEdgeEdgeStencils(
           return query_bounds.overlap(bounds);
         },
         [&](int node_index) {
-          return edge_tree.subtreeMaxPrimitiveIndex(node_index) >
-                 query_edge.id;
+          return edge_tree.subtreeMaxPrimitiveIndex(node_index) > query_edge.id;
         });
   });
 
@@ -2043,38 +1542,33 @@ CandidateDetectionResult detectDeformableDeformableCandidatesAtBVHLeaves(
     const spatify::LBVH<Real> triangle_tree = buildLBVH(tree_triangles);
     tbb::enumerable_thread_specific<CandidateDetectionResult> local;
 
-    tbb::parallel_for(
-        size_t{0}, deformable_points.size(), [&](size_t index) {
-          const PrimitiveRef& point = deformable_points[index];
-          const GeometryBounds query_bounds = point.bounds.dilate(query_dilation);
+    tbb::parallel_for(size_t{0}, deformable_points.size(), [&](size_t index) {
+      const PrimitiveRef& point = deformable_points[index];
+      const GeometryBounds query_bounds = point.bounds.dilate(query_dilation);
 
-          CandidateDetectionResult& local_result = local.local();
+      CandidateDetectionResult& local_result = local.local();
 
-          triangle_tree.runSpatialQuery(
-              [&](int primitive_index) {
-                const PrimitiveRef& triangle = tree_triangles[primitive_index];
-                if (geometry.triangleContainsPoint(triangle.id,
-                                                   PointIdx{point.id}))
-                  return false;
+      triangle_tree.runSpatialQuery(
+          [&](int primitive_index) {
+            const PrimitiveRef& triangle = tree_triangles[primitive_index];
+            if (geometry.triangleContainsPoint(triangle.id, PointIdx{point.id}))
+              return false;
 
-                if (!pointTriangleCollisionEnabled(
-                        geometry, PointIdx{point.id}, triangle.id))
-                  return false;
+            if (!pointTriangleCollisionEnabled(geometry, PointIdx{point.id},
+                                               triangle.id))
+              return false;
 
-                std::optional<CandidateHit> hit =
-                    makeSweptPointTriangleCandidate(
-                        PointIdx{point.id}, triangle.id, geometry, direction,
-                        config);
+            std::optional<CandidateHit> hit = makeSweptPointTriangleCandidate(
+                PointIdx{point.id}, triangle.id, geometry, direction, config);
 
-                if (hit)
-                  addCandidateHit(local_result, std::move(*hit));
+            if (hit) addCandidateHit(local_result, std::move(*hit));
 
-                return true;
-              },
-              [&](const GeometryBounds& bounds) {
-                return query_bounds.overlap(bounds);
-              });
-        });
+            return true;
+          },
+          [&](const GeometryBounds& bounds) {
+            return query_bounds.overlap(bounds);
+          });
+    });
 
     mergeThreadLocalCandidateResults(result, local);
   }
@@ -2085,41 +1579,37 @@ CandidateDetectionResult detectDeformableDeformableCandidatesAtBVHLeaves(
     assert(edge_tree.hasSubtreeMaxPrimitiveIndex());
     tbb::enumerable_thread_specific<CandidateDetectionResult> local;
 
-    tbb::parallel_for(
-        size_t{0}, deformable_edges.size(), [&](size_t index) {
-          const PrimitiveRef& query_edge = deformable_edges[index];
-          const GeometryBounds query_bounds =
-              ensureFiniteBVHBounds(query_edge.bounds.dilate(query_dilation));
-          CandidateDetectionResult& local_result = local.local();
+    tbb::parallel_for(size_t{0}, deformable_edges.size(), [&](size_t index) {
+      const PrimitiveRef& query_edge = deformable_edges[index];
+      const GeometryBounds query_bounds =
+          ensureFiniteBVHBounds(query_edge.bounds.dilate(query_dilation));
+      CandidateDetectionResult& local_result = local.local();
 
-          edge_tree.runSpatialQuery(
-              [&](int primitive_index) {
-                const PrimitiveRef& candidate = tree_edges[primitive_index];
-                if (candidate.id <= query_edge.id)
-                  return false;
+      edge_tree.runSpatialQuery(
+          [&](int primitive_index) {
+            const PrimitiveRef& candidate = tree_edges[primitive_index];
+            if (candidate.id <= query_edge.id) return false;
 
-                if (geometry.edgesAdjacent(query_edge.id, candidate.id))
-                  return false;
+            if (geometry.edgesAdjacent(query_edge.id, candidate.id))
+              return false;
 
-                if (!edgeEdgeCollisionEnabled(geometry, query_edge.id,
-                                              candidate.id))
-                  return false;
+            if (!edgeEdgeCollisionEnabled(geometry, query_edge.id,
+                                          candidate.id))
+              return false;
 
-                std::optional<CandidateHit> hit =
-                    makeSweptEdgeEdgeCandidate(query_edge.id, candidate.id,
-                                               geometry, direction, config);
-                if (hit)
-                  addCandidateHit(local_result, std::move(*hit));
-                return true;
-              },
-              [&](const GeometryBounds& bounds) {
-                return query_bounds.overlap(bounds);
-              },
-              [&](int node_index) {
-                return edge_tree.subtreeMaxPrimitiveIndex(node_index) >
-                       query_edge.id;
-              });
-        });
+            std::optional<CandidateHit> hit = makeSweptEdgeEdgeCandidate(
+                query_edge.id, candidate.id, geometry, direction, config);
+            if (hit) addCandidateHit(local_result, std::move(*hit));
+            return true;
+          },
+          [&](const GeometryBounds& bounds) {
+            return query_bounds.overlap(bounds);
+          },
+          [&](int node_index) {
+            return edge_tree.subtreeMaxPrimitiveIndex(node_index) >
+                   query_edge.id;
+          });
+    });
 
     mergeThreadLocalCandidateResults(result, local);
   }
@@ -2130,11 +1620,9 @@ CandidateDetectionResult detectDeformableDeformableCandidatesAtBVHLeaves(
 }
 
 void gatherRigidInvolvedBodyPairs(const GlobalGeometryManager& geometry,
-                                  Real query_dilation,
-                                  ContactWorkList& work) {
+                                  Real query_dilation, ContactWorkList& work) {
   KSK_PROFILE_SCOPE("ContactDetectionCPU/GatherRigidInvolvedBodyPairs");
-  if (work.bodies.size() < 2)
-    return;
+  if (work.bodies.size() < 2) return;
 
   std::vector<PrimitiveRef> body_refs;
   body_refs.reserve(work.bodies.size());
@@ -2160,13 +1648,12 @@ void gatherRigidInvolvedBodyPairs(const GlobalGeometryManager& geometry,
     const ContactWorkList::GeometryBodyBounds& first_record =
         work.bodies.at(first);
     const GeometryBounds query_bounds =
-        ensureFiniteBVHBounds(first_record.bounds);
+        ensureFiniteBVHBounds(first_record.bounds.dilate(query_dilation));
     body_tree.runSpatialQuery(
         [&](int primitive_index) {
           const int second =
               body_refs.at(static_cast<size_t>(primitive_index)).id;
-          if (second <= first)
-            return false;
+          if (second <= first) return false;
 
           const GeometryBodyIdx first_body = first_record.body;
           const GeometryBodyIdx second_body =
@@ -2191,13 +1678,14 @@ void gatherRigidInvolvedBodyPairs(const GlobalGeometryManager& geometry,
   const size_t old_size = work.bodyPairs.size();
   if (old_size + offsets.back() > 0)
     work.bodyPairs.resize(old_size + offsets.back());
-  else work.bodyPairs.clear();
+  else
+    work.bodyPairs.clear();
 
   tbb::parallel_for(size_t{0}, work.bodies.size(), [&](size_t first) {
     const ContactWorkList::GeometryBodyBounds& first_record =
         work.bodies.at(first);
     const GeometryBounds query_bounds =
-        ensureFiniteBVHBounds(first_record.bounds);
+        ensureFiniteBVHBounds(first_record.bounds.dilate(query_dilation));
     size_t write = old_size + offsets[first];
 
     body_tree.runSpatialQuery(
@@ -2220,11 +1708,10 @@ void gatherRigidInvolvedBodyPairs(const GlobalGeometryManager& geometry,
             return false;
 
           GeometryBounds i_aabb =
-              intersectBounds(first_record.bounds, second_record.bounds);
-          if (!isFiniteBounds(i_aabb))
-            return false;
+              intersectBounds(first_record.bounds.dilate(query_dilation),
+                              second_record.bounds.dilate(query_dilation));
+          if (!isFiniteBounds(i_aabb)) return false;
 
-          i_aabb.dilate(query_dilation);
           work.bodyPairs.at(write++) = ContactWorkList::BodyPairWork{
               .first = first_body,
               .second = second_body,
@@ -2247,8 +1734,7 @@ CandidateDetectionResult detectRigidInvolvedCandidatesAtBVHLeaves(
     const std::vector<PrimitiveRef>& edges,
     const std::vector<PrimitiveRef>& rigid_edges,
     const std::vector<PrimitiveRef>& rigid_triangles,
-    std::span<const glm::dvec3> direction,
-    const ContactDetectionConfig& config,
+    std::span<const glm::dvec3> direction, const ContactDetectionConfig& config,
     ContactWorkList& work) {
   KSK_PROFILE_SCOPE("ContactDetectionCPU/DetectRigidInvolvedLeaves");
   CandidateDetectionResult result;
@@ -2291,28 +1777,28 @@ CandidateDetectionResult detectRigidInvolvedCandidatesAtBVHLeaves(
                 if (triangleBody(geometry, triangle.id) != target_body)
                   return false;
 
-                if (!triangle.bounds.overlap(pair.iAABB))
-                  return false;
+                if (!triangle.bounds.overlap(pair.iAABB)) return false;
 
                 if (geometry.triangleContainsPoint(triangle.id,
                                                    PointIdx{point.id}))
                   return false;
 
-                if (!pointTriangleCollisionEnabled(
-                        geometry, PointIdx{point.id}, triangle.id))
+                if (!pointTriangleCollisionEnabled(geometry, PointIdx{point.id},
+                                                   triangle.id))
                   return false;
 
                 std::optional<CandidateHit> hit =
-                    makeSweptPointTriangleCandidate(
-                        PointIdx{point.id}, triangle.id, geometry, direction,
-                        config);
+                    makeSweptPointTriangleCandidate(PointIdx{point.id},
+                                                    triangle.id, geometry,
+                                                    direction, config);
                 if (hit) {
                   addCandidateHit(local_result, std::move(*hit));
                 }
                 return true;
               },
               [&](const GeometryBounds& bounds) {
-                return query_bounds.overlap(bounds) && bounds.overlap(pair.iAABB);
+                return query_bounds.overlap(bounds) &&
+                       bounds.overlap(pair.iAABB);
               });
         });
     mergeThreadLocalCandidateResults(result, local);
@@ -2341,8 +1827,7 @@ CandidateDetectionResult detectRigidInvolvedCandidatesAtBVHLeaves(
                 if (edgeBody(geometry, candidate.id) != target_body)
                   return false;
 
-                if (!candidate.bounds.overlap(pair.iAABB))
-                  return false;
+                if (!candidate.bounds.overlap(pair.iAABB)) return false;
 
                 if (query_edge.id == candidate.id ||
                     geometry.edgesAdjacent(query_edge.id, candidate.id))
@@ -2352,20 +1837,18 @@ CandidateDetectionResult detectRigidInvolvedCandidatesAtBVHLeaves(
                                               candidate.id))
                   return false;
 
-                const int first_edge =
-                    std::min(query_edge.id, candidate.id);
-                const int second_edge =
-                    std::max(query_edge.id, candidate.id);
-                std::optional<CandidateHit> hit =
-                    makeSweptEdgeEdgeCandidate(first_edge, second_edge,
-                                               geometry, direction, config);
+                const int first_edge = std::min(query_edge.id, candidate.id);
+                const int second_edge = std::max(query_edge.id, candidate.id);
+                std::optional<CandidateHit> hit = makeSweptEdgeEdgeCandidate(
+                    first_edge, second_edge, geometry, direction, config);
                 if (hit) {
                   addCandidateHit(local_result, std::move(*hit));
                 }
                 return true;
               },
               [&](const GeometryBounds& bounds) {
-                return query_bounds.overlap(bounds) && bounds.overlap(pair.iAABB);
+                return query_bounds.overlap(bounds) &&
+                       bounds.overlap(pair.iAABB);
               });
         });
     mergeThreadLocalCandidateResults(result, local);
@@ -2376,7 +1859,8 @@ CandidateDetectionResult detectRigidInvolvedCandidatesAtBVHLeaves(
   return result;
 }
 
-StepSizeUpperBoundResult computeDeformableDeformableStepSizeUpperBoundAtBVHLeaves(
+StepSizeUpperBoundResult
+computeDeformableDeformableStepSizeUpperBoundAtBVHLeaves(
     const GlobalGeometryManager& geometry,
     const std::vector<PrimitiveRef>& deformable_points,
     const std::vector<PrimitiveRef>& deformable_edges,
@@ -2399,8 +1883,7 @@ StepSizeUpperBoundResult computeDeformableDeformableStepSizeUpperBoundAtBVHLeave
       triangle_tree.runSpatialQuery(
           [&](int primitive_index) {
             const PrimitiveRef& triangle = tree_triangles[primitive_index];
-            if (geometry.triangleContainsPoint(triangle.id,
-                                               PointIdx{point.id}))
+            if (geometry.triangleContainsPoint(triangle.id, PointIdx{point.id}))
               return false;
 
             if (!pointTriangleCollisionEnabled(geometry, PointIdx{point.id},
@@ -2435,8 +1918,7 @@ StepSizeUpperBoundResult computeDeformableDeformableStepSizeUpperBoundAtBVHLeave
       edge_tree.runSpatialQuery(
           [&](int primitive_index) {
             const PrimitiveRef& candidate = tree_edges[primitive_index];
-            if (candidate.id <= query_edge.id)
-              return false;
+            if (candidate.id <= query_edge.id) return false;
 
             if (geometry.edgesAdjacent(query_edge.id, candidate.id))
               return false;
@@ -2474,8 +1956,7 @@ StepSizeUpperBoundResult computeRigidInvolvedStepSizeUpperBoundAtBVHLeaves(
     const std::vector<PrimitiveRef>& edges,
     const std::vector<PrimitiveRef>& rigid_edges,
     const std::vector<PrimitiveRef>& rigid_triangles,
-    std::span<const glm::dvec3> direction,
-    const ContactDetectionConfig& config,
+    std::span<const glm::dvec3> direction, const ContactDetectionConfig& config,
     ContactWorkList& work) {
   KSK_PROFILE_SCOPE("ContactDetectionCPU/StepBoundRigidInvolvedLeaves");
   StepSizeUpperBoundResult result;
@@ -2497,94 +1978,97 @@ StepSizeUpperBoundResult computeRigidInvolvedStepSizeUpperBoundAtBVHLeaves(
 
   if (!rigid_triangles.empty()) {
     tbb::enumerable_thread_specific<StepSizeUpperBoundResult> local;
-    tbb::parallel_for(size_t{0}, rigid_pair_refs.points.size(), [&](size_t index) {
-      const BodyPairPrimitiveRef& ref = rigid_pair_refs.points[index];
-      const ContactWorkList::BodyPairWork& pair =
-          work.bodyPairs.at(static_cast<size_t>(ref.pair));
-      const GeometryBodyIdx target_body = oppositeBody(pair, ref.side);
-      if (!isRigidBody(geometry, target_body)) {
-        return;
-      }
-      const PrimitiveRef& point = points.at(static_cast<size_t>(ref.primitive));
-      const GeometryBounds query_bounds =
-          ensureFiniteBVHBounds(point.bounds.dilate(query_dilation));
-      StepSizeUpperBoundResult& local_result = local.local();
-      rigid_triangle_tree.runSpatialQuery(
-          [&](int primitive_index) {
-            const PrimitiveRef& triangle =
-                tree_rigid_triangles[static_cast<size_t>(primitive_index)];
-            if (triangleBody(geometry, triangle.id) != target_body)
-              return false;
+    tbb::parallel_for(
+        size_t{0}, rigid_pair_refs.points.size(), [&](size_t index) {
+          const BodyPairPrimitiveRef& ref = rigid_pair_refs.points[index];
+          const ContactWorkList::BodyPairWork& pair =
+              work.bodyPairs.at(static_cast<size_t>(ref.pair));
+          const GeometryBodyIdx target_body = oppositeBody(pair, ref.side);
+          if (!isRigidBody(geometry, target_body)) {
+            return;
+          }
+          const PrimitiveRef& point =
+              points.at(static_cast<size_t>(ref.primitive));
+          const GeometryBounds query_bounds =
+              ensureFiniteBVHBounds(point.bounds.dilate(query_dilation));
+          StepSizeUpperBoundResult& local_result = local.local();
+          rigid_triangle_tree.runSpatialQuery(
+              [&](int primitive_index) {
+                const PrimitiveRef& triangle =
+                    tree_rigid_triangles[static_cast<size_t>(primitive_index)];
+                if (triangleBody(geometry, triangle.id) != target_body)
+                  return false;
 
-            if (!triangle.bounds.overlap(pair.iAABB))
-              return false;
+                if (!triangle.bounds.overlap(pair.iAABB)) return false;
 
-            if (geometry.triangleContainsPoint(triangle.id,
-                                               PointIdx{point.id}))
-              return false;
+                if (geometry.triangleContainsPoint(triangle.id,
+                                                   PointIdx{point.id}))
+                  return false;
 
-            if (!pointTriangleCollisionEnabled(geometry, PointIdx{point.id},
-                                               triangle.id))
-              return false;
+                if (!pointTriangleCollisionEnabled(geometry, PointIdx{point.id},
+                                                   triangle.id))
+                  return false;
 
-            addStepSizeUpperBound(
-                local_result,
-                computeSweptPointTriangleTOI(PointIdx{point.id}, triangle.id,
-                                             geometry, direction, config));
-            return true;
-          },
-          [&](const GeometryBounds& bounds) {
-            return query_bounds.overlap(bounds) && bounds.overlap(pair.iAABB);
-          });
-    });
+                addStepSizeUpperBound(
+                    local_result, computeSweptPointTriangleTOI(
+                                      PointIdx{point.id}, triangle.id, geometry,
+                                      direction, config));
+                return true;
+              },
+              [&](const GeometryBounds& bounds) {
+                return query_bounds.overlap(bounds) &&
+                       bounds.overlap(pair.iAABB);
+              });
+        });
     mergeThreadLocalStepSizeUpperBoundResults(result, local);
   }
 
   if (!rigid_edges.empty()) {
     tbb::enumerable_thread_specific<StepSizeUpperBoundResult> local;
-    tbb::parallel_for(size_t{0}, rigid_pair_refs.edges.size(), [&](size_t index) {
-      const BodyPairPrimitiveRef& ref = rigid_pair_refs.edges[index];
-      const ContactWorkList::BodyPairWork& pair =
-          work.bodyPairs.at(static_cast<size_t>(ref.pair));
-      const GeometryBodyIdx target_body = oppositeBody(pair, ref.side);
-      if (!isRigidBody(geometry, target_body)) {
-        return;
-      }
-      const PrimitiveRef& query_edge =
-          edges.at(static_cast<size_t>(ref.primitive));
-      const GeometryBounds query_bounds =
-          ensureFiniteBVHBounds(query_edge.bounds.dilate(query_dilation));
-      StepSizeUpperBoundResult& local_result = local.local();
-      rigid_edge_tree.runSpatialQuery(
-          [&](int primitive_index) {
-            const PrimitiveRef& candidate =
-                tree_rigid_edges.at(static_cast<size_t>(primitive_index));
-            if (edgeBody(geometry, candidate.id) != target_body)
-              return false;
+    tbb::parallel_for(
+        size_t{0}, rigid_pair_refs.edges.size(), [&](size_t index) {
+          const BodyPairPrimitiveRef& ref = rigid_pair_refs.edges[index];
+          const ContactWorkList::BodyPairWork& pair =
+              work.bodyPairs.at(static_cast<size_t>(ref.pair));
+          const GeometryBodyIdx target_body = oppositeBody(pair, ref.side);
+          if (!isRigidBody(geometry, target_body)) {
+            return;
+          }
+          const PrimitiveRef& query_edge =
+              edges.at(static_cast<size_t>(ref.primitive));
+          const GeometryBounds query_bounds =
+              ensureFiniteBVHBounds(query_edge.bounds.dilate(query_dilation));
+          StepSizeUpperBoundResult& local_result = local.local();
+          rigid_edge_tree.runSpatialQuery(
+              [&](int primitive_index) {
+                const PrimitiveRef& candidate =
+                    tree_rigid_edges.at(static_cast<size_t>(primitive_index));
+                if (edgeBody(geometry, candidate.id) != target_body)
+                  return false;
 
-            if (!candidate.bounds.overlap(pair.iAABB))
-              return false;
+                if (!candidate.bounds.overlap(pair.iAABB)) return false;
 
-            if (query_edge.id == candidate.id ||
-                geometry.edgesAdjacent(query_edge.id, candidate.id))
-              return false;
+                if (query_edge.id == candidate.id ||
+                    geometry.edgesAdjacent(query_edge.id, candidate.id))
+                  return false;
 
-            if (!edgeEdgeCollisionEnabled(geometry, query_edge.id,
-                                          candidate.id))
-              return false;
+                if (!edgeEdgeCollisionEnabled(geometry, query_edge.id,
+                                              candidate.id))
+                  return false;
 
-            const int first_edge = std::min(query_edge.id, candidate.id);
-            const int second_edge = std::max(query_edge.id, candidate.id);
-            addStepSizeUpperBound(
-                local_result,
-                computeSweptEdgeEdgeTOI(first_edge, second_edge, geometry,
-                                        direction, config));
-            return true;
-          },
-          [&](const GeometryBounds& bounds) {
-            return query_bounds.overlap(bounds) && bounds.overlap(pair.iAABB);
-          });
-    });
+                const int first_edge = std::min(query_edge.id, candidate.id);
+                const int second_edge = std::max(query_edge.id, candidate.id);
+                addStepSizeUpperBound(
+                    local_result,
+                    computeSweptEdgeEdgeTOI(first_edge, second_edge, geometry,
+                                            direction, config));
+                return true;
+              },
+              [&](const GeometryBounds& bounds) {
+                return query_bounds.overlap(bounds) &&
+                       bounds.overlap(pair.iAABB);
+              });
+        });
     mergeThreadLocalStepSizeUpperBoundResults(result, local);
   }
 
@@ -2594,7 +2078,8 @@ StepSizeUpperBoundResult computeRigidInvolvedStepSizeUpperBoundAtBVHLeaves(
 }
 
 CurrentActiveContactWork gatherCurrentActiveContactWork(
-    const GlobalGeometryManager& geometry, const ContactPrimitiveRefs& primitives,
+    const GlobalGeometryManager& geometry,
+    const ContactPrimitiveRefs& primitives,
     const ContactDetectionConfig& config) {
   KSK_PROFILE_SCOPE("ContactDetectionCPU/GatherCurrentActiveContactWork");
   CurrentActiveContactWork active_work;
@@ -2613,23 +2098,20 @@ CurrentActiveContactWork gatherCurrentActiveContactWork(
           primitives.deformable_triangles, query_dilation, config,
           active_work.stencils);
 
-  active_work.edgeEdgeLeafPairs +=
-      gatherGlobalDeformableEdgeEdgeStencils(
-          geometry, primitives.deformable_edges, query_dilation, config,
-          active_work.stencils);
+  active_work.edgeEdgeLeafPairs += gatherGlobalDeformableEdgeEdgeStencils(
+      geometry, primitives.deformable_edges, query_dilation, config,
+      active_work.stencils);
 
   gatherRigidInvolvedBodyPairs(geometry, query_dilation, work);
   if (!work.bodyPairs.empty()) {
-    std::vector<PrimitiveRef> tree_rigid_triangles =
-        primitives.rigid_triangles;
+    std::vector<PrimitiveRef> tree_rigid_triangles = primitives.rigid_triangles;
     std::vector<PrimitiveRef> tree_rigid_edges = primitives.rigid_edges;
     const spatify::LBVH<Real> rigid_triangle_tree =
         buildLBVH(tree_rigid_triangles);
     const spatify::LBVH<Real> rigid_edge_tree = buildLBVH(tree_rigid_edges);
 
-    const RigidInvolvedPairRefs rigid_pair_refs =
-        buildRigidInvolvedPairRefs(geometry, primitives.points,
-                                   primitives.edges, work);
+    const RigidInvolvedPairRefs rigid_pair_refs = buildRigidInvolvedPairRefs(
+        geometry, primitives.points, primitives.edges, work);
     active_work.pointTriangleLeafPairs +=
         queryPointRefsAgainstRigidTrianglesForActiveStencils(
             geometry, primitives.points, tree_rigid_triangles,
@@ -2644,30 +2126,16 @@ CurrentActiveContactWork gatherCurrentActiveContactWork(
   return active_work;
 }
 
-int stencilPointCount(ContactCase type) {
-  switch (type) {
-    case ContactCase::PP:
-      return 2;
-    case ContactCase::PE:
-      return 3;
-    case ContactCase::PT:
-    case ContactCase::EE:
-      return 4;
-  }
-  return 0;
-}
-
 void routeStencil(GlobalContactRouter& routed,
                   const GlobalGeometryManager& geometry_manager,
                   const ContactStencil& stencil) {
-  const int point_count = stencilPointCount(stencil.type);
+  const int point_count = contactPointCount(stencil.type);
   const GeometryStencilInfo info = geometry_manager.classify(
       std::span(stencil.geometryIds.data(), point_count));
 
-  if (info.subsystemCount == 1) {
+  if (!info.hasCollider && info.subsystemCount == 1) {
     auto subsystem_idx = info.subsystems[0];
-    auto& subsystem_contacts =
-        routed.subsystemInternalContacts[subsystem_idx];
+    auto& subsystem_contacts = routed.subsystemInternalContacts[subsystem_idx];
     subsystem_contacts.subsystem = subsystem_idx;
     subsystem_contacts.contacts.push_back(stencil);
     return;
@@ -2676,8 +2144,9 @@ void routeStencil(GlobalContactRouter& routed,
   routed.globalContacts.push_back(stencil);
 }
 
-GlobalContactRouter routeActiveStencils(const GlobalGeometryManager& geometry,
-                                        const ContactStencils& active_stencils) {
+GlobalContactRouter routeActiveStencils(
+    const GlobalGeometryManager& geometry,
+    const ContactStencils& active_stencils) {
   GlobalContactRouter routed;
   for (const ContactStencil& active : active_stencils) {
     routeStencil(routed, geometry, active);
@@ -2751,17 +2220,17 @@ StepSizeUpperBoundResult computeStepSizeUpperBoundAtBVHLeavesOnCPU(
                              primitives.triangles, work);
   }
 
-  mergeStepSizeUpperBoundResult(
-      result,
+  StepSizeUpperBoundResult deformable_result =
       computeDeformableDeformableStepSizeUpperBoundAtBVHLeaves(
           geometry, primitives.deformable_points, primitives.deformable_edges,
-          primitives.deformable_triangles, geometryDirection.cpu(), config));
+          primitives.deformable_triangles, geometryDirection.cpu(), config);
+  mergeStepSizeUpperBoundResult(result, deformable_result);
 
-  mergeStepSizeUpperBoundResult(
-      result,
+  StepSizeUpperBoundResult rigid_result =
       computeRigidInvolvedStepSizeUpperBoundAtBVHLeaves(
           geometry, primitives.points, primitives.edges, primitives.rigid_edges,
-          primitives.rigid_triangles, geometryDirection.cpu(), config, work));
+          primitives.rigid_triangles, geometryDirection.cpu(), config, work);
+  mergeStepSizeUpperBoundResult(result, rigid_result);
 
   return result;
 }
@@ -2794,8 +2263,8 @@ Real computeStepSizeUpperBoundAlongDirectionOnCPU(
         "CPU contact detection cannot produce device contact tables");
   }
 
-  return computeStepSizeUpperBoundAtBVHLeavesOnCPU(
-             geometry, geometryDirection, config)
+  return computeStepSizeUpperBoundAtBVHLeavesOnCPU(geometry, geometryDirection,
+                                                   config)
       .stepSizeUpperBound;
 }
 

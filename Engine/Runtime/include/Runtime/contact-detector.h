@@ -8,7 +8,8 @@ namespace ksk::runtime {
 class ContactDetector {
  public:
   // Rebuild the active barrier constraints at the scene's current geometry.
-  void rebuildActiveContacts(SimulationContext& simulation) const;
+  void rebuildActiveContacts(SimulationContext& simulation,
+                             bool updateFrictionReferenceContacts = false) const;
 
   // Use swept CCD only to bound the step length along a proposed direction.
   [[nodiscard]] Real computeCCDStepBound(
@@ -24,7 +25,8 @@ class ContactDetector {
       const RuntimeScene& scene);
 
   static void applyRoutedContacts(SimulationContext& simulation,
-                                  const GlobalContactRouter& routedContacts);
+                                  const GlobalContactRouter& routedContacts,
+                                  bool updateFrictionReferenceContacts);
 };
 
 }  // namespace ksk::runtime

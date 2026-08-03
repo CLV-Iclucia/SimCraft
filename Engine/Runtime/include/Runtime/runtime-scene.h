@@ -70,7 +70,8 @@ struct RuntimeScene {
   std::vector<SubsystemBatch> subsystemBatches;
   GlobalGeometryManager geometry;
   ContactStencils contacts;
-  std::vector<glm::dvec3> frictionReferencePositions;
+  ContactStencils frictionReferenceContacts;
+  FrictionContactStencils frictionContacts;
   GlobalSolverConfig solverConfig;
   glm::dvec3 gravity{0.0, -9.81, 0.0};
   BufferLayout buffers;
@@ -91,7 +92,7 @@ struct SceneConstraintDesc {
 struct SceneColliderDesc {
   GeometryMeshDesc mesh;
   glm::dmat4 transform{1.0};
-  Real frictionCoefficient = -1.0;
+  PhysicalMaterialId physicalMaterial = kDefaultPhysicalMaterial;
   std::string tag;
 };
 

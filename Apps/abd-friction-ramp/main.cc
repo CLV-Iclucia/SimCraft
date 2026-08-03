@@ -15,13 +15,16 @@
 
 namespace {
 
-constexpr double kRampAngle = 0.42;
-constexpr double kRampLength = 3.2;
-constexpr double kRampWidth = 1.15;
+double kRampAngle = std::atan(0.5);
+constexpr double kRampLength = 6.0;
+constexpr double kRampWidth = 3.2;
 constexpr double kRampCenterY = 0.62;
 constexpr double kSliderHalfX = 0.12;
 constexpr double kSliderHalfY = 0.055;
 constexpr double kSliderHalfZ = 0.09;
+constexpr double kSliderRampGap = 0.01;
+constexpr ksk::runtime::PhysicalMaterialId kRampMaterial = 1;
+constexpr ksk::runtime::PhysicalMaterialId kFirstSliderMaterial = 100;
 
 ksk::core::Vec3f toVec3f(const glm::dvec3& value)
 {
@@ -72,13 +75,13 @@ ksk::runtime::GeometryMeshDesc makeRampColliderMesh()
       std::array<int, 3>{0, 1, 2},
       std::array<int, 3>{0, 2, 3},
   };
-  mesh.radius = 1.0e-3;
+  mesh.radius = 0.0;
   return mesh;
 }
 
 ksk::abd::ABDBodyDesc makeSlider(double lane,
                                  double start_s,
-                                 double friction)
+                                 ksk::runtime::PhysicalMaterialId material)
 {
   ksk::abd::ABDBodyDesc body;
   const double x = kSliderHalfX;
@@ -110,11 +113,10 @@ ksk::abd::ABDBodyDesc makeSlider(double lane,
   body.initialTransform[1] = rampNormal();
   body.initialTransform[2] = rampBinormal();
   body.initialTransform[3] =
-      rampPoint(start_s, lane) + (kSliderHalfY + 4.0e-3) * rampNormal();
+      rampPoint(start_s, lane) + (kSliderHalfY + kSliderRampGap) * rampNormal();
   body.density = 650.0;
   body.orthogonalStiffness = 5.0e6;
-  body.contactThickness = 1.5e-3;
-  body.frictionCoefficient = friction;
+  body.physicalMaterial = material;
   return body;
 }
 
@@ -172,7 +174,7 @@ int main(int argc, char** argv)
   options.add_options()
       ("steps", "number of simulation steps",
        cxxopts::value<int>()->default_value("1200"))
-      ("dt", "time step", cxxopts::value<double>()->default_value("0.003"))
+      ("dt", "time step", cxxopts::value<double>()->default_value("0.01"))
       ("no-render", "disable rendering",
        cxxopts::value<bool>()->default_value("false"))
       ("h,help", "print help");
@@ -198,17 +200,19 @@ int main(int argc, char** argv)
   scene.solverConfig.contactStiffness = 3.0e5;
   scene.solverConfig.maxNewtonIterations = 80;
   scene.solverConfig.maxPcgIterations = 600;
-  scene.solverConfig.solveMode = ksk::runtime::GlobalSolveMode::Coupled;
+  scene.solverConfig.solveMode = ksk::runtime::GlobalSolveMode::Decoupled;
 
   scene.addCollider(ksk::runtime::SceneColliderDesc{
       .mesh = makeRampColliderMesh(),
       .transform = glm::dmat4{1.0},
-      .frictionCoefficient = 1.0,
+      .physicalMaterial = kRampMaterial,
       .tag = "static-ramp",
   });
 
-  const std::array<double, 5> frictions{0.02, 0.08, 0.18, 0.36, 0.65};
+  const std::array<double, 6> frictions{
+      0.1, 0.3, 0.4, 0.5, 0.6, 0.7};
   const std::vector<ksk::core::Vec3f> colors{
+      {0.76f, 0.82f, 0.88f},
       {0.20f, 0.63f, 0.95f},
       {0.20f, 0.78f, 0.46f},
       {0.94f, 0.76f, 0.22f},
@@ -216,12 +220,14 @@ int main(int argc, char** argv)
       {0.66f, 0.42f, 0.88f},
   };
   for (int i = 0; i < static_cast<int>(frictions.size()); ++i) {
-    const double lane =
-        -0.42 + 0.21 * static_cast<double>(i);
-    const double start_s =
-        -0.98 + 0.02 * static_cast<double>(i);
+    const double lane = -1.25 + 0.5 * static_cast<double>(i);
+    const double start_s = -2.2 + 0.8 * static_cast<double>(i);
+    const ksk::runtime::PhysicalMaterialId slider_material =
+        kFirstSliderMaterial + i;
+    scene.solverConfig.frictionTable.set(
+        slider_material, kRampMaterial, frictions[static_cast<size_t>(i)]);
     ksk::abd::addABDBody(
-        scene, makeSlider(lane, start_s, frictions[static_cast<size_t>(i)]),
+        scene, makeSlider(lane, start_s, slider_material),
         "slider-mu-" + std::to_string(i));
   }
 
@@ -243,6 +249,7 @@ int main(int argc, char** argv)
       return;
     }
     const ksk::runtime::RuntimeStepResult result = runner.step();
+    const ksk::runtime::RuntimeScene& step_scene = runner.simulation().scene();
     const bool finite = std::isfinite(result.finalGradientNorm) &&
                         std::isfinite(result.finalStepNorm);
     solve_failed = !finite;
@@ -250,7 +257,10 @@ int main(int argc, char** argv)
               << " iterations=" << result.iterations
               << " converged=" << (result.converged ? "true" : "false")
               << " grad=" << result.finalGradientNorm
-              << " step_norm=" << result.finalStepNorm << '\n';
+              << " step_norm=" << result.finalStepNorm
+              << " contacts=" << step_scene.contacts.size()
+              << " friction_contacts=" << step_scene.frictionContacts.size();
+    std::cout << '\n';
   };
 
   if (no_render) {

@@ -10,9 +10,12 @@ using Real = double;
 
 using SubsystemIdx = int;
 using PointIdx = int;
+using PhysicalMaterialId = int;
 
 using ObjectId = int;
 using ObjectTypeId = RF::TypeId;
+
+inline constexpr PhysicalMaterialId kDefaultPhysicalMaterial = 0;
 
 template <typename T>
 constexpr ObjectTypeId elementTypeId() noexcept

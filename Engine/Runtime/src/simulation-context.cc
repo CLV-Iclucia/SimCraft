@@ -32,6 +32,8 @@ void SimulationContext::rebuild()
   scene_.dofs = {};
   scene_.geometry.clear();
   scene_.contacts = {};
+  scene_.frictionReferenceContacts = {};
+  scene_.frictionContacts = {};
   scene_.subsystemBatches.clear();
   scene_.gravity = gravity_;
 
@@ -70,7 +72,7 @@ void SimulationContext::rebuild()
     const GeometryBodyIdx body =
         scene_.geometry.instances[static_cast<size_t>(instance)].owner.body;
     scene_.geometry.bodyCollisionFilters[static_cast<size_t>(body)]
-        .frictionCoefficient = desc.frictionCoefficient;
+        .physicalMaterial = desc.physicalMaterial;
   }
   scene_.dofs.totalScalars = total_scalars;
   scene_.refreshBufferLayout();

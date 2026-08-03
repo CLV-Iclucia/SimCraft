@@ -155,23 +155,57 @@ SH_INLINE void shPtEdgeTest(real3 from, real3 to, real3 pt,
 
 SH_INLINE int shDecidePointTriangleDistanceType(
     real3 p, real3 t0, real3 t1, real3 t2) {
-    real3 normal = shCross(t1 - t0, t2 - t0);
+    real3 ab = t1 - t0;
+    real3 ac = t2 - t0;
+    real3 normal = shCross(ab, ac);
+    if (shDot(normal, normal) == 0.0) {
+        real3 bc = t2 - t1;
+        real lab = shDot(ab, ab);
+        real lbc = shDot(bc, bc);
+        real lca = shDot(ac, ac);
+        if (lab >= lbc && lab >= lca) {
+            real alpha = lab > 0.0 ? shDot(p - t0, ab) / lab : 0.0;
+            if (alpha <= 0.0) return SH_PT_P_A;
+            if (alpha >= 1.0) return SH_PT_P_B;
+            return SH_PT_P_AB;
+        }
+        if (lbc >= lca) {
+            real alpha = lbc > 0.0 ? shDot(p - t1, bc) / lbc : 0.0;
+            if (alpha <= 0.0) return SH_PT_P_B;
+            if (alpha >= 1.0) return SH_PT_P_C;
+            return SH_PT_P_BC;
+        }
+        real3 ca = t0 - t2;
+        real alpha = lca > 0.0 ? shDot(p - t2, ca) / lca : 0.0;
+        if (alpha <= 0.0) return SH_PT_P_C;
+        if (alpha >= 1.0) return SH_PT_P_A;
+        return SH_PT_P_CA;
+    }
 
-    real s0, t0v;
-    shPtEdgeTest(t0, t1, p, normal, s0, t0v);
-    if (s0 > 0.0 && s0 < 1.0 && t0v >= 0.0) return SH_PT_P_AB;
+    real3 ap = p - t0;
+    real d1 = shDot(ab, ap);
+    real d2 = shDot(ac, ap);
+    if (d1 <= 0.0 && d2 <= 0.0) return SH_PT_P_A;
 
-    real s1, t1v;
-    shPtEdgeTest(t1, t2, p, normal, s1, t1v);
-    if (s1 > 0.0 && s1 < 1.0 && t1v >= 0.0) return SH_PT_P_BC;
+    real3 bp = p - t1;
+    real d3 = shDot(ab, bp);
+    real d4 = shDot(ac, bp);
+    if (d3 >= 0.0 && d4 <= d3) return SH_PT_P_B;
 
-    real s2, t2v;
-    shPtEdgeTest(t2, t0, p, normal, s2, t2v);
-    if (s2 > 0.0 && s2 < 1.0 && t2v >= 0.0) return SH_PT_P_CA;
+    real vc = d1 * d4 - d3 * d2;
+    if (vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0) return SH_PT_P_AB;
 
-    if (s0 <= 0.0 && s2 >= 1.0) return SH_PT_P_A;
-    if (s1 <= 0.0 && s0 >= 1.0) return SH_PT_P_B;
-    if (s2 <= 0.0 && s1 >= 1.0) return SH_PT_P_C;
+    real3 cp = p - t2;
+    real d5 = shDot(ab, cp);
+    real d6 = shDot(ac, cp);
+    if (d6 >= 0.0 && d5 <= d6) return SH_PT_P_C;
+
+    real vb = d5 * d2 - d1 * d6;
+    if (vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0) return SH_PT_P_CA;
+
+    real va = d3 * d6 - d5 * d4;
+    if (va <= 0.0 && (d4 - d3) >= 0.0 && (d5 - d6) >= 0.0)
+        return SH_PT_P_BC;
 
     return SH_PT_P_ABC;
 }

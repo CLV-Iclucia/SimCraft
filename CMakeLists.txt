@@ -60,12 +60,8 @@ else()
   message(FATAL_ERROR "Kiseki Runtime buffers currently require RHI.")
 endif()
 
-# Kiseki-level runtime layer. Keep it before physics modules so FEM/HairSim
-# adapters can depend on Kiseki::Runtime without creating reverse dependencies.
+# Kiseki comprehensive multiphysics engine
 add_subdirectory(Engine)
-
-# FEM has an optional GPU backend (RHI + RPK), so it must come after them.
-add_subdirectory(FEM)
 
 # FluidSim depends on RHI (GPU backend), so it comes after RHI
 add_subdirectory(FluidSim)

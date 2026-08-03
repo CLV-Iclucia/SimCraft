@@ -41,7 +41,7 @@ struct GeometryBodyCollisionFilter {
   std::uint32_t group = kDefaultCollisionGroup;
   std::uint32_t mask = kAllCollisionGroups;
   bool enabled = true;
-  Real frictionCoefficient = -1.0;
+  PhysicalMaterialId physicalMaterial = kDefaultPhysicalMaterial;
 };
 
 using GeometryBodyCollisionFilters = std::vector<GeometryBodyCollisionFilter>;

@@ -20,8 +20,8 @@ struct ABDBodyDesc {
   glm::dmat4x3 initialVelocity{0.0};
   runtime::Real density = 1.0;
   runtime::Real orthogonalStiffness = 1.0e6;
-  runtime::Real contactThickness = 0.0;
-  runtime::Real frictionCoefficient = -1.0;
+  runtime::PhysicalMaterialId physicalMaterial =
+      runtime::kDefaultPhysicalMaterial;
 };
 
 struct KLASS() ABDBodyObject final : runtime::SceneObject {

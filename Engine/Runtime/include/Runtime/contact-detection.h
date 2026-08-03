@@ -98,9 +98,6 @@ struct ContactDetectionConfig {
   Real dHat = 1.0e-3;
   Real stiffness = 1.0e5;
   Real toi = 1.0;
-  Real frictionCoefficient = 0.0;
-  Real frictionEpsilon = 1.0e-6;
-  const std::vector<glm::dvec3>* frictionReferencePositions = nullptr;
 };
 
 [[nodiscard]] GlobalContactRouter rebuildActiveContacts(

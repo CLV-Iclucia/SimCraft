@@ -17,19 +17,11 @@ ContactDetectionConfig ContactDetector::createDetectionConfig(
     const RuntimeScene& scene, Real toi) {
   const GlobalSolverConfig& solver_config = scene.solverConfig;
   const Real barrier_distance = solver_config.contactBarrierDistance;
-  const bool friction_enabled = solver_config.enableFriction;
   return ContactDetectionConfig{
-      .storage = friction_enabled ? ContactDetectionStorage::Host
-                                  : solver_config.contactDetectionStorage,
+      .storage = solver_config.contactDetectionStorage,
       .dHat = barrier_distance,
       .stiffness = solver_config.contactStiffness,
       .toi = toi,
-      .frictionCoefficient = friction_enabled ? solver_config.frictionCoefficient
-                                              : 0.0,
-      .frictionEpsilon = solver_config.frictionEpsilon,
-      .frictionReferencePositions = friction_enabled
-                                        ? &scene.frictionReferencePositions
-                                        : nullptr,
   };
 }
 
@@ -40,7 +32,8 @@ ContactDetectionConfig ContactDetector::createCurrentBarrierConfig(
 }
 
 void ContactDetector::applyRoutedContacts(SimulationContext& simulation,
-                                          const GlobalContactRouter& routedContacts) {
+                                          const GlobalContactRouter& routedContacts,
+                                          bool updateFrictionReferenceContacts) {
   KSK_PROFILE_SCOPE("ContactDetector/ApplyRoutedContacts");
   KSK_PROFILE_VALUE("contact.routed.global",
                     static_cast<double>(routedContacts.globalContacts.size()));
@@ -48,6 +41,29 @@ void ContactDetector::applyRoutedContacts(SimulationContext& simulation,
       "contact.routed.internal_subsystems",
       static_cast<double>(routedContacts.subsystemInternalContacts.size()));
   RuntimeScene& scene = simulation.scene();
+  if (updateFrictionReferenceContacts) {
+    scene.frictionReferenceContacts.clear();
+  }
+  if (updateFrictionReferenceContacts && scene.solverConfig.enableFriction) {
+    size_t reference_count = routedContacts.globalContacts.size();
+    for (const auto& [subsystem, data] :
+         routedContacts.subsystemInternalContacts) {
+      (void)subsystem;
+      reference_count += data.contacts.size();
+    }
+    scene.frictionReferenceContacts.reserve(reference_count);
+    scene.frictionReferenceContacts.insert(
+        scene.frictionReferenceContacts.end(),
+        routedContacts.globalContacts.begin(),
+        routedContacts.globalContacts.end());
+    for (const auto& [subsystem, data] :
+         routedContacts.subsystemInternalContacts) {
+      (void)subsystem;
+      scene.frictionReferenceContacts.insert(
+          scene.frictionReferenceContacts.end(), data.contacts.begin(),
+          data.contacts.end());
+    }
+  }
   scene.contacts = std::move(routedContacts.globalContacts);
 
   for (const auto& subsystem : simulation.subsystems()) {
@@ -63,13 +79,15 @@ void ContactDetector::applyRoutedContacts(SimulationContext& simulation,
 }
 
 void ContactDetector::rebuildActiveContacts(
-    SimulationContext& simulation) const {
+    SimulationContext& simulation,
+    bool updateFrictionReferenceContacts) const {
   KSK_PROFILE_SCOPE("ContactDetector/RebuildActiveContacts");
   GlobalContactRouter routed_contacts =
       runtime::rebuildActiveContacts(
           simulation.scene().geometry,
           createCurrentBarrierConfig(simulation.scene()));
-  applyRoutedContacts(simulation, std::move(routed_contacts));
+  applyRoutedContacts(simulation, std::move(routed_contacts),
+                      updateFrictionReferenceContacts);
 }
 
 Real ContactDetector::computeCCDStepBound(

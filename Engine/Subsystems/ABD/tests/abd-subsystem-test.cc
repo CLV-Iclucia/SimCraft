@@ -36,7 +36,6 @@ ABDBodyDesc makePointBody(glm::dvec3 point)
 {
   ABDBodyDesc body;
   body.surface.vertices = {point};
-  body.contactThickness = 0.0;
   return body;
 }
 
