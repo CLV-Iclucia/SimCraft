@@ -6,8 +6,8 @@
 // Equivalent to: python/examples/cube_drop.py
 //
 // Demonstrates:
-//   TetMesh loading → material creation → System setup →
-//   kinematic ground plane → IPC integrator → realtime rendering.
+//   TetMesh loading �?material creation �?System setup �?
+//   kinematic ground plane �?IPC integrator �?realtime rendering.
 //
 // Usage:
 //   cube-drop [--dt 0.01] [--steps 500] [--no-render]
@@ -21,7 +21,7 @@
 #include <fem/colliders.h>
 #include <fem/ipc/implicit-euler.h>
 #include <Maths/block-solvers/block-pcg.h>
-#include <Deform/strain-energy-density.h>
+#include <Engine/Deform/strain-energy-density.h>
 #include <Renderer/simulation-app.h>
 #include <fem/scene-proxy.h>
 #include <iostream>
@@ -29,7 +29,7 @@
 
 using namespace ksk;
 using namespace ksk::fem;
-using namespace ksk::deform;
+using namespace ksk::engine::deform;
 
 // ─── Main ──────────────────────────────────────────────────────────────────────
 
@@ -96,7 +96,7 @@ int main(int argc, char** argv) {
     system.colliders().push_back(std::move(ground));
   }
 
-  // 初始化系统（分配 DOF、构建质量矩阵等）
+  // 初始化系统（分配 DOF、构建质量矩阵等�?
   system.init();
 
   // ─── 5. Integrator ──────────────────────────────────────────────────────────

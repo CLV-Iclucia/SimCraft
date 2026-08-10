@@ -17,7 +17,7 @@ pybind11_add_module(kiseki
     src/bind_der.cc
     src/bind_abd.cc
 )
-target_link_libraries(kiseki PRIVATE Kiseki::Renderer Kiseki::DER Kiseki::EngineABD)
+target_link_libraries(kiseki PRIVATE Kiseki::Renderer Kiseki::DER Kiseki::EngineABD Kiseki::EngineDeform)
 target_include_directories(kiseki PRIVATE src)
 target_compile_definitions(kiseki PRIVATE
     KISEKI_VERSION="0.1.0"

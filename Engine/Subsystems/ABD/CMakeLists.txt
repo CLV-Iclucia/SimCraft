@@ -3,12 +3,14 @@ project(EngineABD LANGUAGES CXX)
 set(ENGINE_ABD_SOURCES
     src/abd-scene.cc
     src/abd-subsystem.cc
+    src/abd-newton-ipc-api.cc
     src/cpu/abd-cpu-backend.cc
 )
 
 set(ENGINE_ABD_HEADERS
     include/ABD/abd-scene.h
     include/ABD/abd-subsystem.h
+    include/ABD/abd-newton-ipc-api.h
     include/ABD/cpu/abd-cpu-backend.h
 )
 

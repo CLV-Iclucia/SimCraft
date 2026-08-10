@@ -1,8 +1,10 @@
 #include <Core/profiler.h>
-#include <Deform/deformation-gradient.h>
-#include <Deform/strain-energy-density.h>
+#include <Engine/Deform/deformation-gradient.h>
+#include <Engine/Deform/strain-energy-density.h>
 #include <FEM/cpu/fem-cpu-backend.h>
 #include <FEM/fem-subsystem.h>
+#include <FEM/solver/fem-newton-ipc-api.h>
+#include <FEM/solver/fem-pd-api.h>
 #include <Maths/tensor.h>
 #include <tbb/parallel_for.h>
 
@@ -451,6 +453,18 @@ std::vector<FEMPrimitive> makeTetPrimitives(std::vector<TetMeshDesc> meshes) {
 }
 }  // namespace
 
+std::unique_ptr<runtime::NewtonIPCSubsystemSolver>
+FEMSubsystem::createNewtonIPCSolver()
+{
+  return std::make_unique<FEMNewtonIpcApi>(*this);
+}
+
+std::unique_ptr<runtime::ProjectiveDynamicsSubsystemSolver>
+FEMSubsystem::createProjectiveDynamicsSolver()
+{
+  return std::make_unique<FEMProjectiveDynamicsApi>(*this);
+}
+
 FEMSubsystem::FEMSubsystem(runtime::SubsystemIdx id,
                            std::vector<TetMeshDesc> meshes,
                            std::vector<FEMConstraintBinding> constraints,
@@ -670,10 +684,6 @@ void FEMSubsystem::applyInternalContactHessian(runtime::ConstDofView localDq,
                                                runtime::DofView localY) const {
   cpu_backend_->applyInternalContactHessian(localDq, localY);
 }
-
-void FEMSubsystem::visit(runtime::CpuSubsystemBackend& backend) {}
-
-void FEMSubsystem::visit(runtime::GpuSubsystemBackend& backend) {}
 
 int FEMSubsystem::localScalarCount() const noexcept {
   return range_.scalarCount;

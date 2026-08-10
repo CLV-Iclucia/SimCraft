@@ -7,22 +7,23 @@ namespace ksk::runtime {
 
 SimulationContext::SimulationContext(
     std::vector<std::unique_ptr<Subsystem>> subsystems,
-    GlobalSolverConfig solver,
+    std::unique_ptr<GlobalSolverConfig> solver,
     glm::dvec3 gravity)
-    : SimulationContext(std::move(subsystems), {}, solver, gravity)
+    : SimulationContext(std::move(subsystems), {}, std::move(solver), gravity)
 {
 }
 
 SimulationContext::SimulationContext(
     std::vector<std::unique_ptr<Subsystem>> subsystems,
     std::vector<std::string> subsystemTypeNames,
-    GlobalSolverConfig solver,
+    std::unique_ptr<GlobalSolverConfig> solver,
     glm::dvec3 gravity)
     : subsystems_(std::move(subsystems))
     , subsystem_type_names_(std::move(subsystemTypeNames))
     , gravity_(gravity)
 {
-  scene_.solverConfig = solver;
+  scene_.solverConfig =
+      solver ? std::move(solver) : makeDefaultSolverConfig();
   scene_.gravity = gravity_;
   rebuild();
 }

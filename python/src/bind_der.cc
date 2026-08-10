@@ -153,47 +153,59 @@ py::array_t<double> rodPositions(const PyRuntimeSimulation& sim, int rodIndex)
 
 void bind_der(py::module_& m)
 {
-  py::enum_<runtime::GlobalSolveMode>(m, "GlobalSolveMode")
-      .value("Decoupled", runtime::GlobalSolveMode::Decoupled)
-      .value("Coupled", runtime::GlobalSolveMode::Coupled)
+  py::enum_<runtime::GlobalSolverType>(m, "GlobalSolverType")
+      .value("NewtonIPC", runtime::GlobalSolverType::NewtonIPC)
+      .value("ProjectiveDynamics",
+             runtime::GlobalSolverType::ProjectiveDynamics)
+      .export_values();
+
+  py::enum_<runtime::LinearSolveMode>(m, "LinearSolveMode")
+      .value("Decoupled", runtime::LinearSolveMode::Decoupled)
+      .value("Coupled", runtime::LinearSolveMode::Coupled)
       .export_values();
 
   py::class_<runtime::GlobalSolverConfig>(m, "GlobalSolverConfig")
       .def(py::init<>())
       .def_readwrite("max_newton_iterations",
                      &runtime::GlobalSolverConfig::maxNewtonIterations)
-      .def_readwrite("max_pcg_iterations",
-                     &runtime::GlobalSolverConfig::maxPcgIterations)
-      .def_readwrite("max_line_search_iterations",
-                     &runtime::GlobalSolverConfig::maxLineSearchIterations)
       .def_readwrite("newton_gradient_tolerance",
                      &runtime::GlobalSolverConfig::newtonGradientTolerance)
       .def_readwrite("newton_step_tolerance",
                      &runtime::GlobalSolverConfig::newtonStepTolerance)
-      .def_readwrite("line_search_armijo",
-                     &runtime::GlobalSolverConfig::lineSearchArmijo)
-      .def_readwrite("ccd_step_size_scale",
-                     &runtime::GlobalSolverConfig::ccdStepSizeScale)
-      .def_readwrite("pcg_tolerance",
-                     &runtime::GlobalSolverConfig::pcgTolerance)
-      .def_readwrite("enable_pcg_warm_start",
-                     &runtime::GlobalSolverConfig::enablePCGWarmStart)
       .def_readwrite("enable_contact",
                       &runtime::GlobalSolverConfig::enableContact)
       .def_readwrite("enable_friction",
                       &runtime::GlobalSolverConfig::enableFriction)
+      .def_readwrite("solver_type",
+                      &runtime::GlobalSolverConfig::solverType)
       .def_readwrite("solve_mode",
-                      &runtime::GlobalSolverConfig::solveMode)
+                      &runtime::GlobalSolverConfig::solveMode);
+
+  py::class_<runtime::NewtonIpcSolverConfig, runtime::GlobalSolverConfig>(
+      m, "NewtonIpcSolverConfig")
+      .def(py::init<>())
+      .def_readwrite("max_pcg_iterations",
+                     &runtime::NewtonIpcSolverConfig::maxPcgIterations)
+      .def_readwrite("max_line_search_iterations",
+                     &runtime::NewtonIpcSolverConfig::maxLineSearchIterations)
+      .def_readwrite("line_search_armijo",
+                     &runtime::NewtonIpcSolverConfig::lineSearchArmijo)
+      .def_readwrite("ccd_step_size_scale",
+                     &runtime::NewtonIpcSolverConfig::ccdStepSizeScale)
+      .def_readwrite("pcg_tolerance",
+                     &runtime::NewtonIpcSolverConfig::pcgTolerance)
+      .def_readwrite("enable_pcg_warm_start",
+                     &runtime::NewtonIpcSolverConfig::enablePCGWarmStart)
       .def_readwrite("coupled_diagonal_regularization",
-                     &runtime::GlobalSolverConfig::coupledDiagonalRegularization)
+                     &runtime::NewtonIpcSolverConfig::coupledDiagonalRegularization)
       .def_readwrite("contact_barrier_distance",
-                      &runtime::GlobalSolverConfig::contactBarrierDistance)
+                      &runtime::NewtonIpcSolverConfig::contactBarrierDistance)
       .def_readwrite("contact_stiffness",
-                     &runtime::GlobalSolverConfig::contactStiffness)
+                     &runtime::NewtonIpcSolverConfig::contactStiffness)
       .def_readwrite("friction_coefficient",
-                     &runtime::GlobalSolverConfig::frictionCoefficient)
+                     &runtime::NewtonIpcSolverConfig::frictionCoefficient)
       .def_readwrite("friction_epsilon",
-                     &runtime::GlobalSolverConfig::frictionEpsilon);
+                     &runtime::NewtonIpcSolverConfig::frictionEpsilon);
 
   py::class_<runtime::RuntimeStepResult>(m, "RuntimeStepResult")
       .def_readonly("iterations", &runtime::RuntimeStepResult::iterations)
@@ -318,12 +330,20 @@ void bind_der(py::module_& m)
           })
       .def_property(
           "solver",
-          [](PyDERScene& self) -> runtime::GlobalSolverConfig& {
-            return self.scene.solverConfig;
+          [](PyDERScene& self) -> runtime::NewtonIpcSolverConfig& {
+            runtime::NewtonIpcSolverConfig* config =
+                RF::Cast<runtime::NewtonIpcSolverConfig>(
+                    self.scene.solverConfig.get());
+            if (config == nullptr) {
+              throw py::value_error(
+                  "DERScene solver is not a Newton IPC solver config");
+            }
+            return *config;
           },
-          [](PyDERScene& self, runtime::GlobalSolverConfig solver) {
+          [](PyDERScene& self, const runtime::NewtonIpcSolverConfig& solver) {
             self.checkUnlocked();
-            self.scene.solverConfig = solver;
+            self.scene.solverConfig =
+                std::make_unique<runtime::NewtonIpcSolverConfig>(solver);
           },
           py::return_value_policy::reference_internal)
       .def("build",

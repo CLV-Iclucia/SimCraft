@@ -1,10 +1,14 @@
 ﻿#pragma once
 
 #include <Runtime/contact-detector.h>
+#include <Runtime/global-pd-solver.h>
+#include <Runtime/newton-ipc-subsystem-api.h>
 #include <Runtime/runtime-scene.h>
 #include <Runtime/simulation-context.h>
+#include <Runtime/solver-result.h>
 
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -12,56 +16,18 @@ namespace ksk::runtime {
 
 struct ContactGeometryHessian;
 
-struct RuntimeStepResult {
-  int iterations = 0;
-  double finalGradientNorm = 0.0;
-  double finalStepNorm = 0.0;
-  bool converged = false;
-  std::string terminationReason;
-};
-
-class GlobalSolverStatsCollector {
+// Global Newton + IPC solver.
+//
+// Drives the nonlinear IPC optimization through the cached
+// NewtonIPCSubsystemSolver adapters. The base Subsystem lifecycle
+// (readState/beginStep/updateGeometry/acceptStep) stays solver-independent and
+// is still called directly; energy/operator/contact work goes through the
+// solver-specific APIs.
+class GlobalNewtonIpcSolver {
  public:
-  using StatMap = std::map<std::string, double>;
-
-  void beginFrame();
-  void clear() noexcept;
-
-  void frameSet(std::string key, double value);
-  void frameAdd(std::string key, double value);
-  void frameMax(std::string key, double value);
-  void frameMin(std::string key, double value);
-  void frameAverage(std::string key, double value);
-
-  void globalSet(std::string key, double value);
-  void globalAdd(std::string key, double value);
-  void globalMax(std::string key, double value);
-  void globalMin(std::string key, double value);
-  void globalAverage(std::string key, double value);
-
-  [[nodiscard]] const StatMap& global() const noexcept { return global_; }
-  [[nodiscard]] const std::vector<StatMap>& frames() const noexcept {
-    return frames_;
-  }
-
- private:
-  static void add(StatMap& stats, std::string key, double value);
-  static void max(StatMap& stats, std::string key, double value);
-  static void min(StatMap& stats, std::string key, double value);
-  static void average(StatMap& stats, std::map<std::string, int>& counts,
-                      std::string key, double value);
-
-  [[nodiscard]] StatMap& currentFrame();
-
-  StatMap global_;
-  std::map<std::string, int> global_average_counts_;
-  std::vector<StatMap> frames_;
-  std::vector<std::map<std::string, int>> frame_average_counts_;
-};
-
-class GlobalGaussNewtonSolver {
- public:
-  void prepare(const RuntimeScene& scene);
+  // Creates/caches the per-subsystem Newton IPC API adapters. Requires every
+  // subsystem to support Newton IPC (throws otherwise).
+  void prepare(SimulationContext& simulation);
   RuntimeStepResult step(SimulationContext& simulation, double dt,
                          double time = 0.0,
                          GlobalSolverStatsCollector* stats = nullptr);
@@ -72,45 +38,50 @@ class GlobalGaussNewtonSolver {
   }
 
  private:
-  [[nodiscard]] static double evaluateObjective(SimulationContext& simulation,
-                                                double dt);
-  static void assembleContactGradient(SimulationContext& simulation,
-                                      DofBuffer& gradient);
-  static void assembleContactFrictionGradient(SimulationContext& simulation,
-                                              DofBuffer& gradient);
-  [[nodiscard]] static bool solveNewtonDirection(
+  [[nodiscard]] NewtonIPCSubsystemSolver* apiFor(SubsystemIdx id) noexcept;
+  [[nodiscard]] const NewtonIPCSubsystemSolver* apiFor(
+      SubsystemIdx id) const noexcept;
+
+  [[nodiscard]] double evaluateSubsystemObjectiveAndUpdateGeometry(
+      SimulationContext& simulation, double dt);
+  void assembleContactGradient(SimulationContext& simulation,
+                               DofBuffer& gradient);
+  void assembleContactFrictionGradient(SimulationContext& simulation,
+                                       DofBuffer& gradient);
+  [[nodiscard]] bool solveNewtonDirection(
       SimulationContext& simulation, const DofBuffer& gradient,
       DofBuffer& direction, GlobalSolverStatsCollector* stats,
       const ContactGeometryHessian* contactHessian = nullptr,
       std::string* failureReason = nullptr);
-  [[nodiscard]] static bool solveDecoupledDirection(
+  [[nodiscard]] bool solveDecoupledDirection(
       SimulationContext& simulation, const DofBuffer& gradient,
       DofBuffer& direction, GlobalSolverStatsCollector* stats,
       const ContactGeometryHessian* contactHessian = nullptr,
       std::string* failureReason = nullptr);
-  [[nodiscard]] static bool solveCoupledDirection(
+  [[nodiscard]] bool solveCoupledDirection(
       SimulationContext& simulation, const DofBuffer& gradient,
       DofBuffer& direction, GlobalSolverStatsCollector* stats,
       const ContactGeometryHessian* contactHessian = nullptr,
       std::string* failureReason = nullptr);
-  [[nodiscard]] static bool solveSingleSubsystemDirection(
+  [[nodiscard]] bool solveSingleSubsystemDirection(
       SimulationContext& simulation, const DofBuffer& gradient,
       DofBuffer& direction);
-  [[nodiscard]] static bool solveBlockDiagonalSubsystemDirection(
+  [[nodiscard]] bool solveBlockDiagonalSubsystemDirection(
       SimulationContext& simulation, const DofBuffer& gradient,
       DofBuffer& direction);
-  static void applyGlobalMatrix(
+  void applyGlobalMatrix(
       SimulationContext& simulation, const DofBuffer& x, DofBuffer& y,
       const ContactGeometryHessian* contactHessian = nullptr);
-  static void applyGlobalContactHessian(
+  void applyGlobalContactHessian(
       SimulationContext& simulation, const DofBuffer& x, DofBuffer& y,
       const ContactGeometryHessian* contactHessian = nullptr);
-  static void applyPreconditioner(SimulationContext& simulation,
-                                  const DofBuffer& residual, DofBuffer& z);
+  void applyPreconditioner(SimulationContext& simulation,
+                           const DofBuffer& residual, DofBuffer& z);
 
   int scalar_count_ = 0;
   int geometry_point_count_ = 0;
   ContactDetector contact_detector_;
+  std::vector<std::unique_ptr<NewtonIPCSubsystemSolver>> subsystem_apis_;
 };
 
 class SimulationRunner {
@@ -136,7 +107,8 @@ class SimulationRunner {
 
  private:
   SimulationContext simulation_;
-  GlobalGaussNewtonSolver solver_;
+  GlobalNewtonIpcSolver newton_solver_;
+  GlobalProjectiveDynamicsSolver pd_solver_;
   RuntimeStepResult last_step_;
   double time_step_ = 1.0 / 60.0;
   double time_ = 0.0;
@@ -147,3 +119,4 @@ class SimulationRunner {
     const RuntimeSceneDesc& scene);
 
 }  // namespace ksk::runtime
+

@@ -1,7 +1,9 @@
 #include <DER/der-subsystem.h>
 
 #include <DER/cpu/der-cpu-backend.h>
+#include <DER/der-newton-ipc-api.h>
 #include <DER/gpu/der-gpu-backend.h>
+#include <Runtime/projective-dynamics-subsystem-api.h>
 
 #include <stdexcept>
 #include <memory>
@@ -38,6 +40,22 @@ int rodScalarCount(const Rod& rod)
 }
 
 }  // namespace
+
+std::unique_ptr<runtime::NewtonIPCSubsystemSolver>
+DERSubsystem::createNewtonIPCSolver()
+{
+  return std::make_unique<DERNewtonIpcApi>(*this);
+}
+
+std::unique_ptr<runtime::ProjectiveDynamicsSubsystemSolver>
+DERSubsystem::createProjectiveDynamicsSolver()
+{
+  // DER does not advertise PD support in the first phase: stretching and
+  // bending can fit a PD formulation, but twisting is not straightforward, and
+  // the current bending path needs correction before it is used as a PD
+  // backend.
+  return nullptr;
+}
 
 DERSubsystem::DERSubsystem(runtime::SubsystemIdx id,
                            std::vector<Rod> rods,
@@ -282,16 +300,6 @@ void DERSubsystem::applyInternalContactHessian(runtime::ConstDofView localDq,
     return;
   }
   cpu_backend_->applyInternalContactHessian(localDq, localY);
-}
-
-void DERSubsystem::visit(runtime::CpuSubsystemBackend& backend)
-{
-  (void)backend;
-}
-
-void DERSubsystem::visit(runtime::GpuSubsystemBackend& backend)
-{
-  (void)backend;
 }
 
 const std::vector<DERGeometrySample>& DERSubsystem::geometrySamples() const noexcept

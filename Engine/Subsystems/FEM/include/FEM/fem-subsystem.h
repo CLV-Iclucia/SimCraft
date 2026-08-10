@@ -61,6 +61,9 @@ struct FEMClothPrimitive {
 
 using FEMPrimitive = std::variant<FEMTetMeshPrimitive, FEMClothPrimitive>;
 
+class FEMNewtonIpcApi;
+class FEMProjectiveDynamicsApi;
+
 class FEMSubsystem final : public runtime::Subsystem {
  public:
   FEMSubsystem(runtime::SubsystemIdx id,
@@ -89,36 +92,44 @@ class FEMSubsystem final : public runtime::Subsystem {
   void acceptStep(runtime::ConstDofView q,
                   runtime::DofView qdot,
                   double dt) override;
+
+  // Solver API factories.
+  [[nodiscard]] std::unique_ptr<runtime::NewtonIPCSubsystemSolver>
+  createNewtonIPCSolver() override;
+  [[nodiscard]] std::unique_ptr<runtime::ProjectiveDynamicsSubsystemSolver>
+  createProjectiveDynamicsSolver() override;
+
+  // Newton + IPC operations. These are NOT part of the base Subsystem
+  // interface; they are invoked by the FEM Newton IPC API adapter (see
+  // FEM/solver/fem-newton-ipc-api.h).
   [[nodiscard]] double evaluateObjective(runtime::ConstDofView q,
                                          runtime::ConstDofView qdot,
-                                         double dt) override;
+                                         double dt);
 
-  void updateInternalConstraints(double time, double dt) override;
-  void prepareLocalOperator(double dt) override;
-  void assembleLocalGradient(runtime::DofView g) const override;
+  void updateInternalConstraints(double time, double dt);
+  void prepareLocalOperator(double dt);
+  void assembleLocalGradient(runtime::DofView g) const;
   void applyLocalMatrix(runtime::ConstDofView x,
-                        runtime::DofView y) const override;
+                        runtime::DofView y) const;
   void appendLocalMatrixEntries(
-      std::vector<runtime::SparseMatrixEntry>& entries) const override;
+      std::vector<runtime::SparseMatrixEntry>& entries) const;
   void solveLocalSystem(runtime::ConstDofView b,
-                        runtime::DofView x) const override;
+                        runtime::DofView x) const;
 
   void updateGeometry(runtime::GlobalGeometryManager& geometry) const override;
   void mapLocalDirectionToGeometry(runtime::ConstDofView localDq,
-                              runtime::GeometryView globalDx) const override;
-  void applyInternalContacts(runtime::ContactStencils contacts) override;
+                              runtime::GeometryView globalDx) const;
+  void applyInternalContacts(runtime::ContactStencils contacts);
   void scatterContactGradient(
       std::span<const runtime::PointIdx> points,
       runtime::ConstGeometryView pointGradient,
-      runtime::DofView g) const override;
+      runtime::DofView g) const;
   void applyContactGeometryHessianProduct(
       std::span<const runtime::PointIdx> productPoints,
       runtime::ConstGeometryView pointHessianProduct,
-      runtime::DofView localY) const override;
+      runtime::DofView localY) const;
   void applyInternalContactHessian(runtime::ConstDofView localDq,
-                                   runtime::DofView localY) const override;
-  void visit(runtime::CpuSubsystemBackend& backend) override;
-  void visit(runtime::GpuSubsystemBackend& backend) override;
+                                   runtime::DofView localY) const;
 
   [[nodiscard]] const std::vector<TetMeshDesc>& meshes() const noexcept
   {

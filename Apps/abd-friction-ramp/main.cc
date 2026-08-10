@@ -192,15 +192,18 @@ int main(int argc, char** argv)
   ksk::runtime::RuntimeSceneDesc scene;
   scene.timeStep = dt;
   scene.gravity = glm::dvec3{0.0, -9.81, 0.0};
-  scene.solverConfig.enableContact = true;
-  scene.solverConfig.enableFriction = true;
-  scene.solverConfig.frictionCoefficient = 0.0;
-  scene.solverConfig.frictionEpsilon = 1.0e-5;
-  scene.solverConfig.contactBarrierDistance = 2.0e-3;
-  scene.solverConfig.contactStiffness = 3.0e5;
-  scene.solverConfig.maxNewtonIterations = 80;
-  scene.solverConfig.maxPcgIterations = 600;
-  scene.solverConfig.solveMode = ksk::runtime::GlobalSolveMode::Decoupled;
+  ksk::runtime::NewtonIpcSolverConfig& newton =
+      *RF::Cast<ksk::runtime::NewtonIpcSolverConfig>(
+          scene.solverConfig.get());
+  newton.enableContact = true;
+  newton.enableFriction = true;
+  newton.frictionCoefficient = 0.0;
+  newton.frictionEpsilon = 1.0e-5;
+  newton.contactBarrierDistance = 2.0e-3;
+  newton.contactStiffness = 3.0e5;
+  newton.maxNewtonIterations = 80;
+  newton.maxPcgIterations = 600;
+  newton.solveMode = ksk::runtime::LinearSolveMode::Decoupled;
 
   scene.addCollider(ksk::runtime::SceneColliderDesc{
       .mesh = makeRampColliderMesh(),
@@ -224,7 +227,7 @@ int main(int argc, char** argv)
     const double start_s = -2.2 + 0.8 * static_cast<double>(i);
     const ksk::runtime::PhysicalMaterialId slider_material =
         kFirstSliderMaterial + i;
-    scene.solverConfig.frictionTable.set(
+    newton.frictionTable.set(
         slider_material, kRampMaterial, frictions[static_cast<size_t>(i)]);
     ksk::abd::addABDBody(
         scene, makeSlider(lane, start_s, slider_material),

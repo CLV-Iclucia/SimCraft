@@ -6,7 +6,7 @@
 #define KISEKI_DEFORM_TYPES_H_
 #include <Maths/types.h>
 #include <Maths/tensor.h>
-namespace ksk::deform {
+namespace ksk::engine::deform {
 template <typename T, int N, int M>
 using Matrix = maths::Matrix<T, N, M>;
 using maths::Vector;

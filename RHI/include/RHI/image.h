@@ -6,9 +6,9 @@
 
 #pragma once
 
+#include <Core/rc-ptr.h>
 #include <Core/properties.h>
 #include <RHI/format.h>
-#include <RHI/rc-ptr.h>
 
 #include <atomic>
 #include <cstdint>
@@ -60,7 +60,7 @@ class Image : public ksk::core::NonCopyable {
   std::atomic<uint32_t> m_rc{0};
 };
 
-using ImageRef = RcPtr<Image>;
+using ImageRef = core::rc_ptr<Image>;
 
 // ---- Sampler ---------------------------------------------------------------
 struct SamplerDesc {
@@ -89,7 +89,7 @@ class Sampler : public ksk::core::NonCopyable {
   std::atomic<uint32_t> m_rc{0};
 };
 
-using SamplerRef = RcPtr<Sampler>;
+using SamplerRef = core::rc_ptr<Sampler>;
 
 // ---- ImageBinding ----------------------------------------------------------
 //

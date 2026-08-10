@@ -207,10 +207,13 @@ int main(int argc, char** argv)
   scene.gravity =
       args.count("gravity") > 0 ? glm::dvec3(0.0, -9.81, 0.0)
                                 : glm::dvec3(0.0);
-  scene.solverConfig.maxNewtonIterations = 20;
-  scene.solverConfig.maxPcgIterations = 100;
-  scene.solverConfig.newtonGradientTolerance = 1.0e-8;
-  scene.solverConfig.newtonStepTolerance = 1.0e-10;
+  ksk::runtime::NewtonIpcSolverConfig& newton =
+      *RF::Cast<ksk::runtime::NewtonIpcSolverConfig>(
+          scene.solverConfig.get());
+  newton.maxNewtonIterations = 20;
+  newton.maxPcgIterations = 100;
+  newton.newtonGradientTolerance = 1.0e-8;
+  newton.newtonStepTolerance = 1.0e-10;
   double twist_target = 0.0;
 
   ksk::scene::HairMaterial material;

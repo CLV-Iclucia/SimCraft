@@ -49,7 +49,6 @@ add_subdirectory(${EXTERNAL_PATH}/cxxopts)
 add_subdirectory(Core)
 add_subdirectory(Spatify)
 add_subdirectory(Maths)
-add_subdirectory(Deform)
 
 # Runtime buffers use RHI-owned GPU storage for device-resident data.
 option(KISEKI_BUILD_RHI "Build RHI module" ON)

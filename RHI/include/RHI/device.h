@@ -36,7 +36,7 @@ class Device : public ksk::core::NonCopyable {
 
   virtual ~Device() = default;
 
-  // ---- Resource creation (all return XxxRef = RcPtr<Xxx>) --------------
+  // ---- Resource creation (all return XxxRef = core::rc_ptr<Xxx>) --------
   virtual BufferRef createBuffer(const BufferDesc& desc) = 0;
   virtual ImageRef createImage(const ImageDesc& desc) = 0;
   virtual SamplerRef createSampler(const SamplerDesc& desc) = 0;

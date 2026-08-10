@@ -15,7 +15,7 @@
 #include <fem/ipc/integrator.h>
 #include <fem/ipc/implicit-euler.h>
 #include <fem/fem-simulation.h>
-#include <Deform/strain-energy-density.h>
+#include <Engine/Deform/strain-energy-density.h>
 #include <Maths/block-solvers/block-pcg.h>
 
 #include <memory>
@@ -27,7 +27,7 @@
 
 namespace py = pybind11;
 using namespace ksk::fem;
-using namespace ksk::deform;
+using namespace ksk::engine::deform;
 
 // ─── Python wrapper types ───────────────────────────────────────────────
 

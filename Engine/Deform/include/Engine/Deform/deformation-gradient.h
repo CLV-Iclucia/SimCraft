@@ -4,9 +4,9 @@
 
 #ifndef KISEKI_DEFORM_INCLUDE_DEFORM_DEFORMATION_GRADIENT_H_
 #define KISEKI_DEFORM_INCLUDE_DEFORM_DEFORMATION_GRADIENT_H_
-#include <Deform/types.h>
+#include <Engine/Deform/types.h>
 #include <Maths/svd.h>
-namespace ksk::deform {
+namespace ksk::engine::deform {
 template<typename T, int Dim>
 struct DeformationGradient {
   DeformationGradient() : m_Dm_inverse(Matrix<T, Dim, Dim>::Identity()) {}

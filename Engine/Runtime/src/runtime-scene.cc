@@ -17,10 +17,10 @@ void RuntimeScene::refreshBufferLayout() noexcept
   buffers.geometryPoints = geometry.pointCount();
 }
 
-SubsystemBuildContext::SubsystemBuildContext(GlobalSolverConfig solver,
+SubsystemBuildContext::SubsystemBuildContext(const GlobalSolverConfig* solver,
                                              glm::dvec3 gravity,
                                              const RuntimeSceneDesc* scene)
-    : solver_(solver)
+    : solver_(solver ? cloneSolverConfig(*solver) : makeDefaultSolverConfig())
     , gravity_(gravity)
     , scene_(scene)
 {
@@ -75,7 +75,7 @@ SimulationContext SubsystemBuildContext::finish()
   return SimulationContext(
       std::move(subsystems_),
       std::move(subsystem_type_names_),
-      solver_,
+      std::move(solver_),
       gravity_);
 }
 
@@ -258,7 +258,7 @@ std::vector<ObjectRef> RuntimeSceneDesc::findObjectsByTag(const std::string& tag
 
 SimulationContext buildSimulation(const RuntimeSceneDesc& scene)
 {
-  SubsystemBuildContext context(scene.solverConfig, scene.gravity, &scene);
+  SubsystemBuildContext context(scene.solverConfig.get(), scene.gravity, &scene);
   for (const auto& subsystem : scene.subsystems) {
     if (!subsystem) {
       throw std::runtime_error("runtime scene contains null subsystem");

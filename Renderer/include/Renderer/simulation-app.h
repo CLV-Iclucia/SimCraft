@@ -9,7 +9,7 @@
 
 namespace ksk::renderer {
 
-/// SimulationApp: 将"模拟循环 + 渲染器 + 线程管理 + 帧推送"全部内聚。
+/// SimulationApp
 ///
 /// 用户只需提供：
 ///   1. stepFn:       每步模拟的逻辑 (接受 step index)
@@ -58,6 +58,10 @@ struct SimulationApp {
 
   /// 有渲染模式：开窗口 + 模拟线程 + 自动推帧。
   /// 阻塞直到模拟完成或窗口关闭。返回完成的步数。
+  ///
+  /// 当 rendererConfig.mode == RenderMode::Offline 时，run() 自动使用
+  /// OfflineRenderer：不开窗口，把所有 SceneProxy 帧交给可插拔的
+  /// FrameSink（rendererConfig.offline.sinkName 选择，默认 "null" 干跑）。
   int run(int maxSteps) {
     if (!stepFn || !buildProxy) {
       std::cerr << "[SimulationApp] Error: stepFn and buildProxy must be set before run()\n";
@@ -123,6 +127,21 @@ struct SimulationApp {
     }
 
     return maxSteps;
+  }
+
+  /// 离线烘焙模式：等价于把 rendererConfig.mode 设为 RenderMode::Offline 后
+  /// 调用 run(maxSteps)。不开窗口、无需显示器；模拟线程每步之后自动推帧，
+  /// OfflineRenderer 按顺序把每个 SceneProxy 交给所选的 FrameSink。
+  ///
+  /// 用法（接入你自己的离线渲染器）：
+  ///   renderer::registerFrameSink("mytracer", [] { return std::make_unique<MyTracer>(); });
+  ///   app.rendererConfig.mode = renderer::RenderMode::Offline;
+  ///   app.rendererConfig.offline.sinkName = "mytracer";
+  ///   app.rendererConfig.offline.outputDir = "bake/";
+  ///   app.runOffline(maxSteps);
+  int runOffline(int maxSteps) {
+    rendererConfig.mode = RenderMode::Offline;
+    return run(maxSteps);
   }
 };
 

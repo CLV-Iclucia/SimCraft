@@ -1,5 +1,6 @@
 #include "interactive-renderer.h"
 
+#include <Renderer/offline-renderer.h>
 #include "render-backend.h"
 #include "render-backend-factory.h"
 
@@ -408,6 +409,12 @@ SceneBounds InteractiveRenderer::computeSceneBounds(const SceneProxy& scene) con
 }
 
 std::unique_ptr<Renderer> createRenderer(const RendererConfig& config) {
+  if (config.mode == RenderMode::Offline) {
+    auto renderer = std::make_unique<OfflineRenderer>();
+    renderer->setConfig(config);
+    return renderer;
+  }
+
   auto renderer = std::make_unique<InteractiveRenderer>();
   renderer->setConfig(config);
   return renderer;

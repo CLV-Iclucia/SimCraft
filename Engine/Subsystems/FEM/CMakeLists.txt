@@ -4,18 +4,22 @@ set(ENGINE_FEM_SOURCES
     src/fem-scene.cc
     src/fem-subsystem.cc
     src/cpu/fem-cpu-backend.cc
+    src/solver/fem-newton-ipc-api.cc
+    src/solver/fem-pd-api.cc
 )
 
 set(ENGINE_FEM_HEADERS
     include/FEM/fem-scene.h
     include/FEM/fem-subsystem.h
     include/FEM/cpu/fem-cpu-backend.h
+    include/FEM/solver/fem-newton-ipc-api.h
+    include/FEM/solver/fem-pd-api.h
 )
 
 add_library(EngineFEM STATIC ${ENGINE_FEM_SOURCES} ${ENGINE_FEM_HEADERS})
 add_library(Kiseki::EngineFEM ALIAS EngineFEM)
 target_include_directories(EngineFEM PUBLIC include)
-target_link_libraries(EngineFEM PUBLIC Kiseki::Core Kiseki::Runtime Kiseki::SceneObjects Kiseki::Deform Kiseki::EngineContactIPC Eigen3::Eigen TBB::tbb)
+target_link_libraries(EngineFEM PUBLIC Kiseki::Core Kiseki::Runtime Kiseki::SceneObjects Kiseki::EngineDeform Kiseki::EngineContactIPC Eigen3::Eigen TBB::tbb)
 if(KISEKI_USE_CHOLMOD)
     target_compile_definitions(EngineFEM PUBLIC KISEKI_USE_CHOLMOD)
     if(TARGET SuiteSparse::CHOLMOD)

@@ -15,12 +15,17 @@ GeometryBuffer createGeometryDirectionBuffer(const DofBuffer& direction,
 
 ContactDetectionConfig ContactDetector::createDetectionConfig(
     const RuntimeScene& scene, Real toi) {
-  const GlobalSolverConfig& solver_config = scene.solverConfig;
-  const Real barrier_distance = solver_config.contactBarrierDistance;
+  const GlobalSolverConfig& solver_config = *scene.solverConfig;
+  const NewtonIpcSolverConfig* newton_config =
+      RF::Cast<NewtonIpcSolverConfig>(&solver_config);
   return ContactDetectionConfig{
-      .storage = solver_config.contactDetectionStorage,
-      .dHat = barrier_distance,
-      .stiffness = solver_config.contactStiffness,
+      .storage = newton_config != nullptr
+                     ? newton_config->contactDetectionStorage
+                     : ContactDetectionStorage::Host,
+      .dHat = newton_config != nullptr ? newton_config->contactBarrierDistance
+                                       : 0.0,
+      .stiffness =
+          newton_config != nullptr ? newton_config->contactStiffness : 1e6,
       .toi = toi,
   };
 }
@@ -31,9 +36,11 @@ ContactDetectionConfig ContactDetector::createCurrentBarrierConfig(
   return config;
 }
 
-void ContactDetector::applyRoutedContacts(SimulationContext& simulation,
-                                          const GlobalContactRouter& routedContacts,
-                                          bool updateFrictionReferenceContacts) {
+void ContactDetector::applyRoutedContacts(
+    SimulationContext& simulation,
+    const GlobalContactRouter& routedContacts,
+    const std::vector<std::unique_ptr<NewtonIPCSubsystemSolver>>& subsystemApis,
+    bool updateFrictionReferenceContacts) {
   KSK_PROFILE_SCOPE("ContactDetector/ApplyRoutedContacts");
   KSK_PROFILE_VALUE("contact.routed.global",
                     static_cast<double>(routedContacts.globalContacts.size()));
@@ -44,7 +51,7 @@ void ContactDetector::applyRoutedContacts(SimulationContext& simulation,
   if (updateFrictionReferenceContacts) {
     scene.frictionReferenceContacts.clear();
   }
-  if (updateFrictionReferenceContacts && scene.solverConfig.enableFriction) {
+  if (updateFrictionReferenceContacts && scene.solverConfig->enableFriction) {
     size_t reference_count = routedContacts.globalContacts.size();
     for (const auto& [subsystem, data] :
          routedContacts.subsystemInternalContacts) {
@@ -66,20 +73,21 @@ void ContactDetector::applyRoutedContacts(SimulationContext& simulation,
   }
   scene.contacts = std::move(routedContacts.globalContacts);
 
-  for (const auto& subsystem : simulation.subsystems()) {
+  for (const auto& api : subsystemApis) {
     ContactStencils contacts;
     const auto found =
-        routedContacts.subsystemInternalContacts.find(subsystem->id());
+        routedContacts.subsystemInternalContacts.find(api->subsystemId());
 
     if (found != routedContacts.subsystemInternalContacts.end())
       contacts = std::move(found->second.contacts);
 
-    subsystem->applyInternalContacts(std::move(contacts));
+    api->applyInternalContacts(std::move(contacts));
   }
 }
 
 void ContactDetector::rebuildActiveContacts(
     SimulationContext& simulation,
+    const std::vector<std::unique_ptr<NewtonIPCSubsystemSolver>>& subsystemApis,
     bool updateFrictionReferenceContacts) const {
   KSK_PROFILE_SCOPE("ContactDetector/RebuildActiveContacts");
   GlobalContactRouter routed_contacts =
@@ -87,11 +95,14 @@ void ContactDetector::rebuildActiveContacts(
           simulation.scene().geometry,
           createCurrentBarrierConfig(simulation.scene()));
   applyRoutedContacts(simulation, std::move(routed_contacts),
-                      updateFrictionReferenceContacts);
+                      subsystemApis, updateFrictionReferenceContacts);
 }
 
 Real ContactDetector::computeCCDStepBound(
-    SimulationContext& simulation, const DofBuffer& direction) const {
+    SimulationContext& simulation,
+    const DofBuffer& direction,
+    const std::vector<std::unique_ptr<NewtonIPCSubsystemSolver>>& subsystemApis)
+    const {
   KSK_PROFILE_SCOPE("ContactDetector/ComputeCCDStepBound");
   RuntimeScene& scene = simulation.scene();
   GeometryBuffer geometry_direction =
@@ -99,9 +110,9 @@ Real ContactDetector::computeCCDStepBound(
 
   {
     KSK_PROFILE_SCOPE("ContactDetector/ComputeCCDStepBound/MapDirections");
-    for (const auto& subsystem : simulation.subsystems()) {
-      subsystem->mapLocalDirectionToGeometry(
-          direction.slice(subsystem->dofRange()), geometry_direction.view());
+    for (const auto& api : subsystemApis) {
+      api->mapLocalDirectionToGeometry(
+          direction.slice(api->dofRange()), geometry_direction.view());
     }
   }
 

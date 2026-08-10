@@ -4,19 +4,22 @@
 #include <Runtime/buffers.h>
 #include <Runtime/dof-layout.h>
 #include <Runtime/global-geometry-manager.h>
-#include <Runtime/subsystem-backend.h>
 
+#include <memory>
 #include <span>
 #include <vector>
 
 namespace ksk::runtime {
 
-struct SparseMatrixEntry {
-  int row = 0;
-  int col = 0;
-  double value = 0.0;
-};
+class NewtonIPCSubsystemSolver;
+class ProjectiveDynamicsSubsystemSolver;
 
+// Base interface for a simulation subsystem.
+//
+// `Subsystem` answers: "what state and geometry do you own?" It only exposes
+// solver-independent lifecycle methods. Solver-specific operations are exposed
+// through per-solver API objects created by createNewtonIPCSolver() /
+// createProjectiveDynamicsSolver().
 class Subsystem {
  public:
   virtual ~Subsystem() = default;
@@ -33,35 +36,17 @@ class Subsystem {
   virtual void acceptStep(ConstDofView q,
                           DofView qdot,
                           double dt) = 0;
-  [[nodiscard]] virtual double evaluateObjective(ConstDofView q,
-                                                 ConstDofView qdot,
-                                                 double dt) = 0;
-
-  virtual void updateInternalConstraints(double time, double dt) = 0;
-  virtual void prepareLocalOperator(double dt) = 0;
-  virtual void assembleLocalGradient(DofView g) const = 0;
-  virtual void applyLocalMatrix(ConstDofView x, DofView y) const = 0;
-  virtual void appendLocalMatrixEntries(
-      std::vector<SparseMatrixEntry>& entries) const = 0;
-  virtual void solveLocalSystem(ConstDofView b, DofView x) const = 0;
-
   virtual void updateGeometry(GlobalGeometryManager& geometry) const = 0;
-  virtual void mapLocalDirectionToGeometry(ConstDofView localDq,
-                                      GeometryView globalDx) const = 0;
-  virtual void applyInternalContacts(ContactStencils contacts) = 0;
-  virtual void scatterContactGradient(
-      std::span<const PointIdx> points,
-      ConstGeometryView pointGradient,
-      DofView g) const = 0;
-  // Pull back contact derivatives from geometry space to local DOF space.
-  virtual void applyContactGeometryHessianProduct(
-      std::span<const PointIdx> productPoints,
-      ConstGeometryView pointHessianProduct,
-      DofView localY) const = 0;
-  virtual void applyInternalContactHessian(ConstDofView localDq,
-                                           DofView localY) const = 0;
-  virtual void visit(CpuSubsystemBackend& backend) = 0;
-  virtual void visit(GpuSubsystemBackend& backend) = 0;
+
+  // Solver API factories. Unsupported solvers return nullptr.
+  // Defined out-of-line (Runtime/src/subsystem.cc) so the returned
+  // std::unique_ptr has the complete solver API type at destruction time.
+  [[nodiscard]] virtual std::unique_ptr<NewtonIPCSubsystemSolver>
+  createNewtonIPCSolver();
+
+  [[nodiscard]] virtual std::unique_ptr<ProjectiveDynamicsSubsystemSolver>
+  createProjectiveDynamicsSolver();
 };
 
 }  // namespace ksk::runtime
+

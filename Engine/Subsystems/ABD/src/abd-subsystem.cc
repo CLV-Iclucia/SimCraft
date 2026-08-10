@@ -1,6 +1,8 @@
 #include <ABD/abd-subsystem.h>
 
+#include <ABD/abd-newton-ipc-api.h>
 #include <ABD/cpu/abd-cpu-backend.h>
+#include <Runtime/projective-dynamics-subsystem-api.h>
 
 #include <stdexcept>
 #include <utility>
@@ -14,6 +16,19 @@ constexpr int bodyScalarOffset(int body) noexcept
 }
 
 }  // namespace
+
+std::unique_ptr<runtime::NewtonIPCSubsystemSolver>
+ABDSubsystem::createNewtonIPCSolver()
+{
+  return std::make_unique<ABDNewtonIpcApi>(*this);
+}
+
+std::unique_ptr<runtime::ProjectiveDynamicsSubsystemSolver>
+ABDSubsystem::createProjectiveDynamicsSolver()
+{
+  // PD for ABD is out of scope for the first phase.
+  return nullptr;
+}
 
 glm::dmat4 affineToMat4(const glm::dmat4x3& affine) noexcept
 {
@@ -218,17 +233,6 @@ void ABDSubsystem::applyInternalContactHessian(runtime::ConstDofView localDq,
                                                runtime::DofView localY) const
 {
   cpu_backend_->applyInternalContactHessian(localDq, localY);
-}
-
-void ABDSubsystem::visit(runtime::CpuSubsystemBackend& backend)
-{
-  (void)backend;
-}
-
-void ABDSubsystem::visit(runtime::GpuSubsystemBackend& backend)
-{
-  (void)backend;
-  throw std::runtime_error("ABDSubsystem does not implement a GPU backend yet");
 }
 
 const std::vector<ABDBodyDesc>& ABDSubsystem::bodies() const noexcept

@@ -99,6 +99,7 @@ ImageRef VulkanSwapchain::acquireNextImage(Semaphore& signalSemaphore) {
     // Swapchain is out of date -- caller should recreate.
     return ImageRef{};
   }
+
   if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
     spdlog::error("Rhi: vkAcquireNextImageKHR failed (VkResult {})",
                   static_cast<int>(result));

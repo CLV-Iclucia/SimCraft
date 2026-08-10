@@ -72,7 +72,7 @@ struct RuntimeScene {
   ContactStencils contacts;
   ContactStencils frictionReferenceContacts;
   FrictionContactStencils frictionContacts;
-  GlobalSolverConfig solverConfig;
+  std::unique_ptr<GlobalSolverConfig> solverConfig = makeDefaultSolverConfig();
   glm::dvec3 gravity{0.0, -9.81, 0.0};
   BufferLayout buffers;
 
@@ -113,7 +113,9 @@ using SubsystemDescFactory =
 
 class SubsystemBuildContext {
  public:
-  explicit SubsystemBuildContext(GlobalSolverConfig solver = {},
+  // `solver` may be null; a default Newton+IPC config is used in that case.
+  // The config is deep-cloned so the caller keeps ownership of its own object.
+  explicit SubsystemBuildContext(const GlobalSolverConfig* solver = nullptr,
                                  glm::dvec3 gravity =
                                      glm::dvec3(0.0, -9.81, 0.0),
                                  const RuntimeSceneDesc* scene = nullptr);
@@ -129,7 +131,7 @@ class SubsystemBuildContext {
   [[nodiscard]] SimulationContext finish();
 
  private:
-  GlobalSolverConfig solver_;
+  std::unique_ptr<GlobalSolverConfig> solver_;
   glm::dvec3 gravity_;
   const RuntimeSceneDesc* scene_ = nullptr;
   std::vector<std::unique_ptr<Subsystem>> subsystems_;
@@ -150,7 +152,7 @@ struct SubsystemObjectGroup {
 };
 
 struct RuntimeSceneDesc {
-  GlobalSolverConfig solverConfig;
+  std::unique_ptr<GlobalSolverConfig> solverConfig = makeDefaultSolverConfig();
   glm::dvec3 gravity{0.0, -9.81, 0.0};
   double timeStep = 1.0 / 60.0;
   std::vector<std::unique_ptr<SubsystemDesc>> subsystems;

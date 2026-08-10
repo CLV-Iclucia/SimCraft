@@ -131,8 +131,8 @@ int main() {
   psoDesc.vertexShader = vs;
   psoDesc.fragmentShader = fs;
   psoDesc.topology = GraphicsPipelineDesc::PrimitiveTopology::TriangleList;
-  psoDesc.depthTest = false;
-  psoDesc.depthWrite = false;
+  psoDesc.setDepthTest(false);
+  psoDesc.setDepthWrite(false);
   psoDesc.colorFormats.push_back(swapchain->imageFormat());
 
   auto pipeline = device->createGraphicsPipeline(psoDesc);

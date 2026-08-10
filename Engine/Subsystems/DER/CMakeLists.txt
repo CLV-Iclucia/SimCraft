@@ -5,6 +5,7 @@ set(DER_SOURCES
     src/hair-scene.cc
     src/der-subsystem.cc
     src/der-scene.cc
+    src/der-newton-ipc-api.cc
     src/cpu/der-cpu-backend.cc
     src/gpu/der-gpu-backend.cc
 )
@@ -13,6 +14,7 @@ set(DER_HEADERS
     include/DER/rod.h
     include/DER/der-subsystem.h
     include/DER/der-scene.h
+    include/DER/der-newton-ipc-api.h
     include/DER/cpu/der-cpu-backend.h
     include/DER/gpu/der-gpu-backend.h
 )

@@ -18,9 +18,9 @@
 
 #pragma once
 
+#include <Core/rc-ptr.h>
 #include <Core/properties.h>
 #include <RHI/format.h>
-#include <RHI/rc-ptr.h>
 #include <RHI/shader.h>
 
 #include <atomic>
@@ -69,15 +69,36 @@ struct GraphicsPipelineDesc {
   using Bindings = std::vector<VertexBinding>;
   Bindings vertexBindings;
 
-  // Rendering state (simplified, sufficient for fluid visualization)
   enum class PrimitiveTopology { TriangleList, LineList, PointList };
   PrimitiveTopology topology = PrimitiveTopology::TriangleList;
 
-  bool depthTest = true;
-  bool depthWrite = true;
+  // ---- Packed pipeline-state flags ----
+  // The boolean state (depth test/write, alpha blend) is folded into a single
+  // word instead of N separate bools: keeps the desc compact (better cache
+  // behaviour as a pipeline-cache map key) and lets the whole flag set be
+  // compared as one integer in operator<. 32 bits available — add new flags by
+  // defining a kFlag* constant plus a matching accessor.
+  using Flags = uint32_t;
+  static constexpr Flags kFlagDepthTest  = 1u << 0;
+  static constexpr Flags kFlagDepthWrite = 1u << 1;
+  static constexpr Flags kFlagAlphaBlend = 1u << 2;
 
-  // Color blending (simplified: global alpha blend toggle)
-  bool alphaBlend = false;
+  // Default: depth test + write enabled, alpha blending disabled.
+  Flags flags = kFlagDepthTest | kFlagDepthWrite;
+
+  bool depthTest() const noexcept { return (flags & kFlagDepthTest) != 0; }
+  bool depthWrite() const noexcept { return (flags & kFlagDepthWrite) != 0; }
+  bool alphaBlend() const noexcept { return (flags & kFlagAlphaBlend) != 0; }
+
+  void setDepthTest(bool b) noexcept {
+    flags = static_cast<Flags>((flags & ~kFlagDepthTest) | (b ? kFlagDepthTest : 0));
+  }
+  void setDepthWrite(bool b) noexcept {
+    flags = static_cast<Flags>((flags & ~kFlagDepthWrite) | (b ? kFlagDepthWrite : 0));
+  }
+  void setAlphaBlend(bool b) noexcept {
+    flags = static_cast<Flags>((flags & ~kFlagAlphaBlend) | (b ? kFlagAlphaBlend : 0));
+  }
 
   // Render target format description
   using Formats = std::vector<Format>;
@@ -105,11 +126,9 @@ inline bool GraphicsPipelineDesc::operator<(const GraphicsPipelineDesc& o) const
     return vertexShader.get() < o.vertexShader.get();
   if (fragmentShader.get() != o.fragmentShader.get())
     return fragmentShader.get() < o.fragmentShader.get();
-  // 2. Compare topology + state flags
+  // 2. Compare topology + state flags (whole flag set as one integer)
   if (topology != o.topology) return topology < o.topology;
-  if (depthTest != o.depthTest) return depthTest < o.depthTest;
-  if (depthWrite != o.depthWrite) return depthWrite < o.depthWrite;
-  if (alphaBlend != o.alphaBlend) return alphaBlend < o.alphaBlend;
+  if (flags != o.flags) return flags < o.flags;
   // 3. Compare render target formats
   if (colorFormats != o.colorFormats) return colorFormats < o.colorFormats;
   if (depthFormat != o.depthFormat) return depthFormat < o.depthFormat;
@@ -142,6 +161,6 @@ class Pipeline : public core::NonCopyable {
   std::atomic<uint32_t> m_rc{0};
 };
 
-using PipelineRef = RcPtr<Pipeline>;
+using PipelineRef = core::rc_ptr<Pipeline>;
 
 }  // namespace ksk::rhi

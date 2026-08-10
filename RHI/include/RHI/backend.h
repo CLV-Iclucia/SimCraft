@@ -12,7 +12,7 @@ namespace ksk::rhi {
 
 enum class Backend : uint32_t {
   Vulkan,
-  Dx12,  // Reserved for R3+; not implemented in R0–R2.
+  Dx12,
 };
 
 enum class QueueType : uint32_t {

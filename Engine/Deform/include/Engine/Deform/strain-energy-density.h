@@ -6,14 +6,11 @@
 
 #include <Core/profiler.h>
 #include <memory>
-#include <Deform/types.h>
-#include <Deform/invariants.h>
-#include <Deform/deformation-gradient.h>
-#include <Core/deserializer.h>
-#include <unordered_map>
-#include <spdlog/spdlog.h>
+#include <Engine/Deform/types.h>
+#include <Engine/Deform/invariants.h>
+#include <Engine/Deform/deformation-gradient.h>
 
-namespace ksk::deform {
+namespace ksk::engine::deform {
 template<typename T>
 struct StrainEnergyDensity {
   [[nodiscard]] virtual T computeEnergyDensity(const DeformationGradient<T, 3> &dg) const = 0;
@@ -38,14 +35,6 @@ struct StableNeoHookean final : StrainEnergyDensity<T> {
     auto lambda_ = E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu));
     mu = 0.4 / 0.3 * mu_;
     lambda = lambda_ + 0.5 / 0.6 * mu_;
-  }
-  static std::unique_ptr<StrainEnergyDensity<T>> createFromJson(const core::JsonNode &json) {
-    if (!json.is<core::JsonDict>())
-      throw std::runtime_error("StableNeoHookean requires a JSON object");
-    const auto &dict = json.as<core::JsonDict>();
-    T mu = dict.at("mu").as<T>();
-    T lambda = dict.at("lambda").as<T>();
-    return std::make_unique<StableNeoHookean<T>>(mu, lambda);
   }
   T computeEnergyDensity(const DeformationGradient<T, 3> &dg) const override {
     auto I = isotropicInvariants(dg);
@@ -86,10 +75,6 @@ struct StableNeoHookean final : StrainEnergyDensity<T> {
 
 template<typename T>
 struct ARAP final : StrainEnergyDensity<T> {
-  static std::unique_ptr<StrainEnergyDensity<T>> createFromJson(const core::JsonNode &json) {
-    return std::make_unique<ARAP<T>>();
-  }
-  
   T computeEnergyDensity(const DeformationGradient<T, 3> &dg) const override {
     return (dg.F() - dg.R()).squaredNorm();
   }
@@ -122,15 +107,6 @@ struct LinearElastic final : StrainEnergyDensity<T> {
   
   LinearElastic(T mu, T lambda) : mu(mu), lambda(lambda) {}
   
-  static std::unique_ptr<StrainEnergyDensity<T>> createFromJson(const core::JsonNode &json) {
-    if (!json.is<core::JsonDict>())
-      throw std::runtime_error("LinearElastic requires a JSON object");
-    const auto &dict = json.as<core::JsonDict>();
-    T mu = dict.at("mu").as<T>();
-    T lambda = dict.at("lambda").as<T>();
-    return std::make_unique<LinearElastic<T>>(mu, lambda);
-  }
-  
   T computeEnergyDensity(const DeformationGradient<T, 3> &dg) const override {
     auto strain = 0.5 * (dg.F() + dg.F().transpose()) - Matrix<T, 3, 3>::Identity();
     T traceStrain = strain.trace();
@@ -153,13 +129,7 @@ struct LinearElastic final : StrainEnergyDensity<T> {
   }
 };
 
-template<typename T>
-std::unique_ptr<StrainEnergyDensity<T>> createStrainEnergyDensity(const core::JsonNode &node);
-
-template std::unique_ptr<StrainEnergyDensity<double>> createStrainEnergyDensity<double>(const core::JsonNode &node);
-template std::unique_ptr<StrainEnergyDensity<float>> createStrainEnergyDensity<float>(const core::JsonNode &node);
-
-}
+}  // namespace ksk::engine::deform
 
 
 

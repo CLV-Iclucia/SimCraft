@@ -14,7 +14,6 @@
 #include <RHI/format.h>
 #include <RHI/image.h>
 #include <RHI/pipeline.h>
-#include <RHI/rc-ptr.h>
 #include <RHI/reflection.h>
 #include <RHI/shader.h>
 #include <RHI/shader-compile-options.h>

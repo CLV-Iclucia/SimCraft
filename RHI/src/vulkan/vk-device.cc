@@ -277,7 +277,7 @@ void VulkanDevice::initDescriptorAllocator() {
 }
 
 // ---- Resource creation -----------------------------------------------------
-// NOTE: use RcPtr<T>(T*) ctor (which calls addRef → m_rc=1), NOT adopt().
+// NOTE: use core::rc_ptr<T>(T*) ctor (which calls addRef -> m_rc=1), NOT adopt().
 // adopt() is reserved for the rare case where the caller already addRef'd
 // the raw pointer; misusing it leaks the resource (m_rc stays at 0, so
 // the very first release underflows and never calls destroy()).

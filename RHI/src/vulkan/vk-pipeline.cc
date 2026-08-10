@@ -374,8 +374,8 @@ void VulkanPipeline::buildGraphicsPipeline(const GraphicsPipelineDesc& desc) {
   // ---- Depth-stencil state ------------------------------------------------
   VkPipelineDepthStencilStateCreateInfo ds{
       VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-  ds.depthTestEnable = desc.depthTest ? VK_TRUE : VK_FALSE;
-  ds.depthWriteEnable = desc.depthWrite ? VK_TRUE : VK_FALSE;
+  ds.depthTestEnable = desc.depthTest() ? VK_TRUE : VK_FALSE;
+  ds.depthWriteEnable = desc.depthWrite() ? VK_TRUE : VK_FALSE;
   ds.depthCompareOp = VK_COMPARE_OP_LESS;
   ds.depthBoundsTestEnable = VK_FALSE;
   ds.stencilTestEnable = VK_FALSE;
@@ -384,7 +384,7 @@ void VulkanPipeline::buildGraphicsPipeline(const GraphicsPipelineDesc& desc) {
   std::vector<VkPipelineColorBlendAttachmentState> colorAttachments;
   for (size_t i = 0; i < desc.colorFormats.size(); ++i) {
     VkPipelineColorBlendAttachmentState ca{};
-    if (desc.alphaBlend) {
+    if (desc.alphaBlend()) {
       ca.blendEnable = VK_TRUE;
       ca.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
       ca.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;

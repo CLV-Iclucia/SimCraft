@@ -66,8 +66,8 @@ TEST(DrawTriangle, RedTriangleOffscreen) {
       .attributes = {{.location = 0, .format = Format::RGB32_Float, .offset = 0}},
   }};
   desc.topology = GraphicsPipelineDesc::PrimitiveTopology::TriangleList;
-  desc.depthTest = false;
-  desc.depthWrite = false;
+  desc.setDepthTest(false);
+  desc.setDepthWrite(false);
   desc.colorFormats = {Format::RGBA8_UNorm};
 
   auto pso = device->createGraphicsPipeline(desc);
@@ -234,8 +234,8 @@ TEST(DrawTriangle, GraphicsShaderParamsPushConstants) {
       .attributes = {{.location = 0, .format = Format::RGB32_Float, .offset = 0}},
   }};
   desc.topology = GraphicsPipelineDesc::PrimitiveTopology::TriangleList;
-  desc.depthTest = false;
-  desc.depthWrite = false;
+  desc.setDepthTest(false);
+  desc.setDepthWrite(false);
   desc.colorFormats = {Format::RGBA8_UNorm};
 
   auto pso = device->createGraphicsPipeline(desc);
@@ -376,8 +376,8 @@ TEST(DrawTriangle, PipelineCacheSameDesc) {
       .stride = sizeof(float) * 3,
       .attributes = {{.location = 0, .format = Format::RGB32_Float, .offset = 0}},
   }};
-  desc.depthTest = false;
-  desc.depthWrite = false;
+  desc.setDepthTest(false);
+  desc.setDepthWrite(false);
   desc.colorFormats = {Format::RGBA8_UNorm};
 
   auto pso1 = device->createGraphicsPipeline(desc);

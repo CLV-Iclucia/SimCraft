@@ -47,11 +47,4 @@ std::span<std::byte> asWritableStructuredBytes(std::span<T> values) {
   return std::as_writable_bytes(values);
 }
 
-static_assert(is_direct_structured_data_v<glm::vec3>);
-static_assert(is_direct_structured_data_v<glm::dvec3>);
-static_assert(is_direct_structured_data_v<glm::mat3>);
-static_assert(is_direct_structured_data_v<glm::dmat3>);
-static_assert(is_direct_structured_data_v<glm::vec4>);
-static_assert(is_direct_structured_data_v<glm::dvec4>);
-
 }  // namespace ksk::rhi

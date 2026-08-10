@@ -399,12 +399,20 @@ void bind_abd(py::module_& m)
           })
       .def_property(
           "solver",
-          [](PyABDScene& self) -> runtime::GlobalSolverConfig& {
-            return self.scene.solverConfig;
+          [](PyABDScene& self) -> runtime::NewtonIpcSolverConfig& {
+            runtime::NewtonIpcSolverConfig* config =
+                RF::Cast<runtime::NewtonIpcSolverConfig>(
+                    self.scene.solverConfig.get());
+            if (config == nullptr) {
+              throw py::value_error(
+                  "ABDScene solver is not a Newton IPC solver config");
+            }
+            return *config;
           },
-          [](PyABDScene& self, runtime::GlobalSolverConfig solver) {
+          [](PyABDScene& self, const runtime::NewtonIpcSolverConfig& solver) {
             self.checkUnlocked();
-            self.scene.solverConfig = solver;
+            self.scene.solverConfig =
+                std::make_unique<runtime::NewtonIpcSolverConfig>(solver);
           },
           py::return_value_policy::reference_internal)
       .def("build",

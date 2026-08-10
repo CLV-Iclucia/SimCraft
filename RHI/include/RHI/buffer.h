@@ -6,8 +6,8 @@
 
 #pragma once
 
+#include <Core/rc-ptr.h>
 #include <Core/properties.h>
-#include <RHI/rc-ptr.h>
 
 #include <atomic>
 #include <cstddef>
@@ -78,6 +78,6 @@ class Buffer : public core::NonCopyable {
   std::atomic<uint32_t> m_rc{0};
 };
 
-using BufferRef = RcPtr<Buffer>;
+using BufferRef = core::rc_ptr<Buffer>;
 
 }  // namespace ksk::rhi

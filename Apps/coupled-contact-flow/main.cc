@@ -215,13 +215,16 @@ int main(int argc, char** argv) {
   ksk::runtime::RuntimeSceneDesc scene;
   scene.gravity = glm::dvec3(0.0, -9.8, 0.0);
   scene.timeStep = dt;
-  scene.solverConfig.maxNewtonIterations = 100;
-  scene.solverConfig.maxPcgIterations = 1000;
-  scene.solverConfig.enableContact = !no_contact;
-  scene.solverConfig.maxLineSearchIterations = 20;
-  scene.solverConfig.contactBarrierDistance = 1.0e-3;
-  scene.solverConfig.solveMode = ksk::runtime::GlobalSolveMode::Decoupled;
-  scene.solverConfig.enableContact = true;
+  ksk::runtime::NewtonIpcSolverConfig& newton =
+      *RF::Cast<ksk::runtime::NewtonIpcSolverConfig>(
+          scene.solverConfig.get());
+  newton.maxNewtonIterations = 100;
+  newton.maxPcgIterations = 1000;
+  newton.enableContact = !no_contact;
+  newton.maxLineSearchIterations = 20;
+  newton.contactBarrierDistance = 1.0e-3;
+  newton.solveMode = ksk::runtime::LinearSolveMode::Decoupled;
+  newton.enableContact = true;
 
   const ksk::runtime::ObjectRef cloth =
       ksk::engine::fem::addClothMesh(scene, makeClothSheet(), "cloth-sheet");

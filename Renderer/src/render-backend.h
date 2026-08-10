@@ -1,7 +1,7 @@
 #pragma once
 
+#include <Renderer/render-context.h>
 #include <Renderer/scene-proxy.h>
-#include <glm/glm.hpp>
 
 namespace ksk::renderer {
 
@@ -11,16 +11,6 @@ struct RenderBackendInit {
   int height = 1;
   bool vsync = true;
   bool headless = false;
-};
-
-struct RenderFrameContext {
-  glm::mat4 view{1.0f};
-  glm::mat4 projection{1.0f};
-  glm::vec3 cameraPosition{0.0f};
-  glm::vec3 cameraTarget{0.0f};
-  float cameraDistance = 1.0f;
-  int framebufferWidth = 1;
-  int framebufferHeight = 1;
 };
 
 class RenderBackend {

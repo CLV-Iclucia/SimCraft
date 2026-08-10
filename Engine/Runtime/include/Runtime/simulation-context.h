@@ -13,12 +13,13 @@ namespace ksk::runtime {
 class SimulationContext {
  public:
   SimulationContext() = default;
-  explicit SimulationContext(std::vector<std::unique_ptr<Subsystem>> subsystems,
-                             GlobalSolverConfig solver = {},
-                             glm::dvec3 gravity = glm::dvec3(0.0, -9.81, 0.0));
+  explicit SimulationContext(
+      std::vector<std::unique_ptr<Subsystem>> subsystems,
+      std::unique_ptr<GlobalSolverConfig> solver = nullptr,
+      glm::dvec3 gravity = glm::dvec3(0.0, -9.81, 0.0));
   SimulationContext(std::vector<std::unique_ptr<Subsystem>> subsystems,
                     std::vector<std::string> subsystemTypeNames,
-                    GlobalSolverConfig solver = {},
+                    std::unique_ptr<GlobalSolverConfig> solver = nullptr,
                     glm::dvec3 gravity = glm::dvec3(0.0, -9.81, 0.0));
   SimulationContext(const SimulationContext&) = delete;
   SimulationContext& operator=(const SimulationContext&) = delete;

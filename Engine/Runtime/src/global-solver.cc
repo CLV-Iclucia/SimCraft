@@ -31,19 +31,19 @@ void validateSimulationStateForStep(const SimulationContext& simulation) {
 
   if (simulation.subsystems().empty()) {
     throw std::runtime_error(
-        "GlobalGaussNewtonSolver::step received a SimulationContext with no "
+        "GlobalNewtonIpcSolver::step received a SimulationContext with no "
         "subsystems. Build it with buildSimulation/buildSimulationRunner "
         "from a populated RuntimeSceneDesc before stepping.");
   }
   if (scalar_count <= 0) {
     throw std::runtime_error(
-        "GlobalGaussNewtonSolver::step received a SimulationContext with zero "
+        "GlobalNewtonIpcSolver::step received a SimulationContext with zero "
         "DOFs. Check that scene objects were assigned to subsystems before "
         "buildSimulation/buildSimulationRunner.");
   }
   if (q_count != scalar_count || qdot_count != scalar_count) {
     throw std::runtime_error(
-        "GlobalGaussNewtonSolver::step received inconsistent DOF buffers: "
+        "GlobalNewtonIpcSolver::step received inconsistent DOF buffers: "
         "scene.dofs.totalScalars=" +
         std::to_string(scalar_count) +
         ", q.scalarCount=" + std::to_string(q_count) +
@@ -51,6 +51,20 @@ void validateSimulationStateForStep(const SimulationContext& simulation) {
   }
 }
 #endif
+
+// The Newton + IPC solver only runs when the scene config is a
+// NewtonIpcSolverConfig (the default). This helper resolves and validates it.
+const NewtonIpcSolverConfig* requireNewtonConfig(
+    const SimulationContext& simulation)
+{
+  const auto* config =
+      RF::Cast<NewtonIpcSolverConfig>(simulation.scene().solverConfig.get());
+  if (config == nullptr) {
+    throw std::runtime_error(
+        "GlobalNewtonIpcSolver requires a NewtonIpcSolverConfig");
+  }
+  return config;
+}
 
 GeometryBuffer createGeometryDirectionBuffer(const DofBuffer& direction,
                                              int point_count) {
@@ -125,11 +139,11 @@ double computeDofViewInfNorm(ConstDofView view) {
   return norm;
 }
 
-const char* solveModeName(GlobalSolveMode mode) noexcept {
+const char* solveModeName(LinearSolveMode mode) noexcept {
   switch (mode) {
-    case GlobalSolveMode::Decoupled:
+    case LinearSolveMode::Decoupled:
       return "decoupled";
-    case GlobalSolveMode::Coupled:
+    case LinearSolveMode::Coupled:
       return "coupled";
   }
   return "<unknown>";
@@ -145,11 +159,6 @@ std::string subsystemTypeName(const RuntimeScene& scene,
   }
   return {};
 }
-
-double evaluateSubsystemObjectiveAndUpdateGeometry(
-    SimulationContext& simulation, double dt);
-double evaluateObjectiveAndUpdateGeometry(SimulationContext& simulation,
-                                          double dt);
 
 void warnInvalidPreconditionerDotBreakdown(SimulationContext& simulation,
                                            const DofBuffer& residual,
@@ -194,16 +203,23 @@ void rebuildFrictionReferenceContacts(SimulationContext& simulation) {
   RuntimeScene& scene = simulation.scene();
   scene.frictionContacts.clear();
 
-  if (!scene.solverConfig.enableContact || !scene.solverConfig.enableFriction ||
+  if (!scene.solverConfig->enableContact ||
+      !scene.solverConfig->enableFriction ||
       scene.frictionReferenceContacts.empty()) {
+    return;
+  }
+
+  const NewtonIpcSolverConfig* newton_config =
+      RF::Cast<NewtonIpcSolverConfig>(scene.solverConfig.get());
+  if (newton_config == nullptr) {
     return;
   }
 
   scene.frictionContacts = buildFrictionContactStencils(
       scene.geometry, scene.frictionReferenceContacts,
-      scene.solverConfig.frictionTable,
-      scene.solverConfig.frictionCoefficient,
-      scene.solverConfig.frictionEpsilon);
+      newton_config->frictionTable,
+      newton_config->frictionCoefficient,
+      newton_config->frictionEpsilon);
 }
 
 void appendContactGeometryHessian(ContactGeometryHessian& target,
@@ -336,12 +352,71 @@ GlobalSolverStatsCollector::currentFrame() {
   return frames_.back();
 }
 
-void GlobalGaussNewtonSolver::prepare(const RuntimeScene& scene) {
-  scalar_count_ = scene.dofs.totalScalars;
-  geometry_point_count_ = static_cast<int>(scene.geometry.points.size());
+void GlobalNewtonIpcSolver::prepare(SimulationContext& simulation) {
+  subsystem_apis_.clear();
+
+  for (auto& subsystem : simulation.subsystems()) {
+    auto api = subsystem->createNewtonIPCSolver();
+    if (!api) {
+      throw std::runtime_error(
+          "subsystem does not support NewtonIPC solver");
+    }
+    subsystem_apis_.push_back(std::move(api));
+  }
+
+  scalar_count_ = simulation.scene().dofs.totalScalars;
+  geometry_point_count_ =
+      static_cast<int>(simulation.scene().geometry.pointCount());
 }
 
-RuntimeStepResult GlobalGaussNewtonSolver::step(
+NewtonIPCSubsystemSolver* GlobalNewtonIpcSolver::apiFor(
+    SubsystemIdx id) noexcept {
+  for (const auto& api : subsystem_apis_) {
+    if (api->subsystemId() == id) {
+      return api.get();
+    }
+  }
+  return nullptr;
+}
+
+const NewtonIPCSubsystemSolver* GlobalNewtonIpcSolver::apiFor(
+    SubsystemIdx id) const noexcept {
+  for (const auto& api : subsystem_apis_) {
+    if (api->subsystemId() == id) {
+      return api.get();
+    }
+  }
+  return nullptr;
+}
+
+double GlobalNewtonIpcSolver::evaluateSubsystemObjectiveAndUpdateGeometry(
+    SimulationContext& simulation, double dt) {
+  KSK_PROFILE_SCOPE("GlobalSolver/EvaluateObjective/Subsystems");
+  double result = 0.0;
+  DofBuffer& q = simulation.q();
+  DofBuffer& qdot = simulation.qdot();
+  const auto& subsystems = simulation.subsystems();
+  const size_t count = std::min(subsystems.size(), subsystem_apis_.size());
+  for (size_t i = 0; i < count; ++i) {
+    const DofRange range = subsystems[i]->dofRange();
+    {
+      KSK_PROFILE_SCOPE("GlobalSolver/EvaluateObjective/ReadSubsystemState");
+      subsystems[i]->readState(q.slice(range), qdot.slice(range));
+    }
+    {
+      KSK_PROFILE_SCOPE("GlobalSolver/EvaluateObjective/SubsystemObjective");
+      result += subsystem_apis_[i]->evaluateObjective(q.slice(range),
+                                                      qdot.slice(range), dt);
+    }
+    {
+      KSK_PROFILE_SCOPE("GlobalSolver/EvaluateObjective/UpdateGeometry");
+      subsystems[i]->updateGeometry(simulation.scene().geometry);
+    }
+  }
+  return result;
+}
+
+RuntimeStepResult GlobalNewtonIpcSolver::step(
     SimulationContext& simulation, double dt, double time,
     GlobalSolverStatsCollector* stats) {
   KSK_PROFILE_SCOPE_COLOR("GlobalSolver/Step",
@@ -354,10 +429,15 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
   }
 #endif
 
-  {
-    KSK_PROFILE_SCOPE("GlobalSolver/Step/Prepare");
-    prepare(simulation.scene());
+  // Re-prepare the cached Newton IPC API adapters whenever the subsystem list
+  // changed (e.g. after a scene rebuild).
+  if (subsystem_apis_.size() != simulation.subsystems().size()) {
+    prepare(simulation);
   }
+
+  scalar_count_ = simulation.scene().dofs.totalScalars;
+  geometry_point_count_ =
+      static_cast<int>(simulation.scene().geometry.pointCount());
 
   DofBuffer& q = simulation.q();
   DofBuffer& qdot = simulation.qdot();
@@ -374,7 +454,8 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
   }
 
   RuntimeStepResult result;
-  const GlobalSolverConfig& config = simulation.scene().solverConfig;
+  const GlobalSolverConfig& config = *simulation.scene().solverConfig;
+  const NewtonIpcSolverConfig& newton_config = *requireNewtonConfig(simulation);
   const int scalar_count = simulation.scene().dofs.totalScalars;
 
   if (stats) {
@@ -389,7 +470,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
     simulation.scene().frictionContacts.clear();
   } else {
     contact_detector_.rebuildActiveContacts(
-        simulation, config.enableFriction);
+        simulation, subsystem_apis_, config.enableFriction);
     rebuildFrictionReferenceContacts(simulation);
   }
 
@@ -412,7 +493,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
       direction = createDofBufferLike(q, scalar_count);
     }
 
-    if (config.enablePCGWarmStart && previous_newton_direction) {
+    if (newton_config.enablePCGWarmStart && previous_newton_direction) {
       KSK_PROFILE_SCOPE("GlobalSolver/Step/NewtonIteration/WarmStartDirection");
       direction.copyFrom(*previous_newton_direction);
       KSK_ADD_FRAME_STAT(stats, "pcg.warm_start.available.count", 1);
@@ -423,10 +504,13 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
     {
       KSK_PROFILE_SCOPE(
           "GlobalSolver/Step/NewtonIteration/UpdateSubsystemStates");
+      for (const auto& api : subsystem_apis_) {
+        const DofRange range = api->dofRange();
+        api->updateInternalConstraints(time + dt, dt);
+      }
       for (const auto& subsystem : subsystems) {
         const DofRange range = subsystem->dofRange();
         subsystem->readState(q.slice(range), qdot.slice(range));
-        subsystem->updateInternalConstraints(time + dt, dt);
         subsystem->updateGeometry(simulation.scene().geometry);
       }
     }
@@ -434,24 +518,24 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
     if (config.enableContact) {
       KSK_PROFILE_SCOPE(
           "GlobalSolver/Step/NewtonIteration/RebuildActiveContacts");
-      contact_detector_.rebuildActiveContacts(simulation);
+      contact_detector_.rebuildActiveContacts(simulation, subsystem_apis_);
     } else
       simulation.scene().contacts.clear();
 
     {
       KSK_PROFILE_SCOPE(
           "GlobalSolver/Step/NewtonIteration/AssembleLocal");  // NOLINT(*-reserved-identifier)
-      for (const auto& subsystem : subsystems) {
-        const DofRange range = subsystem->dofRange();
+      for (const auto& api : subsystem_apis_) {
+        const DofRange range = api->dofRange();
         {
           KSK_PROFILE_SCOPE(
               "GlobalSolver/Step/NewtonIteration/PrepareLocalOperator");
-          subsystem->prepareLocalOperator(dt);
+          api->prepareLocalOperator(dt);
         }
         {
           KSK_PROFILE_SCOPE(
               "GlobalSolver/Step/NewtonIteration/AssembleLocalGradient");
-          subsystem->assembleLocalGradient(gradient.slice(range));
+          api->assembleLocalGradient(gradient.slice(range));
         }
       }
     }
@@ -529,7 +613,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
         KSK_PROFILE_SCOPE(
             "GlobalSolver/Step/NewtonIteration/"
             "RebuildActiveContactsForObjectiveBefore");
-        contact_detector_.rebuildActiveContacts(simulation);
+        contact_detector_.rebuildActiveContacts(simulation, subsystem_apis_);
       }
 
       if (config.enableContact) {
@@ -579,7 +663,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
       objective_before =
           evaluateSubsystemObjectiveAndUpdateGeometry(simulation, dt);
       if (config.enableContact) {
-        contact_detector_.rebuildActiveContacts(simulation);
+        contact_detector_.rebuildActiveContacts(simulation, subsystem_apis_);
       } else {
         simulation.scene().contacts.clear();
       }
@@ -602,7 +686,8 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
         KSK_PROFILE_SCOPE(
             "GlobalSolver/Step/NewtonIteration/ContactCcdDirectionSearch");
         ccd_step_bound =
-            contact_detector_.computeCCDStepBound(simulation, direction);
+            contact_detector_.computeCCDStepBound(simulation, direction,
+                                                  subsystem_apis_);
       }
       KSK_AVERAGE_FRAME_STAT(stats, "newton.ccd_step_upper_bound.average",
                              ccd_step_bound);
@@ -632,7 +717,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
         q.assignLinearCombination(q_before, 1.0, direction);
         synchronizeGeometryFromState(simulation);
         if (config.enableContact) {
-          contact_detector_.rebuildActiveContacts(simulation);
+          contact_detector_.rebuildActiveContacts(simulation, subsystem_apis_);
         } else {
           simulation.scene().contacts.clear();
         }
@@ -659,7 +744,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
         q.copyFrom(q_before);
         synchronizeGeometryFromState(simulation);
         if (config.enableContact) {
-          contact_detector_.rebuildActiveContacts(simulation);
+          contact_detector_.rebuildActiveContacts(simulation, subsystem_apis_);
         } else {
           simulation.scene().contacts.clear();
         }
@@ -676,7 +761,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
     {
       KSK_PROFILE_SCOPE("GlobalSolver/Step/NewtonIteration/LineSearchSetup");
       const double ccd_step_scale =
-          std::clamp(config.ccdStepSizeScale, 0.0, 1.0);
+          std::clamp(newton_config.ccdStepSizeScale, 0.0, 1.0);
       const double ccd_step_limit =
           std::clamp(ccd_step_bound, 0.0, 1.0);
       alpha = ccd_step_limit * ccd_step_scale;
@@ -690,7 +775,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
         q.copyFrom(q_before);
         synchronizeGeometryFromState(simulation);
         if (config.enableContact) {
-          contact_detector_.rebuildActiveContacts(simulation);
+          contact_detector_.rebuildActiveContacts(simulation, subsystem_apis_);
         } else {
           simulation.scene().contacts.clear();
         }
@@ -703,7 +788,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
 
     bool accepted = false;
     int line_search_attempts = 0;
-    for (int line_search = 0; line_search < config.maxLineSearchIterations;
+    for (int line_search = 0; line_search < newton_config.maxLineSearchIterations;
          line_search++) {
       KSK_PROFILE_SCOPE(
           "GlobalSolver/Step/NewtonIteration/LineSearchIteration");
@@ -730,7 +815,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
         KSK_PROFILE_SCOPE(
             "GlobalSolver/Step/NewtonIteration/LineSearch/"
             "RebuildActiveContacts");
-        contact_detector_.rebuildActiveContacts(simulation);
+        contact_detector_.rebuildActiveContacts(simulation, subsystem_apis_);
       } else {
         simulation.scene().contacts.clear();
       }
@@ -754,7 +839,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
         // Trial contact sets are rebuilt, so contact objectives use GIPC-style
         // monotone decrease instead of an Armijo slope from the previous set.
         const double armijo =
-            config.enableContact ? 0.0 : config.lineSearchArmijo;
+            config.enableContact ? 0.0 : newton_config.lineSearchArmijo;
         const double armijo_rhs =
             objective_before + armijo * alpha * directional_derivative;
         line_search_attempts = line_search + 1;
@@ -782,7 +867,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
         q.copyFrom(q_before);
         synchronizeGeometryFromState(simulation);
         if (config.enableContact)
-          contact_detector_.rebuildActiveContacts(simulation);
+          contact_detector_.rebuildActiveContacts(simulation, subsystem_apis_);
         else
           simulation.scene().contacts.clear();
       }
@@ -796,7 +881,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
       result.finalStepNorm = alpha * direction_norm;
     }
 
-    if (config.enablePCGWarmStart) {
+    if (newton_config.enablePCGWarmStart) {
       KSK_PROFILE_SCOPE("GlobalSolver/Step/NewtonIteration/SaveWarmStart");
       previous_newton_direction = direction.clone();
     }
@@ -826,71 +911,19 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(
         result.terminationReason, result.iterations, result.finalGradientNorm,
         result.finalStepNorm, dt, simulation.scene().contacts.size(),
         simulation.scene().frictionContacts.size(),
-        solveModeName(simulation.scene().solverConfig.solveMode), scalar_count,
+        solveModeName(simulation.scene().solverConfig->solveMode), scalar_count,
         geometry_point_count_);
   }
 
   return result;
 }
 
-double GlobalGaussNewtonSolver::evaluateObjective(SimulationContext& simulation,
-                                                  double dt) {
-  return evaluateObjectiveAndUpdateGeometry(simulation, dt);
-}
-
-namespace {
-double evaluateSubsystemObjectiveAndUpdateGeometry(SimulationContext& simulation,
-                                                   double dt) {
-  KSK_PROFILE_SCOPE("GlobalSolver/EvaluateObjective/Subsystems");
-  double result = 0.0;
-  DofBuffer& q = simulation.q();
-  DofBuffer& qdot = simulation.qdot();
-  for (const auto& subsystem : simulation.subsystems()) {
-    const DofRange range = subsystem->dofRange();
-    {
-      KSK_PROFILE_SCOPE("GlobalSolver/EvaluateObjective/ReadSubsystemState");
-      subsystem->readState(q.slice(range), qdot.slice(range));
-    }
-    {
-      KSK_PROFILE_SCOPE("GlobalSolver/EvaluateObjective/SubsystemObjective");
-      result += subsystem->evaluateObjective(q.slice(range), qdot.slice(range),
-                                             dt);
-    }
-    {
-      KSK_PROFILE_SCOPE("GlobalSolver/EvaluateObjective/UpdateGeometry");
-      subsystem->updateGeometry(simulation.scene().geometry);
-    }
-  }
-  return result;
-}
-
-double evaluateObjectiveAndUpdateGeometry(SimulationContext& simulation,
-                                          double dt) {
-  KSK_PROFILE_SCOPE_COLOR("GlobalSolver/EvaluateObjective",
-                          ksk::core::profiler_colors::kPurple);
-  double result = evaluateSubsystemObjectiveAndUpdateGeometry(simulation, dt);
-  if (simulation.scene().solverConfig.enableContact) {
-    KSK_PROFILE_SCOPE("GlobalSolver/EvaluateObjective/ContactEnergy");
-    result += computeContactEnergy(simulation.scene().geometry,
-                                   simulation.scene().contacts);
-  }
-  if (simulation.scene().solverConfig.enableContact &&
-      simulation.scene().solverConfig.enableFriction &&
-      !simulation.scene().frictionContacts.empty()) {
-    KSK_PROFILE_SCOPE("GlobalSolver/EvaluateObjective/ContactFrictionEnergy");
-    result += computeContactFrictionEnergy(simulation.scene().geometry,
-                                           simulation.scene().frictionContacts);
-  }
-  return result;
-}
-}  // namespace
-
-void GlobalGaussNewtonSolver::assembleContactGradient(
+void GlobalNewtonIpcSolver::assembleContactGradient(
     SimulationContext& simulation, DofBuffer& gradient) {
   KSK_PROFILE_SCOPE_COLOR("GlobalSolver/AssembleContactGradient",
                           ksk::core::profiler_colors::kRed);
   const ContactStencils& contacts = simulation.scene().contacts;
-  if (!simulation.scene().solverConfig.enableContact) {
+  if (!simulation.scene().solverConfig->enableContact) {
     return;
   }
   if (contacts.empty()) {
@@ -908,11 +941,11 @@ void GlobalGaussNewtonSolver::assembleContactGradient(
     return;
   }
 
-  for (const auto& subsystem : simulation.subsystems()) {
+  for (const auto& api : subsystem_apis_) {
     KSK_PROFILE_SCOPE("GlobalSolver/AssembleContactGradient/ScatterSubsystem");
     std::vector<PointIdx> points;
     std::vector<glm::dvec3> point_gradient;
-    auto subsystem_id = subsystem->id();
+    const SubsystemIdx subsystem_id = api->subsystemId();
 
     for (int i = 0; i < contact_gradient.points.size(); i++) {
       const PointIdx point = contact_gradient.points[i];
@@ -927,20 +960,20 @@ void GlobalGaussNewtonSolver::assembleContactGradient(
     if (points.empty()) {
       continue;
     }
-    subsystem->scatterContactGradient(
+    api->scatterContactGradient(
         points,
         GeometryBuffer::FromCPU(std::move(point_gradient)).view().asConst(),
-        gradient.slice(subsystem->dofRange()));
+        gradient.slice(api->dofRange()));
   }
 }
 
-void GlobalGaussNewtonSolver::assembleContactFrictionGradient(
+void GlobalNewtonIpcSolver::assembleContactFrictionGradient(
     SimulationContext& simulation, DofBuffer& gradient) {
   KSK_PROFILE_SCOPE_COLOR("GlobalSolver/AssembleContactFrictionGradient",
                           ksk::core::profiler_colors::kRed);
   const FrictionContactStencils& contacts = simulation.scene().frictionContacts;
-  if (!simulation.scene().solverConfig.enableContact ||
-      !simulation.scene().solverConfig.enableFriction) {
+  if (!simulation.scene().solverConfig->enableContact ||
+      !simulation.scene().solverConfig->enableFriction) {
     return;
   }
   if (contacts.empty()) {
@@ -959,12 +992,12 @@ void GlobalGaussNewtonSolver::assembleContactFrictionGradient(
     return;
   }
 
-  for (const auto& subsystem : simulation.subsystems()) {
+  for (const auto& api : subsystem_apis_) {
     KSK_PROFILE_SCOPE(
         "GlobalSolver/AssembleContactFrictionGradient/ScatterSubsystem");
     std::vector<PointIdx> points;
     std::vector<glm::dvec3> point_gradient;
-    auto subsystem_id = subsystem->id();
+    const SubsystemIdx subsystem_id = api->subsystemId();
 
     for (int i = 0; i < friction_gradient.points.size(); i++) {
       const PointIdx point = friction_gradient.points[i];
@@ -979,20 +1012,20 @@ void GlobalGaussNewtonSolver::assembleContactFrictionGradient(
     if (points.empty()) {
       continue;
     }
-    subsystem->scatterContactGradient(
+    api->scatterContactGradient(
         points,
         GeometryBuffer::FromCPU(std::move(point_gradient)).view().asConst(),
-        gradient.slice(subsystem->dofRange()));
+        gradient.slice(api->dofRange()));
   }
 }
 
-bool GlobalGaussNewtonSolver::solveNewtonDirection(
+bool GlobalNewtonIpcSolver::solveNewtonDirection(
     SimulationContext& simulation, const DofBuffer& gradient,
     DofBuffer& direction, GlobalSolverStatsCollector* stats,
     const ContactGeometryHessian* contactHessian, std::string* failureReason) {
   KSK_PROFILE_SCOPE_COLOR("GlobalSolver/SolveNewtonDirection",
                           ksk::core::profiler_colors::kBlue);
-  const GlobalSolverConfig& config = simulation.scene().solverConfig;
+  const GlobalSolverConfig& config = *simulation.scene().solverConfig;
   const int scalar_count = simulation.scene().dofs.totalScalars;
   if (scalar_count == 0) {
     direction.setZero();
@@ -1000,15 +1033,15 @@ bool GlobalGaussNewtonSolver::solveNewtonDirection(
     return true;
   }
 
-  const GlobalSolveMode solve_mode = config.solveMode;
+  const LinearSolveMode solve_mode = config.solveMode;
   KSK_ADD_FRAME_STAT(
       stats, std::string("solve.mode.") + solveModeName(solve_mode) + ".count",
       1);
   switch (solve_mode) {
-    case GlobalSolveMode::Decoupled:
+    case LinearSolveMode::Decoupled:
       return solveDecoupledDirection(simulation, gradient, direction, stats,
                                      contactHessian, failureReason);
-    case GlobalSolveMode::Coupled: {
+    case LinearSolveMode::Coupled: {
       std::string coupled_failure_reason;
       const bool solved =
           solveCoupledDirection(simulation, gradient, direction, stats,
@@ -1032,13 +1065,14 @@ bool GlobalGaussNewtonSolver::solveNewtonDirection(
   return false;
 }
 
-bool GlobalGaussNewtonSolver::solveDecoupledDirection(
+bool GlobalNewtonIpcSolver::solveDecoupledDirection(
     SimulationContext& simulation, const DofBuffer& gradient,
     DofBuffer& direction, GlobalSolverStatsCollector* stats,
     const ContactGeometryHessian* contactHessian, std::string* failureReason) {
   KSK_PROFILE_SCOPE_COLOR("GlobalSolver/SolveDecoupledDirection",
                           ksk::core::profiler_colors::kBlue);
-  const GlobalSolverConfig& config = simulation.scene().solverConfig;
+  const GlobalSolverConfig& config = *simulation.scene().solverConfig;
+  const NewtonIpcSolverConfig& newton_config = *requireNewtonConfig(simulation);
   const int scalar_count = simulation.scene().dofs.totalScalars;
 
   if (!config.enableContact ||
@@ -1061,7 +1095,7 @@ bool GlobalGaussNewtonSolver::solveDecoupledDirection(
         "GlobalSolver/SolveDecoupledDirection/InitializePcgDirection");
     initial_direction_norm = direction.norm();
     use_warm_start =
-        config.enablePCGWarmStart && std::isfinite(initial_direction_norm) &&
+        newton_config.enablePCGWarmStart && std::isfinite(initial_direction_norm) &&
         initial_direction_norm > 0.0;
   }
 
@@ -1112,7 +1146,7 @@ bool GlobalGaussNewtonSolver::solveDecoupledDirection(
     return true;
   }
 
-  const double tolerance = config.pcgTolerance * std::max(1.0, rhs_norm);
+  const double tolerance = newton_config.pcgTolerance * std::max(1.0, rhs_norm);
   if (initial_residual_norm <= tolerance) {
     KSK_AVERAGE_FRAME_STAT(stats, "pcg.iterations.average", 0);
     KSK_AVERAGE_FRAME_STAT(stats, "pcg.final_residual_norm.average",
@@ -1157,7 +1191,7 @@ bool GlobalGaussNewtonSolver::solveDecoupledDirection(
     verification.addScaled(1.0, gradient);
   };
 
-  for (int iteration = 0; iteration < config.maxPcgIterations; ++iteration) {
+  for (int iteration = 0; iteration < newton_config.maxPcgIterations; ++iteration) {
     KSK_PROFILE_SCOPE("GlobalSolver/SolveNewtonDirection/PcgIteration");
     {
       KSK_PROFILE_SCOPE(
@@ -1243,13 +1277,14 @@ bool GlobalGaussNewtonSolver::solveDecoupledDirection(
   return converged;
 }
 
-bool GlobalGaussNewtonSolver::solveCoupledDirection(
+bool GlobalNewtonIpcSolver::solveCoupledDirection(
     SimulationContext& simulation, const DofBuffer& gradient,
     DofBuffer& direction, GlobalSolverStatsCollector* stats,
     const ContactGeometryHessian* contactHessian, std::string* failureReason) {
   KSK_PROFILE_SCOPE_COLOR("GlobalSolver/SolveCoupledDirection",
                           ksk::core::profiler_colors::kPurple);
-  const GlobalSolverConfig& config = simulation.scene().solverConfig;
+  const GlobalSolverConfig& config = *simulation.scene().solverConfig;
+  const NewtonIpcSolverConfig& newton_config = *requireNewtonConfig(simulation);
   const int scalar_count = simulation.scene().dofs.totalScalars;
   if (!gradient.isCPU() || !direction.isCPU()) {
     if (failureReason != nullptr) {
@@ -1270,8 +1305,8 @@ bool GlobalGaussNewtonSolver::solveCoupledDirection(
   {
     KSK_PROFILE_SCOPE(
         "GlobalSolver/SolveCoupledDirection/AppendLocalMatrixEntries");
-    for (const auto& subsystem : simulation.subsystems()) {
-      subsystem->appendLocalMatrixEntries(local_entries);
+    for (const auto& api : subsystem_apis_) {
+      api->appendLocalMatrixEntries(local_entries);
     }
   }
   triplets.reserve(local_entries.size() +
@@ -1302,7 +1337,7 @@ bool GlobalGaussNewtonSolver::solveCoupledDirection(
     }
   }
   for (int i = 0; i < scalar_count; ++i) {
-    triplets.emplace_back(i, i, config.coupledDiagonalRegularization);
+    triplets.emplace_back(i, i, newton_config.coupledDiagonalRegularization);
   }
 
   SparseMatrix matrix;
@@ -1346,7 +1381,7 @@ bool GlobalGaussNewtonSolver::solveCoupledDirection(
   return std::isfinite(direction.norm());
 }
 
-bool GlobalGaussNewtonSolver::solveSingleSubsystemDirection(
+bool GlobalNewtonIpcSolver::solveSingleSubsystemDirection(
     SimulationContext& simulation, const DofBuffer& gradient,
     DofBuffer& direction) {
   KSK_PROFILE_SCOPE("GlobalSolver/SolveSingleSubsystemDirection");
@@ -1369,12 +1404,15 @@ bool GlobalGaussNewtonSolver::solveSingleSubsystemDirection(
     return true;
   }
 
-  const DofRange range = simulation.subsystems().front()->dofRange();
+  if (subsystem_apis_.empty()) {
+    return false;
+  }
+  const DofRange range = subsystem_apis_.front()->dofRange();
   {
     KSK_PROFILE_SCOPE(
         "GlobalSolver/SolveSingleSubsystemDirection/SolveLocalSystem");
-    simulation.subsystems().front()->solveLocalSystem(residual.slice(range),
-                                                      direction.slice(range));
+    subsystem_apis_.front()->solveLocalSystem(residual.slice(range),
+                                              direction.slice(range));
   }
   {
     KSK_PROFILE_SCOPE(
@@ -1383,7 +1421,7 @@ bool GlobalGaussNewtonSolver::solveSingleSubsystemDirection(
   }
 }
 
-bool GlobalGaussNewtonSolver::solveBlockDiagonalSubsystemDirection(
+bool GlobalNewtonIpcSolver::solveBlockDiagonalSubsystemDirection(
     SimulationContext& simulation, const DofBuffer& gradient,
     DofBuffer& direction) {
   KSK_PROFILE_SCOPE("GlobalSolver/SolveBlockDiagonalSubsystemDirection");
@@ -1410,10 +1448,9 @@ bool GlobalGaussNewtonSolver::solveBlockDiagonalSubsystemDirection(
   {
     KSK_PROFILE_SCOPE(
         "GlobalSolver/SolveBlockDiagonalSubsystemDirection/SolveLocalSystems");
-    for (const auto& subsystem : simulation.subsystems()) {
-      const DofRange range = subsystem->dofRange();
-      subsystem->solveLocalSystem(residual.slice(range),
-                                  direction.slice(range));
+    for (const auto& api : subsystem_apis_) {
+      const DofRange range = api->dofRange();
+      api->solveLocalSystem(residual.slice(range), direction.slice(range));
     }
   }
 
@@ -1424,7 +1461,7 @@ bool GlobalGaussNewtonSolver::solveBlockDiagonalSubsystemDirection(
   }
 }
 
-void GlobalGaussNewtonSolver::applyGlobalMatrix(
+void GlobalNewtonIpcSolver::applyGlobalMatrix(
     SimulationContext& simulation, const DofBuffer& x, DofBuffer& y,
     const ContactGeometryHessian* contactHessian) {
   KSK_PROFILE_SCOPE_COLOR("GlobalSolver/ApplyGlobalMatrix",
@@ -1433,25 +1470,25 @@ void GlobalGaussNewtonSolver::applyGlobalMatrix(
     KSK_PROFILE_SCOPE("GlobalSolver/ApplyGlobalMatrix/SetZero");
     y.setZero();
   }
-  for (const auto& subsystem : simulation.subsystems()) {
+  for (const auto& api : subsystem_apis_) {
     KSK_PROFILE_SCOPE("GlobalSolver/ApplyGlobalMatrix/ApplyLocalMatrix");
-    const DofRange range = subsystem->dofRange();
-    subsystem->applyLocalMatrix(x.slice(range), y.slice(range));
+    const DofRange range = api->dofRange();
+    api->applyLocalMatrix(x.slice(range), y.slice(range));
   }
 
   const ContactStencils& contacts = simulation.scene().contacts;
   const FrictionContactStencils& friction_contacts =
       simulation.scene().frictionContacts;
-  if (simulation.scene().solverConfig.enableContact &&
+  if (simulation.scene().solverConfig->enableContact &&
       (!contacts.empty() ||
-       (simulation.scene().solverConfig.enableFriction &&
+       (simulation.scene().solverConfig->enableFriction &&
         !friction_contacts.empty()))) {
     KSK_PROFILE_SCOPE("GlobalSolver/ApplyGlobalMatrix/ApplyContactHessian");
     applyGlobalContactHessian(simulation, x, y, contactHessian);
   }
 }
 
-void GlobalGaussNewtonSolver::applyGlobalContactHessian(
+void GlobalNewtonIpcSolver::applyGlobalContactHessian(
     SimulationContext& simulation, const DofBuffer& x, DofBuffer& y,
     const ContactGeometryHessian* contactHessian) {
   KSK_PROFILE_SCOPE_COLOR("GlobalSolver/ApplyGlobalContactHessian",
@@ -1459,11 +1496,11 @@ void GlobalGaussNewtonSolver::applyGlobalContactHessian(
   const ContactStencils& contacts = simulation.scene().contacts;
   const FrictionContactStencils& friction_contacts =
       simulation.scene().frictionContacts;
-  if (!simulation.scene().solverConfig.enableContact) {
+  if (!simulation.scene().solverConfig->enableContact) {
     return;
   }
   if (contacts.empty() &&
-      (!simulation.scene().solverConfig.enableFriction ||
+      (!simulation.scene().solverConfig->enableFriction ||
        friction_contacts.empty())) {
     return;
   }
@@ -1475,11 +1512,11 @@ void GlobalGaussNewtonSolver::applyGlobalContactHessian(
     geometry_direction = createGeometryDirectionBuffer(
         x, simulation.scene().geometry.pointCount());
   }
-  for (const auto& subsystem : simulation.subsystems()) {
+  for (const auto& api : subsystem_apis_) {
     KSK_PROFILE_SCOPE(
         "GlobalSolver/ApplyGlobalContactHessian/MapDirectionToGeometry");
-    subsystem->mapLocalDirectionToGeometry(x.slice(subsystem->dofRange()),
-                                           geometry_direction.view());
+    api->mapLocalDirectionToGeometry(x.slice(api->dofRange()),
+                                     geometry_direction.view());
   }
 
   struct ContactProductBucket {
@@ -1488,7 +1525,7 @@ void GlobalGaussNewtonSolver::applyGlobalContactHessian(
   };
 
   std::vector<ContactProductBucket> product_buckets(
-      simulation.subsystems().size());
+      subsystem_apis_.size());
 
   if (contactHessian != nullptr) {
     KSK_PROFILE_SCOPE(
@@ -1552,7 +1589,7 @@ void GlobalGaussNewtonSolver::applyGlobalContactHessian(
           geometry_direction.view().asConst());
     }
     ContactPotentialGradient friction_hessian_product;
-    if (simulation.scene().solverConfig.enableFriction) {
+    if (simulation.scene().solverConfig->enableFriction) {
       KSK_PROFILE_SCOPE(
           "GlobalSolver/ApplyGlobalContactHessian/"
           "ComputeGeometryFrictionHessianProduct");
@@ -1603,36 +1640,36 @@ void GlobalGaussNewtonSolver::applyGlobalContactHessian(
     }
   }
 
-  for (const auto& subsystem : simulation.subsystems()) {
+  for (const auto& api : subsystem_apis_) {
     KSK_PROFILE_SCOPE(
         "GlobalSolver/ApplyGlobalContactHessian/ScatterSubsystem");
-    const auto subsystem_id = static_cast<size_t>(subsystem->id());
+    const auto subsystem_id = static_cast<size_t>(api->subsystemId());
     assert(subsystem_id < product_buckets.size());
     auto& bucket = product_buckets[subsystem_id];
 
     if (bucket.points.empty()) {
       continue;
     }
-    subsystem->applyContactGeometryHessianProduct(
+    api->applyContactGeometryHessianProduct(
         bucket.points,
         GeometryBuffer::FromCPU(std::move(bucket.values)).view().asConst(),
-        y.slice(subsystem->dofRange()));
+        y.slice(api->dofRange()));
   }
 }
 
-void GlobalGaussNewtonSolver::applyPreconditioner(SimulationContext& simulation,
-                                                  const DofBuffer& residual,
-                                                  DofBuffer& z) {
+void GlobalNewtonIpcSolver::applyPreconditioner(SimulationContext& simulation,
+                                                const DofBuffer& residual,
+                                                DofBuffer& z) {
   KSK_PROFILE_SCOPE_COLOR("GlobalSolver/ApplyPreconditioner",
                           ksk::core::profiler_colors::kGreen);
   {
     KSK_PROFILE_SCOPE("GlobalSolver/ApplyPreconditioner/SetZero");
     z.setZero();
   }
-  for (const auto& subsystem : simulation.subsystems()) {
+  for (const auto& api : subsystem_apis_) {
     KSK_PROFILE_SCOPE("GlobalSolver/ApplyPreconditioner/SolveLocalSystem");
-    const DofRange range = subsystem->dofRange();
-    subsystem->solveLocalSystem(residual.slice(range), z.slice(range));
+    const DofRange range = api->dofRange();
+    api->solveLocalSystem(residual.slice(range), z.slice(range));
   }
 }
 
@@ -1645,7 +1682,17 @@ RuntimeStepResult SimulationRunner::step(GlobalSolverStatsCollector* stats) {
                           ksk::core::profiler_colors::kBlue);
   {
     KSK_PROFILE_SCOPE("SimulationRunner/Step/SolverStep");
-    last_step_ = solver_.step(simulation_, time_step_, time_, stats);
+    const GlobalSolverType solver_type =
+        simulation_.scene().solverConfig->solverType;
+    switch (solver_type) {
+      case GlobalSolverType::NewtonIPC:
+        last_step_ =
+            newton_solver_.step(simulation_, time_step_, time_, stats);
+        break;
+      case GlobalSolverType::ProjectiveDynamics:
+        last_step_ = pd_solver_.step(simulation_, time_step_, time_, stats);
+        break;
+    }
   }
   {
     KSK_PROFILE_SCOPE("SimulationRunner/Step/AdvanceCounters");

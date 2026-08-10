@@ -3,12 +3,12 @@
 //
 
 #pragma once
-#include <Deform/types.h>
-#include <Deform/deformation-gradient.h>
+#include <Engine/Deform/types.h>
+#include <Engine/Deform/deformation-gradient.h>
 #include <Core/properties.h>
 #include <Maths/tensor.h>
 #include <Maths/linalg-utils.h>
-namespace ksk::deform {
+namespace ksk::engine::deform {
 template<typename T>
 struct EigenMatrixSigmas : core::NonCopyable {
   std::array<Matrix<T, 3, 3>, 3> eigenMatrixSigmas;
